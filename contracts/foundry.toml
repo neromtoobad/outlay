@@ -1,0 +1,13 @@
+[profile.default]
+src = "src"
+test = "test"
+out = "out"
+cache_path = "cache"
+solc_version = "0.8.26"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 500
+
+[rpc_endpoints]
+arc = "https://rpc.mainnet.arc.io"
+arc_testnet = "https://rpc.testnet.arc.io"
