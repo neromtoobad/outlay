@@ -37,7 +37,9 @@ const LAMPS = [984, 1324, 1650, 2034, 2360, 2686];
 
 const STAND = 0.9, BEHIND = 0.86, SEATED = 0.72, CFO_SCALE = 0.9;
 const SEAT_Y = DESK.top + 22; // seated sprites are drawn behind the desk; the desk front hides the rest
-const SPEED = 470; // world units / second
+const SPEED = 330; // world units / second: a brisk walk for a ~316-unit-tall person
+const STEP = 128; // ground covered by one step of a ~316-unit-tall person; cycles advance by distance so feet do not slide
+const CYCLE_STEPS: Record<string, number> = { 'messenger-carry': 4 }; // steps drawn in each 8-frame sheet (default 2)
 const WF = { idle: 0, walkA: 1, walkB: 2, type: 3, cheer: 4, sad: 5, box: 6, coin: 7 };
 const CF = { idle: 0, walkA: 1, walkB: 2, talk: 3, stamp: 4, stern: 5, thumbs: 6, deny: 7 };
 const SERVICE: Record<string, string> = { 'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List' };
@@ -81,6 +83,18 @@ async function loadFrames(id: string): Promise<Frames> {
   const tex = await Promise.all(meta.frames.map((f: any) => PIXI.Assets.load(`/sprites/${id}/${f.file}`)));
   return { meta, tex };
 }
+/** A side-view walk cycle (frames face RIGHT), scaled to the character's standing height. */
+type Cycle = { tex: PIXI.Texture[]; anchorX: number; k: number; dist: number };
+const bboxH = (f: any) => f.bbox[3] - f.bbox[1];
+async function loadCycle(id: string, base: Frames): Promise<Cycle | undefined> {
+  try {
+    const r = await fetch(`/sprites/${id}/${id}.json`); if (!r.ok) return undefined;
+    const meta = await r.json();
+    const tex = await Promise.all(meta.frames.map((f: any) => PIXI.Assets.load(`/sprites/${id}/${f.file}`)));
+    const hc = meta.frames.reduce((a: number, f: any) => a + bboxH(f), 0) / meta.frames.length;
+    return { tex, anchorX: meta.anchor.x, k: bboxH(base.meta.frames[0]) / hc, dist: STEP * (CYCLE_STEPS[id] ?? 2) };
+  } catch { return undefined; }
+}
 
 // ------------------------------------------------------------------ an agent
 class Actor {
@@ -91,7 +105,9 @@ class Actor {
   scale: number;
   facing = 1;
   frame = 0;
-  mode: 'seat' | 'behind' | 'stand' | 'walk' | 'carry' = 'stand';
+  mode: 'seat' | 'behind' | 'stand' | 'walk' | 'carry' | 'carryStand' = 'stand';
+  cycles: { walk?: Cycle; carry?: Cycle } = {};
+  private shown: PIXI.Texture | null = null;
   hold: number | null = null; // pose override frame
   walked = 0;
   busyUntil = 0;
@@ -112,6 +128,7 @@ class Actor {
   update(t: number) {
     const F = this.F;
     let frame = F.idle, dy = 0, sy = 1, sx = 1, rot = 0;
+    let cyc: Cycle | undefined, cf = 0;
     const ph = this.pos.x * 0.013;
     switch (this.mode) {
       case 'seat':
@@ -119,19 +136,35 @@ class Actor {
         if (this.busy) dy = Math.sin(t * 9 + ph) > 0.55 ? -2.5 : 0; else sy = 1 + 0.008 * Math.sin(t * 1.6 + ph);
         break;
       case 'walk': case 'carry': {
-        const step = Math.floor(this.walked / 70) % 2;
-        frame = this.mode === 'carry' ? F.box : step ? F.walkA : F.walkB;
-        dy = -Math.abs(Math.sin((this.walked / 70) * Math.PI)) * 7;
+        cyc = this.mode === 'carry' ? this.cycles.carry : this.cycles.walk;
+        if (cyc) {
+          // side-view cycle: the frame is picked by distance walked, so each step lands where the foot is
+          cf = Math.floor((this.walked / cyc.dist) * cyc.tex.length) % cyc.tex.length;
+        } else {
+          // no side-view art: a four-beat stride (step, pass, step, pass) with a bob on each step
+          const beat = Math.floor(this.walked / 62) % 4;
+          frame = this.mode === 'carry' ? F.box : [F.walkA, F.idle, F.walkB, F.idle][beat];
+          dy = -Math.abs(Math.sin((this.walked / 62) * (Math.PI / 2))) * 6;
+          rot = this.mode === 'carry' ? 0.025 * Math.sin((this.walked / 62) * Math.PI) : 0;
+        }
         break;
       }
+      case 'carryStand':
+        cyc = this.cycles.carry; cf = 1; // the passing pose: feet together, box held
+        if (!cyc) frame = F.box;
+        sy = 1 + 0.008 * Math.sin(t * 1.6 + ph);
+        break;
       default: sy = 1 + 0.01 * Math.sin(t * 1.4 + ph);
     }
     if (this.hold != null) frame = this.hold;
     if (this.hold === F.cheer) { const hop = Math.abs(Math.sin(t * 7 + ph)); dy = -hop * 22; sy = 1 + hop * 0.05; sx = 1 - hop * 0.03; }
     if (this.hold === F.sad) sy = 1 - 0.015 * Math.sin(t * 2 + ph);
     if (this.id === 'cfo' && this.hold === F.deny) rot = 0.05 * Math.sin(t * 20);
-    if (frame !== this.frame) { this.frame = frame; this.sprite.texture = this.c.tex[frame]; }
-    this.sprite.scale.set(this.scale * sx * this.facing, this.scale * sy);
+    let k = 1, dir = this.facing;
+    const tex = cyc && this.hold == null ? cyc.tex[cf] : this.c.tex[frame];
+    if (cyc && this.hold == null) { k = cyc.k; dir = -this.facing; } // cycles face right; base art faces left
+    if (tex !== this.shown) { this.shown = tex; this.frame = frame; this.sprite.texture = tex; this.sprite.anchor.set(cyc && this.hold == null ? cyc.anchorX : this.c.meta.anchor.x, 1); }
+    this.sprite.scale.set(this.scale * k * sx * dir, this.scale * k * sy);
     this.sprite.y = dy;
     this.sprite.rotation = rot;
     this.shadow.visible = this.mode !== 'seat' && this.mode !== 'behind';
@@ -220,6 +253,8 @@ export class OfficeScene {
     if (this.destroyed) return;
     this.bgTex = bgTex as PIXI.Texture;
     const byId = Object.fromEntries(ids.map((id, i) => [id, chars[i] as Frames]));
+    const cycles = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, { walk: await loadCycle(`${id}-walk`, byId[id]), carry: await loadCycle(`${id}-carry`, byId[id]) }] as const)));
+    if (this.destroyed) return;
 
     const bg = new PIXI.Sprite(this.bgTex); bg.width = WW; bg.height = WH;
     this.lane.sortableChildren = true;
@@ -253,6 +288,7 @@ export class OfficeScene {
     SEATS.forEach((id, i) => {
       const a = new Actor(id, byId[id], WF, LAPTOP_X[i] + 4, SEAT_Y, SEATED);
       a.home = { x: DESK_X[i], laptop: LAPTOP_X[i] };
+      a.cycles = cycles[id];
       a.mode = 'seat';
       a.last = 'at their desk';
       this.seats.addChild(a.root);
@@ -264,7 +300,7 @@ export class OfficeScene {
       this.laptopGlow.set(id, glow);
     });
     const cfo = new Actor('cfo', byId.cfo, CF, CFO_SPOT.x, CFO_SPOT.y, CFO_SCALE);
-    cfo.mode = 'behind'; cfo.last = 'watching the books';
+    cfo.mode = 'behind'; cfo.last = 'watching the books'; cfo.cycles = cycles.cfo;
     this.seats.addChild(cfo.root);
     this.actors.set('cfo', cfo);
     cfo.root.on('pointertap', () => this.onAgentClick?.('cfo'));
@@ -495,9 +531,9 @@ export class OfficeScene {
     if (d < 2) return Promise.resolve();
     a.mode = carry ? 'carry' : 'walk';
     if (Math.abs(x - a.pos.x) > 2) a.facing = x > a.pos.x ? -1 : 1;
-    const start = { ...a.pos };
+    const start = { ...a.pos }, base = a.walked;
     return new Promise<void>((res) => {
-      this.tw(a.pos, { x, y, duration: d / SPEED, ease: 'none', onUpdate: () => { a.walked = Math.hypot(a.pos.x - start.x, a.pos.y - start.y); }, onComplete: () => { if (a.mode === 'walk') a.mode = 'stand'; res(); } });
+      this.tw(a.pos, { x, y, duration: d / SPEED, ease: 'none', onUpdate: () => { a.walked = base + Math.hypot(a.pos.x - start.x, a.pos.y - start.y); }, onComplete: () => { if (a.mode === 'walk') a.mode = 'stand'; res(); } });
     });
   }
   private toLane(a: Actor) { this.seats.removeChild(a.root); this.lane.addChild(a.root); }
@@ -511,11 +547,12 @@ export class OfficeScene {
       this.sfx.ding();
       const carrying = a.mode === 'carry';
       await this.moveTo(a, LIFT.x, LANE[from], carrying);
-      a.mode = carrying ? 'carry' : 'stand'; a.facing = 1;
+      a.mode = carrying ? 'carryStand' : 'stand'; a.facing = 1;
       await this.wait(250);
       await new Promise<void>((r) => this.tw(this.lift, { y: LANE[to], duration: Math.abs(LANE[to] - LANE[from]) / 820, ease: 'power2.inOut', onUpdate: () => { a.pos.y = this.lift.y; }, onComplete: () => r() }));
       this.sfx.ding();
       await this.wait(200);
+      if (carrying) a.mode = 'carry';
     });
     await this.lift.busy;
   }

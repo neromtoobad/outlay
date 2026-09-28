@@ -65,4 +65,6 @@ Review boards: `sprites/cast-a.png` and `sprites/cast-b.png`. The worker frame o
 | Sep 28 | office v2 concepts: building cutaway ×4 + isometric floor ×4 (medium 2k) | 2 |
 | Sep 28 | office v2 final: cutaway building ×4 (high 4k, ref b804115c) | 4.25 |
 | Sep 28 | office v2 chair-fix edit ×2 (high 4k, ref 36ece9ad; chosen 379d5dec → `scene/building.webp`) | 2.13 |
-| **Total** | | **16.88 / 500** |
+| Sep 28 | messenger side-view walk ×4 + carry-box walk ×4 (medium 2k, ref sheet); chosen carry w5 → `sprites/messenger-carry` | 2 |
+| Sep 28 | messenger walk ×4 with explicit contact/down/passing/up poses; chosen w10 → `sprites/messenger-walk` | 1 |
+| **Total** | | **19.88 / 500** |

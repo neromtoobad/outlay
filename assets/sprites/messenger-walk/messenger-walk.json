@@ -1,0 +1,92 @@
+{
+  "name": "messenger-walk",
+  "source": "../../assets/style-tests/walk/w10.png",
+  "frameWidth": 561,
+  "frameHeight": 678,
+  "anchor": {
+    "x": 0.48511796841097815,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "messenger-walk-0.png",
+      "bbox": [
+        120,
+        27,
+        605,
+        698
+      ]
+    },
+    {
+      "index": 1,
+      "file": "messenger-walk-1.png",
+      "bbox": [
+        813,
+        96,
+        1210,
+        702
+      ]
+    },
+    {
+      "index": 2,
+      "file": "messenger-walk-2.png",
+      "bbox": [
+        1534,
+        29,
+        1826,
+        698
+      ]
+    },
+    {
+      "index": 3,
+      "file": "messenger-walk-3.png",
+      "bbox": [
+        2101,
+        25,
+        2584,
+        692
+      ]
+    },
+    {
+      "index": 4,
+      "file": "messenger-walk-4.png",
+      "bbox": [
+        118,
+        780,
+        604,
+        1444
+      ]
+    },
+    {
+      "index": 5,
+      "file": "messenger-walk-5.png",
+      "bbox": [
+        817,
+        827,
+        1198,
+        1438
+      ]
+    },
+    {
+      "index": 6,
+      "file": "messenger-walk-6.png",
+      "bbox": [
+        1522,
+        775,
+        1816,
+        1445
+      ]
+    },
+    {
+      "index": 7,
+      "file": "messenger-walk-7.png",
+      "bbox": [
+        2095,
+        779,
+        2584,
+        1438
+      ]
+    }
+  ]
+}

@@ -13,7 +13,7 @@ const args = process.argv.slice(2);
 const flags = Object.fromEntries(args.filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
 const [src, outDir, name, expectedArg] = args.filter((a) => !a.startsWith('--'));
 if (!src || !outDir || !name) {
-  console.error('usage: node slice.mjs <sheet.png> <outDir> <name> [expectedPoses] [--shadow-bottom=0.3]');
+  console.error('usage: node slice.mjs <sheet.png> <outDir> <name> [expectedPoses] [--shadow-bottom=0.3] [--anchor=head]');
   process.exit(1);
 }
 const expected = Number(expectedArg ?? 8);
@@ -143,12 +143,15 @@ const poses = [...big].sort((a, b) => {
   return ra - rb || a.minX - b.minX;
 });
 
-// 5. Feet anchor: horizontal centre of opaque pixels in the bottom 12% of each pose.
+// 5. Anchor: horizontal centre of opaque pixels in the bottom 12% of each pose (the feet), or with
+//    --anchor=head the top 22% (the head), which stays steady through a walk cycle while the feet swap.
 const PAD = 6;
+const headAnchor = flags.anchor === 'head';
 const frames = poses.map((p) => {
-  const footTop = p.maxY - Math.round((p.maxY - p.minY) * 0.12);
+  const band = Math.round((p.maxY - p.minY) * (headAnchor ? 0.22 : 0.12));
+  const y0 = headAnchor ? p.minY : p.maxY - band, y1 = headAnchor ? p.minY + band : p.maxY;
   let sx = 0, n = 0;
-  for (let y = footTop; y <= p.maxY; y++) for (let x = p.minX; x <= p.maxX; x++) {
+  for (let y = y0; y <= y1; y++) for (let x = p.minX; x <= p.maxX; x++) {
     const k = y * W + x;
     if (owner.get(label[k])?.id === p.id) { sx += x; n++; }
   }

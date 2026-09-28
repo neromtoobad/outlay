@@ -1,0 +1,92 @@
+{
+  "name": "messenger-carry",
+  "source": "../../assets/style-tests/walk/w5.png",
+  "frameWidth": 429,
+  "frameHeight": 666,
+  "anchor": {
+    "x": 0.5048031331620422,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "messenger-carry-0.png",
+      "bbox": [
+        116,
+        31,
+        531,
+        689
+      ]
+    },
+    {
+      "index": 1,
+      "file": "messenger-carry-1.png",
+      "bbox": [
+        856,
+        31,
+        1166,
+        688
+      ]
+    },
+    {
+      "index": 2,
+      "file": "messenger-carry-2.png",
+      "bbox": [
+        1469,
+        31,
+        1874,
+        689
+      ]
+    },
+    {
+      "index": 3,
+      "file": "messenger-carry-3.png",
+      "bbox": [
+        2149,
+        31,
+        2499,
+        682
+      ]
+    },
+    {
+      "index": 4,
+      "file": "messenger-carry-4.png",
+      "bbox": [
+        114,
+        791,
+        530,
+        1449
+      ]
+    },
+    {
+      "index": 5,
+      "file": "messenger-carry-5.png",
+      "bbox": [
+        875,
+        789,
+        1169,
+        1443
+      ]
+    },
+    {
+      "index": 6,
+      "file": "messenger-carry-6.png",
+      "bbox": [
+        1468,
+        790,
+        1875,
+        1449
+      ]
+    },
+    {
+      "index": 7,
+      "file": "messenger-carry-7.png",
+      "bbox": [
+        2158,
+        788,
+        2499,
+        1447
+      ]
+    }
+  ]
+}
