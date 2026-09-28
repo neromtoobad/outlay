@@ -2,10 +2,64 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { api, usd, ngn, Avatar, ROLE_NAME, timeAgo, type Order, type Receipt, type Step } from '../lib.tsx';
+import { api, usd, ngn, Avatar, ROLE_NAME, SERVICE_NAME, timeAgo, type Order, type Receipt, type Step } from '../lib.tsx';
 import Office from '../office/Office.tsx';
 
-const SERVICE_NAME: Record<string, string> = { 'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List' };
+function Stepper({ o }: { o: Order }) {
+  const st = o.status;
+  const working = ['queued', 'running', 'revision'].includes(st);
+  const steps: { label: string; note: string; cls: string }[] = [
+    { label: 'Ordered', note: o.payment ? (o.payment.mode === 'promo' ? 'Free first job' : o.payment.mode === 'simulated' ? 'Paid (demo)' : 'Paid into escrow') : 'Quoted', cls: 'done' },
+    { label: st === 'revision' || (working && o.revisionNote) ? 'Revising' : 'Team working', note: working ? 'Live now' : `${o.runs.length} run${o.runs.length === 1 ? '' : 's'}`, cls: working ? 'now' : 'done' },
+    { label: st === 'failed' ? 'Not delivered' : 'Delivered', note: o.deliveredAt ? timeAgo(o.deliveredAt) : st === 'failed' ? 'Refund + bond' : 'Soon', cls: st === 'failed' ? 'bad' : o.deliveredAt ? 'done' : '' },
+    {
+      label: st === 'accepted' ? 'Accepted' : st === 'rejected' ? 'Rejected' : 'Your decision',
+      note: st === 'accepted' ? (o.decision?.by === 'auto' ? 'Auto after 48 h' : 'By you') : st === 'rejected' ? 'Refund + bond paid' : st === 'delivered' ? 'Waiting on you' : '48 h to decide',
+      cls: st === 'accepted' ? 'done' : st === 'rejected' ? 'bad' : st === 'delivered' ? 'now' : '',
+    },
+  ];
+  return <div className="stepper">{steps.map((s) => <div key={s.label} className={`s ${s.cls}`}><b>{s.label}</b><span>{s.note}</span></div>)}</div>;
+}
+
+function Timeline({ steps }: { steps: Step[] }) {
+  return (
+    <ul className="timeline">
+      {steps.length === 0 && <li><Avatar role="cfo" /><span>The CFO is staffing the job…</span><time /></li>}
+      {steps.map((s, i) => (
+        <li key={i}><Avatar role={s.agent} /><div><b>{ROLE_NAME[s.agent] ?? s.agent}</b><span>{s.step}{s.note ? ` · ${s.note}` : ''}</span></div><time>{new Date(s.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time></li>
+      ))}
+    </ul>
+  );
+}
+
+function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
+  const q = o.quote;
+  const spent = receipt.reduce((s, r) => s + r.usd, 0);
+  const price = q.promo ? 0 : q.priceUsd;
+  return (
+    <div className="receipt">
+      <div className="rh"><b>OUTLAY</b><span>{o.id} · {new Date(o.createdAt).toLocaleDateString()}</span></div>
+      <div style={{ fontSize: 11.5, color: 'var(--muted)', textAlign: 'center' }}>Every tool the team bought for this job</div>
+      <hr />
+      <div className="scroll">
+        {receipt.length === 0 && <div className="empty">Nothing bought yet</div>}
+        {receipt.map((r, i) => (
+          <div key={i} className="ln">
+            <span className="who"><Avatar role={r.agent} />{r.vendor}</span>
+            <span className="v">{r.usd.toFixed(4)}</span>
+            <span className="why">{r.reason}{r.dry ? ' · demo' : ` · ${r.transaction.slice(0, 10)}…`}</span>
+          </div>
+        ))}
+      </div>
+      <hr />
+      <div className="tot"><span>Tools ({receipt.length})</span><span>{spent.toFixed(4)}</span></div>
+      <div className="tot"><span>You pay{q.promo ? ' (free)' : ''}</span><span>{price.toFixed(2)}</span></div>
+      <hr />
+      <div className="tot big"><span>Outlay's margin</span><span>{(price - spent).toFixed(4)}</span></div>
+      <div className="foot">USDC · {o.demo ? 'demo receipt, no money moved' : 'paid per call via x402 on Arc'}</div>
+    </div>
+  );
+}
 
 export default function Job() {
   const { id = '' } = useParams();
@@ -36,7 +90,6 @@ export default function Job() {
   const running = o?.live && (!last || last.id !== o.live.jobId) && active ? o.live : null;
   const steps: Step[] = running?.steps ?? last?.steps ?? [];
   const receipt: Receipt[] = running?.receipt ?? last?.receipt ?? [];
-  const spent = receipt.reduce((s, r) => s + r.usd, 0);
   const html = useMemo(() => (last?.deliverable ? DOMPurify.sanitize(marked.parse(last.deliverable, { async: false }) as string) : ''), [last?.deliverable]);
 
   async function decide(action: 'accept' | 'reject' | 'revise') {
@@ -47,137 +100,114 @@ export default function Job() {
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   }
 
-  if (err && !o) return <main className="wrap section"><h2>Couldn't load this job</h2><p className="muted">{err}</p><Link to="/">Back to services</Link></main>;
-  if (!o) return <main className="wrap section muted">Loading…</main>;
+  if (err && !o) return <main className="wrap section center"><h1 className="h1">Couldn't find this job.</h1><p className="muted" style={{ margin: '12px 0 24px' }}>{err}</p><Link to="/" className="btn secondary">Back to Outlay</Link></main>;
+  if (!o) return <main className="wrap section"><div className="skel" style={{ height: 480 }} /></main>;
   const q = o.quote;
-  const price = q.promo ? 0 : q.priceUsd;
 
   return (
     <main className="wrap">
-      <div className="jobhead">
-        <div>
-          <div className="eyebrow">{SERVICE_NAME[o.service] ?? o.service} · {o.id}</div>
-          <h1>{o.brief.length > 90 ? o.brief.slice(0, 90) + '…' : o.brief}</h1>
-          <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>Ordered {timeAgo(o.createdAt)} by {o.email}{o.demo && ' · demo mode: no real money moved'}</div>
+      <div className="pagehead" style={{ paddingBottom: 0 }}>
+        <div className="crumbs"><Link to={`/hire/${o.service}`}>{SERVICE_NAME[o.service] ?? o.service}</Link><span>/</span><span className="mono" style={{ fontSize: 13 }}>{o.id}</span></div>
+        <div className="jobhead">
+          <div>
+            <h1 className="h1">{o.brief.length > 110 ? o.brief.slice(0, 110) + '…' : o.brief}</h1>
+            <div className="meta">Ordered {timeAgo(o.createdAt)} by {o.email}{o.demo && ' · demo mode: no real money moved'}</div>
+          </div>
+          <span className={`badge ${o.status}`}><span className="dot" />{o.status === 'queued' ? 'starting' : o.status}</span>
         </div>
-        <span className={`badge ${o.status}`}><span className="dot" />{o.status === 'queued' ? 'starting' : o.status}</span>
+        <Stepper o={o} />
       </div>
 
       <div className="jobgrid">
-        <div style={{ display: 'grid', gap: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 20, minWidth: 0 }}>
           <div className="minioffice">
             <Office orderId={o.id} team={(o as any).team} idleReplayMs={0} replayToken={replay} />
             <div className="overlay">
-              {active ? <span className="pill live"><span className="dot" />Live: the team on your job</span>
+              {active ? <span className="chip live"><span className="dot" />Live: the team on your job</span>
                 : o.runs.length > 0 && <button className="btn secondary sm" onClick={() => setReplay((x) => x + 1)}>▶ Replay this job</button>}
             </div>
           </div>
-          {last?.qa && o.status !== 'running' && (
+
+          {last?.qa && !active && (
             <div className={`qa ${last.qa.verdict === 'pass' ? 'pass' : 'revise'}`}>
               <Avatar role="auditor" />
-              <div><b>Auditor: {last.qa.verdict === 'pass' ? 'passed' : 'flagged issues'}</b> <span style={{ opacity: .8 }}>· checked by {last.qa.model}</span>{last.qa.notes && <div style={{ fontSize: 13, marginTop: 2 }}>{last.qa.notes}</div>}</div>
+              <div><b>Auditor {last.qa.verdict === 'pass' ? 'passed it' : 'flagged issues'}</b> <span style={{ opacity: .75 }}>· checked by {last.qa.model}</span>{last.qa.notes && <div style={{ fontSize: 13.5, marginTop: 2 }}>{last.qa.notes}</div>}</div>
             </div>
           )}
 
-          {html ? (
+          {html && !active ? (
             <section className="card pad">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <h3 style={{ margin: 0 }}>Your deliverable</h3>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {last!.files.map((f) => <a key={f} className="btn secondary sm" href={`/api/orders/${o.id}/files/${f}`}>Download {f}</a>)}
-                  <a className="btn secondary sm" href={`/api/orders/${o.id}/files/deliverable.md`}>Download .md</a>
+              <div className="dochead">
+                <h3>Your deliverable</h3>
+                <div className="btns">
+                  {last!.files.map((f) => <a key={f} className="btn secondary sm" href={`/api/orders/${o.id}/files/${f}`}>↓ {f}</a>)}
+                  <a className="btn secondary sm" href={`/api/orders/${o.id}/files/deliverable.md`}>↓ .md</a>
                 </div>
               </div>
               <div className="deliverable" dangerouslySetInnerHTML={{ __html: html }} />
+              <details style={{ marginTop: 22, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14.5 }}>How the team did it · {steps.length} steps</summary>
+                <div style={{ marginTop: 10 }}><Timeline steps={steps} /></div>
+              </details>
             </section>
           ) : (
             <section className="card pad">
-              <h3>The team is working</h3>
-              <ul className="timeline">
-                {steps.length === 0 && <li><Avatar role="cfo" /><span>The CFO is staffing the job…</span><time /></li>}
-                {steps.map((s, i) => (
-                  <li key={i}><Avatar role={s.agent} /><div><b>{ROLE_NAME[s.agent] ?? s.agent}</b> <span>{s.step}{s.note ? ` · ${s.note}` : ''}</span></div><time>{new Date(s.at).toLocaleTimeString()}</time></li>
-                ))}
-              </ul>
+              <h3 className="t">{active ? 'The team is working' : 'Work log'} <small>{active ? 'updates live' : ''}</small></h3>
+              <Timeline steps={steps} />
             </section>
           )}
-
-          <section className="card pad">
-            <h3>Receipt <small>every tool the team bought for this job</small></h3>
-            <div className="tblwrap">
-              <table className="tbl">
-                <thead><tr><th>Agent</th><th>Bought</th><th>Why</th><th className="num">USDC</th></tr></thead>
-                <tbody>
-                  {receipt.length === 0 && <tr><td colSpan={4} className="muted">Nothing bought yet.</td></tr>}
-                  {receipt.map((r, i) => (
-                    <tr key={i}>
-                      <td style={{ whiteSpace: 'nowrap' }}><span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}><Avatar role={r.agent} />{ROLE_NAME[r.agent] ?? r.agent}</span></td>
-                      <td>{r.vendor}<div className="ref">{r.dry ? 'demo · no payment' : `x402 · ${r.transaction.slice(0, 14)}…`}</div></td>
-                      <td style={{ color: 'var(--ink-2)' }}>{r.reason}</td>
-                      <td className="num">{usd(r.usd, 4)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr><td colSpan={3}>Tool cost</td><td className="num">{usd(spent, 4)}</td></tr>
-                  <tr><td colSpan={3}>You pay{q.promo ? ' (first job free)' : ''}</td><td className="num">{usd(price, 2)}</td></tr>
-                  <tr><td colSpan={3}>Outlay's margin</td><td className="num">{usd(price - spent, 4)}</td></tr>
-                </tfoot>
-              </table>
-            </div>
-          </section>
         </div>
 
-        <aside style={{ display: 'grid', gap: 18 }}>
+        <aside>
           <section className="card pad">
-            <h3>Your decision</h3>
+            <h3 className="t">Your decision</h3>
             {o.status === 'delivered' ? (
-              <div className="form">
-                <p className="note" style={{ margin: 0 }}>
-                  {q.promo ? 'This one was free. Tell us if it was good.' : <>Accept to release {usd(price)} USDC. Reject and you get it all back <b>plus a {usd(q.bondUsd)} USDC bond</b>.</>} Silence for 48 h counts as acceptance.
+              <div className="form" style={{ gap: 14 }}>
+                <p style={{ fontSize: 14.5, color: 'var(--ink-2)' }}>
+                  {q.promo ? 'This one was free. Tell us if it was good.' : <>Accept to release <b>{usd(q.priceUsd)} USDC</b>. Reject and you get it all back <b>plus a {usd(q.bondUsd)} USDC bond</b>.</>} Silence for 48 h counts as acceptance.
                 </p>
-                <label className="field">Confirm with the email you ordered with
+                <label className="field">Confirm with your email
                   <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" />
                 </label>
                 {o.revisionNote === undefined && (
-                  <label className="field">Want changes? (one free revision)
-                    <textarea style={{ minHeight: 70 }} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. focus on Ikoyi too, and add opening hours" />
+                  <label className="field">Want changes? <span className="hint">One free revision.</span>
+                    <textarea style={{ minHeight: 76 }} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. focus on Ikoyi too, and add opening hours" />
                   </label>
                 )}
                 <div className="decide">
-                  <button className="btn primary" disabled={busy || !email} onClick={() => decide('accept')}>Accept</button>
-                  {o.revisionNote === undefined && <button className="btn secondary" disabled={busy || !email || !note.trim()} onClick={() => decide('revise')}>Request revision</button>}
-                  <button className="btn danger" disabled={busy || !email} onClick={() => decide('reject')}>Reject{q.promo ? '' : ' & refund'}</button>
+                  <button className="btn primary block" disabled={busy || !email} onClick={() => decide('accept')}>Accept the work</button>
+                  <div className="row">
+                    {o.revisionNote === undefined && <button className="btn secondary" disabled={busy || !email || !note.trim()} onClick={() => decide('revise')}>Revise</button>}
+                    <button className="btn danger" disabled={busy || !email} onClick={() => decide('reject')} style={o.revisionNote !== undefined ? { gridColumn: 'span 2' } : undefined}>Reject{q.promo ? '' : ' & refund'}</button>
+                  </div>
                 </div>
                 {err && <div className="error">{err}</div>}
               </div>
             ) : o.status === 'accepted' ? (
-              <p className="qa pass" style={{ margin: 0 }}>Accepted {o.decision?.by === 'auto' ? 'automatically after 48 h' : 'by you'} · {timeAgo(o.decision!.at)}. Thank you.</p>
+              <div className="qa pass"><Avatar role="cfo" /><div>Accepted {o.decision?.by === 'auto' ? 'automatically after 48 h' : 'by you'} · {timeAgo(o.decision!.at)}. Thank you.</div></div>
             ) : o.status === 'rejected' ? (
-              <p className="qa revise" style={{ margin: 0 }}>Rejected{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. The CFO will learn from this.</p>
+              <div className="qa revise"><Avatar role="cfo" /><div>Rejected{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. The CFO will learn from this.</div></div>
             ) : o.status === 'failed' ? (
-              <p className="qa revise" style={{ margin: 0 }}>We couldn't deliver this one{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. {last?.error}</p>
+              <div className="qa revise"><Avatar role="cfo" /><div>We couldn't deliver this one{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. {last?.error}</div></div>
             ) : (
-              <p className="muted" style={{ margin: 0 }}>You'll decide once the work is delivered. Usually a few minutes.</p>
+              <p className="muted" style={{ fontSize: 14.5 }}>You'll decide once the work is delivered, usually within a few minutes. You can close this page; we'll email you.</p>
             )}
           </section>
 
-          <section className="card pad">
-            <h3>The deal</h3>
-            <table className="tbl">
-              <tbody>
-                <tr><td>Price</td><td className="num">{q.promo ? 'Free' : `${usd(q.priceUsd)} USDC`}</td></tr>
-                {!q.promo && <tr><td>Naira</td><td className="num">{ngn(q.priceUsd)}</td></tr>}
-                <tr><td>Bond if rejected</td><td className="num">{q.promo ? '—' : `${usd(q.bondUsd)} USDC`}</td></tr>
-                <tr><td>Paid via</td><td className="num">{o.payment ? (o.payment.mode === 'promo' ? 'free first job' : o.payment.mode === 'simulated' ? 'demo (simulated)' : 'escrow on Arc') : '—'}</td></tr>
-              </tbody>
-            </table>
-            <details style={{ marginTop: 12 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>Why the CFO priced it this way</summary>
-              <ol className="why" style={{ marginTop: 8 }}>{q.reasons.map((r) => <li key={r}>{r}</li>)}</ol>
+          <PaperReceipt o={o} receipt={receipt} />
+
+          <section className="card pad" style={{ marginTop: 6 }}>
+            <h3 className="t">The deal</h3>
+            <div className="srow"><span className="lbl">Price</span><span className="fill" /><span className="v">{q.promo ? 'Free' : `${usd(q.priceUsd)} USDC`}</span></div>
+            {!q.promo && <div className="srow"><span className="lbl">In naira</span><span className="fill" /><span className="v">{ngn(q.priceUsd)}</span></div>}
+            <div className="srow"><span className="lbl">Bond if rejected</span><span className="fill" /><span className="v">{q.promo ? '—' : `${usd(q.bondUsd)} USDC`}</span></div>
+            <div className="srow"><span className="lbl">Paid via</span><span className="fill" /><span className="v" style={{ fontFamily: 'var(--sans)' }}>{o.payment ? (o.payment.mode === 'promo' ? 'Free first job' : o.payment.mode === 'simulated' ? 'Demo escrow' : 'Escrow on Arc') : '—'}</span></div>
+            <details style={{ marginTop: 10 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>Why the CFO priced it this way</summary>
+              <ol className="why">{q.reasons.map((r) => <li key={r}>{r}</li>)}</ol>
             </details>
           </section>
-          <p className="muted" style={{ fontSize: 13, margin: 0 }}>Share this page: every receipt is public. <Link to="/books">See the company's books →</Link></p>
+          <p className="muted" style={{ fontSize: 13.5 }}>Every receipt here is public. <Link to="/books">See the company's books →</Link></p>
         </aside>
       </div>
     </main>

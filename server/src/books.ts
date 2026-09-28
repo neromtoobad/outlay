@@ -108,3 +108,28 @@ export function beancount(): string {
 }
 
 export { dayOf };
+
+/** Per-agent activity for the team page: what each character actually did, from the same records as the books. */
+export function team() {
+  const orders = listOrders().filter((o) => o.demo === DRY);
+  const out: Record<string, { jobs: number; steps: number; calls: number; usd: number; vendors: string[]; last?: { at: string; step: string; orderId: string } }> = {};
+  const get = (a: string) => (out[a] ??= { jobs: 0, steps: 0, calls: 0, usd: 0, vendors: [] });
+  for (const o of orders) {
+    const seen = new Set<string>();
+    for (const r of o.runs) {
+      const j = readJob(r);
+      for (const s of j?.steps ?? []) {
+        const a = get(s.agent);
+        a.steps++;
+        if (!seen.has(s.agent)) { seen.add(s.agent); a.jobs++; }
+        if (!a.last || s.at > a.last.at) a.last = { at: s.at, step: s.note ? `${s.step} · ${s.note}` : s.step, orderId: o.id };
+      }
+      for (const p of j?.receipt ?? []) {
+        const a = get(p.agent);
+        a.calls++; a.usd += p.usd;
+        if (!a.vendors.includes(p.vendor)) a.vendors.push(p.vendor);
+      }
+    }
+  }
+  return { mode: DRY ? 'demo' : 'live', agents: out };
+}

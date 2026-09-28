@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type React from 'react';
 
 export const NGN_PER_USD = 1330; // ≈ market rate, Sep 2026; shown as an approximation only
 
@@ -6,16 +7,45 @@ export const usd = (x: number, d = 2) => `${x.toFixed(d)}`;
 export const ngn = (x: number) => `≈ ₦${Math.round(x * NGN_PER_USD).toLocaleString('en-NG')}`;
 
 export const ROLE_NAME: Record<string, string> = {
-  cfo: 'The Chartoularios (CFO)', scout: 'Scout', researcher: 'Researcher', writer: 'Writer', illustrator: 'Illustrator',
-  verifier: 'Verifier', mailer: 'Mailer', reader: 'Reader', analyst: 'Analyst', messenger: 'Messenger', auditor: 'Auditor',
-  producer: 'Producer', bookkeeper: 'Bookkeeper', linguist: 'Linguist', investigator: 'Investigator',
+  cfo: "The CFO", scout: "Scout", researcher: "Researcher", writer: "Writer", illustrator: "Illustrator",
+  verifier: "Verifier", mailer: "Mailer", reader: "Reader", analyst: "Analyst", messenger: "Messenger", auditor: "Auditor",
+  producer: "Producer", bookkeeper: "Bookkeeper", linguist: "Linguist", investigator: "Investigator",
 };
-const HAS_ART = new Set(['cfo', 'scout', 'researcher', 'writer', 'illustrator', 'verifier', 'mailer', 'reader', 'analyst', 'messenger', 'auditor']);
 
-export function Avatar({ role, lg }: { role: string; lg?: boolean }) {
-  const img = HAS_ART.has(role) ? `url(/sprites/${role}/${role}-0.png)` : undefined;
-  return <span className={`avatar${lg ? ' lg' : ''}`} style={{ backgroundImage: img }} title={ROLE_NAME[role] ?? role} />;
+/** Who each character is. t = the soft tint behind them, c = their signature colour (taken from their outfit). */
+export const ROLES: Record<string, { title: string; blurb: string; c: string; t: string }> = {
+  cfo: { title: "Chief Financial Officer", blurb: "Prices every job, sizes the bond, and runs the vault. He never grades his own team’s work: you do.", c: "#17473b", t: "#e1ece5" },
+  scout: { title: "Finds things", blurb: "Searches the web and Google Maps for exactly what the brief asks for.", c: "#d9a21b", t: "#fbefcc" },
+  researcher: { title: "Plans the work", blurb: "Turns your brief into a search plan, then drafts the answer with citations.", c: "#7a2335", t: "#f4e2e5" },
+  writer: { title: "Writes it up", blurb: "Plain-English briefs and a personal first line for every lead.", c: "#e1705c", t: "#fce6df" },
+  illustrator: { title: "Makes the images", blurb: "On-brand images for content packs and social posts.", c: "#8f79c9", t: "#eee8f8" },
+  verifier: { title: "Checks every contact", blurb: "Live-checks every email and phone number before it reaches you.", c: "#5f97d1", t: "#e2edf9" },
+  mailer: { title: "Sends the outreach", blurb: "Sends and tracks outreach on your behalf.", c: "#ec7418", t: "#fde9d6" },
+  reader: { title: "Reads the sources", blurb: "Opens websites and PDFs and pulls out what matters.", c: "#556b2f", t: "#e9eedb" },
+  analyst: { title: "Crunches the numbers", blurb: "Counts, ratings, patterns: the summary on top of every list.", c: "#2848b8", t: "#e2e7f8" },
+  messenger: { title: "Delivers the work", blurb: "Packages files and gets them to you.", c: "#cf2a2a", t: "#fbe2df" },
+  auditor: { title: "Quality control", blurb: "Checks the work on a different AI model before you ever see it.", c: "#5a2d5f", t: "#eee3ef" },
+};
+export const HAS_ART = new Set(Object.keys(ROLES));
+export const tint = (role: string) => ({ ["--t" as any]: ROLES[role]?.t, ["--c" as any]: ROLES[role]?.c }) as React.CSSProperties;
+
+/** Worker frames: 0 idle, 1-2 walk, 3 typing, 4 cheer, 5 sad, 6 box, 7 coin. CFO: 3 talk, 4 stamp, 5 stern, 6 thumbs, 7 deny. */
+export function Sprite({ role, frame = 0, className = "", style }: { role: string; frame?: number; className?: string; style?: React.CSSProperties }) {
+  if (!HAS_ART.has(role)) return null;
+  return <img className={`sprite ${className}`} src={`/sprites/${role}/${role}-${frame}.png`} alt={ROLE_NAME[role] ?? role} style={style} draggable={false} />;
 }
+
+export function Avatar({ role, lg, xl }: { role: string; lg?: boolean; xl?: boolean }) {
+  const img = HAS_ART.has(role) ? `url(/sprites/${role}/${role}-0.png)` : undefined;
+  return <span className={`avatar${lg ? " lg" : ""}${xl ? " xl" : ""}`} style={{ backgroundImage: img, ...tint(role) }} title={ROLE_NAME[role] ?? role}>{!img && <i className="initial">{(ROLE_NAME[role] ?? role).replace(/^The /, "").slice(0, 1)}</i>}</span>;
+}
+
+export function Check({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
+/** Soft backdrop per department, for service cards. */
+export const DEPT_TINT: Record<string, string> = { "Research": "#f4e2e5", "Sales & Growth": "#fbefcc", "Content & Creative": "#eee8f8", "Web & Tech": "#e2edf9", "Finance & Ops": "#e1ece5" };
 
 export function Seal({ size = 32 }: { size?: number }) {
   return (
@@ -70,3 +100,10 @@ export type Order = {
   decision?: { kind: string; at: string; by: string; note?: string }; refund?: { priceUsd: number; bondUsd: number }; demo: boolean;
   live: { jobId: string; steps: Step[]; receipt: Receipt[] } | null;
 };
+export type AgentStats = { jobs: number; steps: number; calls: number; usd: number; vendors: string[]; last?: { at: string; step: string; orderId: string } };
+export type BooksSummary = {
+  mode: "demo" | "live"; asOf: string;
+  counters: { orders: number; customers: number; delivered: number; accepted: number; rejected: number; acceptanceRate: number | null; freeJobs: number; toolCalls: number };
+  pnl: { revenue: number; tools: number; experts: number; guarantee: number; grossMargin: number; byVendor: Record<string, number>; bondsPaid: number; refunds: number };
+};
+export const SERVICE_NAME: Record<string, string> = { "research-brief": "Research Brief", "local-business-finder": "Local Business Finder", "lead-list": "Lead List" };
