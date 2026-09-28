@@ -4,6 +4,7 @@ import Home from './pages/Home.tsx';
 import Hire from './pages/Hire.tsx';
 import Job from './pages/Job.tsx';
 import Books from './pages/Books.tsx';
+import OfficePage from './pages/OfficePage.tsx';
 
 export default function App() {
   const { data } = useApi<{ mode: string }>('/api/health');
@@ -14,6 +15,7 @@ export default function App() {
           <Link to="/" className="brand"><Seal /><span className="wordmark">OUTLAY</span></Link>
           <nav className="nav">
             <NavLink to="/" end>Services</NavLink>
+            <NavLink to="/office">The office</NavLink>
             <NavLink to="/books">Open books</NavLink>
           </nav>
           <span className="spacer" />
@@ -28,6 +30,7 @@ export default function App() {
         <Route path="/hire/:service" element={<Hire />} />
         <Route path="/job/:id" element={<Job />} />
         <Route path="/books" element={<Books />} />
+        <Route path="/office" element={<OfficePage />} />
         <Route path="*" element={<div className="wrap section"><h2>Not found</h2><Link to="/">Back to services</Link></div>} />
       </Routes>
       <footer>

@@ -216,3 +216,17 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 
 footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 13px; }
 footer .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
+
+/* ---------- office */
+.officegrid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+@media (max-width: 1000px) { .officegrid { grid-template-columns: 1fr; } }
+.office-canvas canvas { display: block; width: 100% !important; height: auto !important; }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 520px; overflow-y: auto; }
+.feed li { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 7px 6px; border-radius: 8px; font-size: 13px; animation: slidein .3s ease; }
+.feed li span { color: var(--ink-2); }
+.feed li.replay { opacity: .72; }
+.feed .ref { font: 11px var(--mono); color: var(--muted); }
+.feed .amt { font: 600 12.5px var(--mono); color: var(--ink-2); }
+.feed .amt.in { color: var(--good); }
+.minioffice { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); }
+.minioffice .overlay { position: absolute; top: 10px; right: 10px; display: flex; gap: 8px; }

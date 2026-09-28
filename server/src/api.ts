@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { DATA_DIR, DRY } from './config.ts';
 import { bus, type OutlayEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
-import { autoAcceptDue, createQuote, decide, getOrder, readJob, start } from './orders.ts';
+import { autoAcceptDue, createQuote, decide, getOrder, readJob, replay, start } from './orders.ts';
 import { books, beancount } from './books.ts';
 
 process.env.OUTLAY_QUIET ??= '1';
@@ -34,7 +34,7 @@ app.post('/api/quote', async (c) => {
 function view(id: string) {
   const o = getOrder(id)!;
   const runs = o.runs.map((r) => readJob(r)).filter(Boolean);
-  return { ...o, email: o.email.replace(/^(.).*(@.*)$/, '$1•••$2'), runs, live: liveJobs.get(o.id) ?? null };
+  return { ...o, email: o.email.replace(/^(.).*(@.*)$/, '$1•••$2'), runs, live: liveJobs.get(o.id) ?? null, team: [...(CATALOG.find((x) => x.id === o.service)?.team ?? [])] };
 }
 
 app.post('/api/orders/:id/start', async (c) => {
@@ -82,6 +82,7 @@ app.get('/api/orders/:id/files/:name', (c) => {
 });
 
 app.get('/api/books', async (c) => c.json(await books()));
+app.get('/api/replay', (c) => c.json({ mode: DRY ? 'demo' : 'live', orders: replay(Number(c.req.query('limit') ?? 6), c.req.query('order') || undefined) }));
 app.get('/api/books.beancount', (c) => {
   c.header('content-type', 'text/plain; charset=utf-8');
   return c.body(beancount());

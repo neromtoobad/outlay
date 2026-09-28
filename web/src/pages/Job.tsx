@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { api, usd, ngn, Avatar, ROLE_NAME, timeAgo, type Order, type Receipt, type Step } from '../lib.tsx';
+import Office from '../office/Office.tsx';
 
 const SERVICE_NAME: Record<string, string> = { 'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List' };
 
@@ -13,20 +14,23 @@ export default function Job() {
   const [email, setEmail] = useState(() => localStorage.getItem('outlay:email') ?? '');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [replay, setReplay] = useState(0);
 
   const load = () => api<Order>(`/api/orders/${id}`).then(setO).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, [id]);
   const active = o && ['queued', 'running', 'revision'].includes(o.status);
+  // A delivered order can still change from elsewhere (another tab, the 48 h auto-accept), so keep listening.
+  const listening = active || o?.status === 'delivered';
   useEffect(() => {
-    if (!active) return;
+    if (!listening) return;
     const es = new EventSource(`/api/events?order=${id}`);
     const bump = () => load();
     es.addEventListener('step', bump);
     es.addEventListener('purchase', bump);
     es.addEventListener('order', bump);
-    const t = setInterval(load, 4000);
+    const t = active ? setInterval(load, 4000) : undefined;
     return () => { es.close(); clearInterval(t); };
-  }, [id, active]);
+  }, [id, listening, active]);
 
   const last = o?.runs.at(-1);
   const running = o?.live && (!last || last.id !== o.live.jobId) && active ? o.live : null;
@@ -61,6 +65,13 @@ export default function Job() {
 
       <div className="jobgrid">
         <div style={{ display: 'grid', gap: 18 }}>
+          <div className="minioffice">
+            <Office orderId={o.id} team={(o as any).team} idleReplayMs={0} replayToken={replay} />
+            <div className="overlay">
+              {active ? <span className="pill live"><span className="dot" />Live: the team on your job</span>
+                : o.runs.length > 0 && <button className="btn secondary sm" onClick={() => setReplay((x) => x + 1)}>▶ Replay this job</button>}
+            </div>
+          </div>
           {last?.qa && o.status !== 'running' && (
             <div className={`qa ${last.qa.verdict === 'pass' ? 'pass' : 'revise'}`}>
               <Avatar role="auditor" />

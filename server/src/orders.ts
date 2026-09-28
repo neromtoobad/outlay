@@ -37,7 +37,35 @@ const file = (id: string) => join(dir(), `${id}.json`);
 export function saveOrder(o: Order) {
   mkdirSync(dir(), { recursive: true });
   writeFileSync(file(o.id), JSON.stringify(o, null, 2));
-  publish({ type: 'order', orderId: o.id, data: { status: o.status, service: o.service } });
+  publish({ type: 'order', orderId: o.id, data: orderEventData(o) });
+}
+
+/** What the office needs to animate an order change: who is on the team and what money moves. */
+export function orderEventData(o: Order, status: string = o.status) {
+  const team = CATALOG.find((c) => c.id === o.service)?.team ?? [];
+  return {
+    status, service: o.service, team: [...team], promo: o.quote.promo, price: o.quote.priceUsd, bond: o.quote.bondUsd,
+    refund: o.refund ?? null, by: o.decision?.by ?? null,
+  };
+}
+
+/** Recent orders rebuilt as the exact event sequence they produced, for the office's replay mode. */
+export function replay(limit = 6, only?: string) {
+  const out: { id: string; service: string; events: { at: string; type: string; orderId: string; data: any }[] }[] = [];
+  for (const o of listOrders().filter((x) => x.demo === DRY && x.runs.length && (!only || x.id === only)).slice(0, limit)) {
+    const ev: { at: string; type: string; orderId: string; data: any }[] = [];
+    if (o.payment) ev.push({ at: o.payment.at, type: 'order', orderId: o.id, data: orderEventData(o, 'queued') });
+    for (const r of o.runs) {
+      const j = readJob(r);
+      for (const s of j?.steps ?? []) ev.push({ at: s.at, type: 'step', orderId: o.id, data: s });
+      for (const p of j?.receipt ?? []) ev.push({ at: p.at, type: 'purchase', orderId: o.id, data: p });
+    }
+    if (o.deliveredAt) ev.push({ at: o.deliveredAt, type: 'order', orderId: o.id, data: orderEventData(o, 'delivered') });
+    if (o.decision) ev.push({ at: o.decision.at, type: 'order', orderId: o.id, data: orderEventData(o, o.decision.kind) });
+    ev.sort((a, b) => a.at.localeCompare(b.at));
+    out.push({ id: o.id, service: o.service, events: ev });
+  }
+  return out;
 }
 export function getOrder(id: string): Order | undefined {
   if (!/^ord_[a-z0-9_]+$/.test(id) || !existsSync(file(id))) return undefined;
