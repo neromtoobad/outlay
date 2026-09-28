@@ -20,6 +20,7 @@ export class Job {
   receipt: ReceiptLine[] = [];
   steps: StepLog[] = [];
   deliverable = '';
+  files: { name: string; content: string }[] = []; // extra deliverables (CSV, etc.)
   qa?: { verdict: 'pass' | 'revise'; notes: string; model: string };
   status: 'running' | 'delivered' | 'failed' = 'running';
   error?: string;
@@ -48,8 +49,9 @@ export class Job {
   }
   save() {
     mkdirSync(this.dir(), { recursive: true });
-    const { deliverable, ...rest } = this;
-    writeFileSync(join(this.dir(), 'job.json'), JSON.stringify({ ...rest, dry: DRY, spentUsd: this.spentUsd() }, null, 2));
+    const { deliverable, files, ...rest } = this;
+    writeFileSync(join(this.dir(), 'job.json'), JSON.stringify({ ...rest, files: files.map((f) => f.name), dry: DRY, spentUsd: this.spentUsd() }, null, 2));
     if (deliverable) writeFileSync(join(this.dir(), 'deliverable.md'), deliverable);
+    for (const f of files) writeFileSync(join(this.dir(), f.name), f.content);
   }
 }

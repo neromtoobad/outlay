@@ -9,7 +9,83 @@ export const HOSTS = {
   blockrun: 'nano.blockrun.ai',
   orthogonal: 'np.orthogonal.com',
   exa: 'api.exa.ai',
+  apex: 'apexfaucet.xyz',
+  stb: 'x402.spendthebits.com',
 } as const;
+
+const qs = (o: Record<string, string>) => new URLSearchParams(o).toString();
+const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+
+// ---------- APEX (GET, query params)
+
+/** Up to 10 pages as clean text, $0.003 per call. Cheaper than Exa for site crawls. */
+export async function webRead(job: Job, agent: Role, urls: string[], reason: string): Promise<Page[]> {
+  const out: Page[] = [];
+  for (let i = 0; i < urls.length; i += 10) {
+    const batch = urls.slice(i, i + 10);
+    const data = await buy<any>(job, {
+      agent, vendor: 'APEX web-read', url: `https://${HOSTS.apex}/api/x402/web-read?${qs({ urls: batch.join(',') })}`, method: 'GET',
+      reason, expectUsd: 0.003, maxUsd: 0.006,
+      dryData: () => ({ pages: batch.map((u, k) => ({ url: u, title: `Site ${u}`, text: k % 2 ? `Contact us: hello@${new URL(u).host}` : 'No email here.' })) }),
+    });
+    const arr = data?.pages ?? data?.results ?? data?.data ?? [];
+    for (const p of arr) out.push({ url: p.finalUrl ?? p.url, title: p.title ?? p.url, text: String(p.text ?? p.body ?? p.content ?? '').slice(0, 8000) });
+  }
+  return out;
+}
+
+export function emailsIn(text: string, domain?: string): string[] {
+  const found = [...new Set((text.match(EMAIL_RE) ?? []).map((e) => e.toLowerCase().replace(/\.$/, '')))];
+  return found.filter((e) => !/\.(png|jpe?g|gif|webp|svg)$/.test(e) && !/sentry|wixpress|example\.(com|org)/.test(e) && (!domain || e.endsWith('@' + domain) || true));
+}
+
+export type EmailVerdict = { email: string; ok: boolean; verdict: string };
+
+/** Up to 100 addresses per call, $0.009: shape, live MX, disposable and role checks. */
+export async function verifyEmails(job: Job, agent: Role, emails: string[], reason: string): Promise<EmailVerdict[]> {
+  if (!emails.length) return [];
+  const out: EmailVerdict[] = [];
+  for (let i = 0; i < emails.length; i += 100) {
+    const batch = emails.slice(i, i + 100);
+    const data = await buy<any>(job, {
+      agent, vendor: 'APEX email-verify', url: `https://${HOSTS.apex}/api/x402/email-verify-bulk?${qs({ emails: batch.join(',') })}`, method: 'GET',
+      reason, expectUsd: 0.009, maxUsd: 0.015,
+      dryData: () => ({ results: batch.map((e, k) => ({ email: e, verdict: k % 4 === 3 ? 'undeliverable' : 'deliverable' })) }),
+    });
+    const arr = data?.results ?? data?.emails ?? data?.data ?? [];
+    for (const r of arr) {
+      const v = String(r.verdict ?? r.status ?? r.result ?? (r.deliverable ? 'deliverable' : 'unknown')).toLowerCase();
+      out.push({ email: String(r.email ?? r.address).toLowerCase(), ok: /deliverable|valid|ok|safe/.test(v) && !/un(deliverable)|invalid|disposable/.test(v), verdict: v });
+    }
+  }
+  return out;
+}
+
+/** Text of a public PDF, page by page, $0.003. */
+export async function pdfText(job: Job, agent: Role, url: string, reason: string): Promise<string> {
+  const data = await buy<any>(job, {
+    agent, vendor: 'APEX pdf-text', url: `https://${HOSTS.apex}/api/x402/pdf-text?${qs({ url })}`, method: 'GET',
+    reason, expectUsd: 0.003, maxUsd: 0.006,
+    dryData: () => ({ pages: [{ page: 1, text: 'INVOICE #1042\nAcme Supplies Ltd\nDate: 2026-09-20\nFlour 25kg x2  ₦48,000\nSugar 10kg x1  ₦14,500\nTotal ₦62,500' }] }),
+  });
+  const pages = data?.pages ?? [];
+  return pages.length ? pages.map((p: any) => `--- page ${p.page ?? ''}\n${p.text ?? ''}`).join('\n') : String(data?.text ?? '');
+}
+
+// ---------- Tomba (Orthogonal, GET)
+
+export type FoundEmail = { email: string; name?: string; position?: string; type?: string; score?: number };
+
+/** Emails published for a domain, $0.01. Used only when the site's own pages show none. */
+export async function domainEmails(job: Job, agent: Role, domain: string, reason: string): Promise<FoundEmail[]> {
+  const data = await buy<any>(job, {
+    agent, vendor: 'Tomba domain-search', url: `https://${HOSTS.orthogonal}/tomba/v1/domain-search?${qs({ domain })}`, method: 'GET',
+    reason, expectUsd: 0.01, maxUsd: 0.015,
+    dryData: () => ({ data: { emails: [{ email: `info@${domain}`, type: 'generic', score: 80 }] } }),
+  });
+  const arr = data?.data?.emails ?? data?.emails ?? [];
+  return arr.map((e: any) => ({ email: String(e.email).toLowerCase(), name: [e.first_name, e.last_name].filter(Boolean).join(' ') || undefined, position: e.position ?? undefined, type: e.type, score: e.score }));
+}
 
 // ---------- search & read
 
@@ -45,15 +121,28 @@ export async function readPages(job: Job, agent: Role, urls: string[], reason: s
   return (data?.results ?? []).map((r: any) => ({ url: r.url, title: r.title ?? r.url, text: String(r.text ?? '').slice(0, 6000) }));
 }
 
-export type Place = { title: string; address?: string; phone?: string; website?: string; rating?: number; ratingCount?: number; category?: string };
+export type Place = {
+  title: string; address?: string; phone?: string; website?: string; rating?: number; ratingCount?: number;
+  category?: string; hours?: string; lat?: number; lng?: number; cid?: string;
+};
 
-export async function mapsSearch(job: Job, agent: Role, q: string, location: string, reason: string): Promise<Place[]> {
+export async function mapsSearch(job: Job, agent: Role, q: string, reason: string, page = 1): Promise<Place[]> {
   const data = await buy<any>(job, {
     agent, vendor: 'Serper Maps (Orthogonal)', url: `https://${HOSTS.orthogonal}/serper/maps`,
-    body: { q: `${q} ${location}` }, reason, expectUsd: 0.006, maxUsd: 0.01,
-    dryData: () => ({ places: [1, 2, 3].map((i) => ({ title: `${q} ${i}`, address: `${i} Admiralty Way, ${location}`, phoneNumber: `+234 800 000 000${i}`, rating: 4 + i / 10, ratingCount: 10 * i, category: q })) }),
+    body: { q, page }, reason, expectUsd: 0.006, maxUsd: 0.01,
+    dryData: () => ({
+      places: [1, 2, 3, 4, 5].map((i) => ({
+        title: `${q} #${page}-${i}`, address: `${i} Admiralty Way, Lekki`, phoneNumber: i % 2 ? `0803 000 00${i}${page}` : undefined,
+        website: i % 3 === 0 ? undefined : `https://${q.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '')}${page}${i}.ng`,
+        rating: 3.8 + i / 10, ratingCount: 12 * i, type: 'Cafe', cid: `${q.length}-${page}${i}`,
+      })),
+    }),
   });
-  return (data?.places ?? []).map((p: any) => ({ title: p.title, address: p.address, phone: p.phoneNumber, website: p.website, rating: p.rating, ratingCount: p.ratingCount, category: p.category ?? p.type }));
+  return (data?.places ?? []).map((p: any) => ({
+    title: p.title, address: p.address, phone: p.phoneNumber, website: p.website, rating: p.rating, ratingCount: p.ratingCount,
+    category: p.type ?? p.category, hours: typeof p.openingHours === 'object' ? Object.entries(p.openingHours).map(([d, h]) => `${d}: ${h}`).join('; ') : p.openingHours,
+    lat: p.latitude, lng: p.longitude, cid: p.cid ? String(p.cid) : undefined,
+  }));
 }
 
 // ---------- LLM (BlockRun, OpenAI-compatible)
