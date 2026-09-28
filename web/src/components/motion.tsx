@@ -1,7 +1,10 @@
 'use client';
 // Shared motion primitives. Everything respects prefers-reduced-motion via <MotionConfig reducedMotion="user">.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { animate, motion, MotionConfig, useInView, useMotionValue, useSpring, useTransform, type Variants } from 'motion/react';
+import { animate, motion, MotionConfig, MotionGlobalConfig, useInView, useMotionValue, useSpring, useTransform, type Variants } from 'motion/react';
+
+// Debug switch for screenshots in hidden/throttled browsers: localStorage outlay:still = 1 skips all Motion animations.
+if (typeof window !== 'undefined') { try { if (localStorage.getItem('outlay:still') === '1') MotionGlobalConfig.skipAnimations = true; } catch {} }
 
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 

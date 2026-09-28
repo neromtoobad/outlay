@@ -4,6 +4,7 @@
 // just delivered. PixiJS draws; GSAP choreographs; an auto-director moves the camera to the action.
 import * as PIXI from 'pixi.js';
 import { gsap } from 'gsap';
+import { Sound } from './music.ts';
 
 export type OfficeEvent = { type: 'step' | 'purchase' | 'order'; orderId?: string; jobId?: string; at?: string; data: any };
 export type Books = { revenue: number; tools: number; margin: number; accepted: number; acceptance: number | null; jobs: number };
@@ -61,24 +62,6 @@ const SHOTS = {
 type ShotName = keyof typeof SHOTS;
 
 const css = (v: string, fb: string) => (typeof document !== 'undefined' && getComputedStyle(document.documentElement).getPropertyValue(v).trim()) || fb;
-
-// ------------------------------------------------------------------ sound (synthesised, off by default)
-class Sfx {
-  private ctx: AudioContext | null = null;
-  on = false;
-  private a() { if (!this.ctx) this.ctx = new AudioContext(); if (this.ctx.state === 'suspended') void this.ctx.resume(); return this.ctx; }
-  private tone(f: number, dur: number, type: OscillatorType, gain: number, at = 0) {
-    if (!this.on) return;
-    const c = this.a(), o = c.createOscillator(), g = c.createGain(), t = c.currentTime + at;
-    o.type = type; o.frequency.value = f; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
-  }
-  coin() { this.tone(1568, 0.07, 'square', 0.035); this.tone(2093, 0.16, 'square', 0.03, 0.06); }
-  ding() { this.tone(1046, 0.6, 'sine', 0.07); this.tone(1318, 0.8, 'sine', 0.05, 0.14); }
-  thud() { this.tone(110, 0.18, 'triangle', 0.18); this.tone(70, 0.25, 'sine', 0.2, 0.01); }
-  chime() { [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.5, 'sine', 0.05, i * 0.09)); }
-  sad() { this.tone(392, 0.35, 'sine', 0.05); this.tone(311, 0.5, 'sine', 0.05, 0.25); }
-}
 
 type Frames = { meta: any; tex: PIXI.Texture[] };
 async function loadFrames(id: string): Promise<Frames> {
@@ -205,7 +188,7 @@ export class OfficeScene {
   private fonts = { sans: 'Inter, sans-serif', serif: 'Georgia, serif', mono: 'monospace', hand: 'cursive' };
   private destroyed = false;
   private ro?: ResizeObserver;
-  sfx = new Sfx();
+  sfx = new Sound();
   onAgentClick?: (id: string) => void;
   onShot?: (name: string) => void;
 
@@ -422,7 +405,7 @@ export class OfficeScene {
     this.dir.follow = null;
     this.go('wide', 1.1);
   }
-  setSound(on: boolean) { this.sfx.on = on; if (on) this.sfx.chime(); }
+  setSound(on: boolean) { this.sfx.setOn(on); if (on) this.sfx.chime(); }
   /** Debug: park the camera (director off). */
   peek(cx: number, cy: number, w: number) { this.dir.on = false; gsap.killTweensOf(this.cam); Object.assign(this.cam, { cx, cy, w }); this.applyCam(); this.app.render(); }
   showShot(shot: ShotName) { this.dir.follow = null; this.go(shot); this.dir.lockUntil = performance.now() + 5000; }
@@ -706,6 +689,7 @@ export class OfficeScene {
 
   handle(e: OfficeEvent) {
     if (this.destroyed || !this.actors.size) return;
+    this.sfx.bump(e.type === 'order' ? 1 : 0.85);
     const d = e.data ?? {};
     const cfo = this.actors.get('cfo')!;
     if (e.type === 'step') {
@@ -747,6 +731,7 @@ export class OfficeScene {
           this.want('wide', 3800);
           for (let i = 0; i < 6; i++) this.coin({ x: DOOR.cx, y: 1850 }, { x: VAULT.x, y: VAULT.y }, { delay: i * 0.12, arc: 520, dur: 1.5, onLand: i === 5 ? () => {
             this.tw(this.vaultWheel, { rotation: `+=${Math.PI * 1.5}`, duration: 1.4, ease: 'power3.out' });
+            this.sfx.cash();
             this.sparkle(VAULT.x, VAULT.y, 0xffd76a, 16);
             this.float({ x: VAULT.x, y: VAULT.y - 120 }, `+${Number(d.price).toFixed(2)} USDC revenue`, 0x1f7a4a, 0xe3f2e8);
             this.sign.alpha = 0.9; this.tw(this.sign, { alpha: 0.2, duration: 1.8 });
@@ -784,6 +769,7 @@ export class OfficeScene {
   destroy() {
     this.destroyed = true;
     this.ro?.disconnect();
+    this.sfx.destroy();
     for (const t of this.tweens) t.kill();
     this.tweens.clear();
     gsap.killTweensOf(this.cam);

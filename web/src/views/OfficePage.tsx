@@ -53,9 +53,12 @@ export default function OfficePage() {
           <h1 className="h1">Watch the company <em>work.</em></h1>
           <p className="sub">Every movement is a real event: an agent types because it just took a step, a coin flies because a tool was just paid for, the seal slams when a job starts.</p>
         </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Link href="/live" className="btn primary sm">⤢ Watch the office only</Link>
         {mode.mode === 'live' ? <span className="chip live"><span className="dot" />Live: a job is running</span>
           : mode.mode === 'replay' ? <span className="chip" title="Recorded events of a finished job, played back faster than real time">↺ Replaying {mode.orderId} · sped up</span>
           : <span className="chip">Quiet: no jobs running</span>}
+        </div>
       </div>
       <div className="officegrid">
         <div className="stagebox"><Office onFeed={onFeed} onMode={setMode} /></div>

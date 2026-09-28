@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { OfficeScene, OfficeEvent } from './scene.ts';
 
 type BooksApi = { pnl: { revenue: number; tools: number; grossMargin: number }; counters: { accepted: number; acceptanceRate: number | null; delivered: number } };
@@ -13,11 +14,15 @@ type Props = {
   replayToken?: number; // bump to force a replay (e.g. "Replay this job")
   controls?: boolean; // show director / sound buttons over the stage
   onAgentClick?: (id: string) => void;
+  fill?: boolean; // fill the parent (the /live stage) instead of a 16:9 box
+  fullLink?: boolean; // show a button that opens the office on its own (/live)
+  soundOnFirstClick?: boolean; // the /live stage: the first click anywhere turns the music on
+  onSound?: (on: boolean) => void;
 };
 
 const wait = (ms: number, signal: { stop: boolean }) => new Promise<void>((r) => { const t = setInterval(() => { if (signal.stop) { clearInterval(t); r(); } }, 100); setTimeout(() => { clearInterval(t); r(); }, ms); });
 
-export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, onMode, replayToken, controls = true, onAgentClick }: Props) {
+export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, onMode, replayToken, controls = true, onAgentClick, fill = false, fullLink = !fill, soundOnFirstClick = false, onSound }: Props) {
   const [director, setDirector] = useState(true);
   const [sound, setSound] = useState(false);
   const el = useRef<HTMLDivElement>(null);
@@ -25,8 +30,17 @@ export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, on
   const [ready, setReady] = useState(false);
   const lastLive = useRef(0);
   const replaying = useRef<{ stop: boolean } | null>(null);
-  const cb = useRef({ onFeed, onMode, onAgentClick });
-  cb.current = { onFeed, onMode, onAgentClick };
+  const cb = useRef({ onFeed, onMode, onAgentClick, onSound });
+  cb.current = { onFeed, onMode, onAgentClick, onSound };
+  const setSoundOn = (v: boolean) => { setSound(v); scene.current?.setSound(v); cb.current.onSound?.(v); };
+
+  // browsers only allow audio after a click: on the /live stage, the first click anywhere starts the music
+  useEffect(() => {
+    if (!ready || !soundOnFirstClick) return;
+    const go = () => { setSoundOn(true); window.removeEventListener('pointerdown', go); window.removeEventListener('keydown', go); };
+    window.addEventListener('pointerdown', go); window.addEventListener('keydown', go);
+    return () => { window.removeEventListener('pointerdown', go); window.removeEventListener('keydown', go); };
+  }, [ready, soundOnFirstClick]);
 
   // mount the scene
   useEffect(() => {
@@ -106,14 +120,15 @@ export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, on
   }, [replayToken]);
 
   return (
-    <div className="office-wrap">
+    <div className={`office-wrap${fill ? ' fill' : ''}`}>
       <div ref={el} className="office-canvas" />
       {!ready && <div className="office-loading"><span className="dot pulse" />Opening the office…</div>}
       {controls && ready && (
         <div className="office-controls">
           <button className={director ? 'on' : ''} onClick={() => { const v = !director; setDirector(v); scene.current?.setDirector(v); }} title="The camera follows the action">{director ? '● Director' : '○ Director'}</button>
           <button onClick={() => { setDirector(false); scene.current?.setDirector(false); }} title="See the whole building">Wide</button>
-          <button className={sound ? 'on' : ''} onClick={() => { const v = !sound; setSound(v); scene.current?.setSound(v); }} title="Sound effects">{sound ? '♪ Sound on' : '♪ Sound off'}</button>
+          <button className={sound ? 'on' : ''} onPointerDown={(e) => e.stopPropagation()} onClick={() => setSoundOn(!sound)} title="Marimba soundtrack and sound effects">{sound ? '♪ Marimba on' : '♪ Marimba off'}</button>
+          {fullLink && <Link href="/live" className="office-full" title="Just the office, full screen">⤢ Office only</Link>}
         </div>
       )}
     </div>

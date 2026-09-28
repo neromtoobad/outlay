@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { Caveat, Cinzel, Instrument_Serif, Inter, JetBrains_Mono } from 'next/font/google';
-import Nav from '@/components/Nav.tsx';
-import Footer from '@/components/Footer.tsx';
 import { Providers } from '@/components/motion.tsx';
 import './globals.css';
 
@@ -22,11 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable} ${brand.variable} ${hand.variable}`}>
       <body>
-        <Providers>
-          <Nav />
-          {children}
-          <Footer />
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

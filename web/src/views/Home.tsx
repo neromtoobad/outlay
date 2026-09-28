@@ -63,7 +63,7 @@ function Stage({ books }: { books: Books | null }) {
               : <span className="chip">The office</span>}
             <span className="muted" style={{ fontSize: 13 }}>Every movement is a real event. Every coin is a real payment.</span>
           </div>
-          <Link href="/office" style={{ fontSize: 13.5, fontWeight: 500 }}>Open the office →</Link>
+          <span style={{ display: 'flex', gap: 16 }}><Link href="/live" style={{ fontSize: 13.5, fontWeight: 500 }}>⤢ Full screen</Link><Link href="/office" style={{ fontSize: 13.5, fontWeight: 500 }}>Open the office →</Link></span>
         </div>
         <div className="stage-screen">
           <Office onMode={setMode} onFeed={(f) => { if (f.e.type === 'purchase') setBuy(f); if (f.e.type === 'step') setStep(f); }} />

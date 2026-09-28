@@ -2,10 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion, MotionGlobalConfig } from 'motion/react';
-
-// Debug switch for screenshots in hidden/throttled browsers: localStorage outlay:still = 1 skips all Motion animations.
-if (typeof window !== 'undefined') { try { if (localStorage.getItem('outlay:still') === '1') MotionGlobalConfig.skipAnimations = true; } catch {} }
+import { motion } from 'motion/react';
 import { Seal, useApi } from '@/lib.tsx';
 
 const LINKS: [string, string][] = [['/#services', 'Services'], ['/#team', 'The team'], ['/office', 'The office'], ['/books', 'Open books']];
