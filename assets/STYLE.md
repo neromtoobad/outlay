@@ -64,4 +64,5 @@ Review boards: `sprites/cast-a.png` and `sprites/cast-b.png`. The worker frame o
 | Sep 27 | Agora market stall ×4 (chosen: 5b4d96c9 → `scene/stall-0.png`) | 1 |
 | Sep 28 | office v2 concepts: building cutaway ×4 + isometric floor ×4 (medium 2k) | 2 |
 | Sep 28 | office v2 final: cutaway building ×4 (high 4k, ref b804115c) | 4.25 |
-| **Total** | | **14.75 / 500** |
+| Sep 28 | office v2 chair-fix edit ×2 (high 4k, ref 36ece9ad; chosen 379d5dec → `scene/building.webp`) | 2.13 |
+| **Total** | | **16.88 / 500** |
