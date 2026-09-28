@@ -19,3 +19,4 @@ assets/scene-tests/
 
 # local job data (may contain customer briefs)
 server/data/
+deployments/local.json
