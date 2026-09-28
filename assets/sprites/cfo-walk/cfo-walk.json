@@ -1,0 +1,92 @@
+{
+  "name": "cfo-walk",
+  "source": "../../assets/style-tests/walk2/s1.png",
+  "frameWidth": 530,
+  "frameHeight": 676,
+  "anchor": {
+    "x": 0.42741536081737175,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "cfo-walk-0.png",
+      "bbox": [
+        142,
+        47,
+        562,
+        712
+      ]
+    },
+    {
+      "index": 1,
+      "file": "cfo-walk-1.png",
+      "bbox": [
+        812,
+        47,
+        1156,
+        706
+      ]
+    },
+    {
+      "index": 2,
+      "file": "cfo-walk-2.png",
+      "bbox": [
+        1507,
+        44,
+        1785,
+        703
+      ]
+    },
+    {
+      "index": 3,
+      "file": "cfo-walk-3.png",
+      "bbox": [
+        2110,
+        37,
+        2549,
+        706
+      ]
+    },
+    {
+      "index": 4,
+      "file": "cfo-walk-4.png",
+      "bbox": [
+        134,
+        791,
+        560,
+        1456
+      ]
+    },
+    {
+      "index": 5,
+      "file": "cfo-walk-5.png",
+      "bbox": [
+        800,
+        791,
+        1145,
+        1449
+      ]
+    },
+    {
+      "index": 6,
+      "file": "cfo-walk-6.png",
+      "bbox": [
+        1499,
+        790,
+        1786,
+        1449
+      ]
+    },
+    {
+      "index": 7,
+      "file": "cfo-walk-7.png",
+      "bbox": [
+        2087,
+        785,
+        2554,
+        1452
+      ]
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "name": "auditor-walk",
+  "source": "../../assets/style-tests/walk2/s5.png",
+  "frameWidth": 520,
+  "frameHeight": 688,
+  "anchor": {
+    "x": 0.4612983777799172,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "auditor-walk-0.png",
+      "bbox": [
+        118,
+        37,
+        569,
+        710
+      ]
+    },
+    {
+      "index": 1,
+      "file": "auditor-walk-1.png",
+      "bbox": [
+        797,
+        65,
+        1170,
+        709
+      ]
+    },
+    {
+      "index": 2,
+      "file": "auditor-walk-2.png",
+      "bbox": [
+        1519,
+        37,
+        1827,
+        709
+      ]
+    },
+    {
+      "index": 3,
+      "file": "auditor-walk-3.png",
+      "bbox": [
+        2151,
+        37,
+        2608,
+        713
+      ]
+    },
+    {
+      "index": 4,
+      "file": "auditor-walk-4.png",
+      "bbox": [
+        119,
+        793,
+        566,
+        1457
+      ]
+    },
+    {
+      "index": 5,
+      "file": "auditor-walk-5.png",
+      "bbox": [
+        798,
+        800,
+        1169,
+        1453
+      ]
+    },
+    {
+      "index": 6,
+      "file": "auditor-walk-6.png",
+      "bbox": [
+        1519,
+        783,
+        1822,
+        1457
+      ]
+    },
+    {
+      "index": 7,
+      "file": "auditor-walk-7.png",
+      "bbox": [
+        2141,
+        785,
+        2589,
+        1466
+      ]
+    }
+  ]
+}

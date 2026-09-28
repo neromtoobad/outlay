@@ -33,6 +33,9 @@ const COFFEE = { x0: 2765, x1: 3079, top: 1819, bottom: 2033 };
 const DOOR = { x0: 560, x1: 757, y0: 1613, y1: 2002, cx: 660 };
 const SIGN = { x0: 1370, y0: 80, x1: 2464, y1: 274 };
 const LIFT = { x: 3390, x0: 3292, x1: 3488 };
+// where people wait for the lift (a little apart, so two waiting people do not overlap)
+const LIFT_WAIT: Record<string, number> = { messenger: 3205, auditor: 3150, cfo: 3150 };
+const liftWait = (id: string) => LIFT_WAIT[id] ?? 3180;
 const LAMPS = [984, 1324, 1650, 2034, 2360, 2686];
 
 const STAND = 0.9, BEHIND = 0.86, SEATED = 0.72, CFO_SCALE = 0.9;
@@ -541,6 +544,7 @@ export class OfficeScene {
   private floorOf(y: number): Floor { return y < 1200 ? 'top' : y < 1780 ? 'mid' : 'ground'; }
   private async ride(a: Actor, to: Floor) {
     const from = this.floorOf(a.pos.y);
+    if (a.mode === 'walk') a.mode = 'stand';
     // call the car
     this.lift.busy = this.lift.busy.then(async () => {
       if (Math.abs(this.lift.y - LANE[from]) > 2) await new Promise<void>((r) => this.tw(this.lift, { y: LANE[from], duration: Math.abs(this.lift.y - LANE[from]) / 900, ease: 'power2.inOut', onComplete: () => r() }));
@@ -584,7 +588,7 @@ export class OfficeScene {
       await this.wait(400);
       this.followActor(m);
       await this.leaveDesk(m, true);
-      await this.moveTo(m, LIFT.x, LANE.mid, true);
+      await this.moveTo(m, liftWait('messenger'), LANE.mid, true);
       await this.ride(m, 'ground');
       await this.moveTo(m, DOOR.cx + 40, LANE.ground, true);
       // out through the door
@@ -595,7 +599,7 @@ export class OfficeScene {
       this.followActor(null); this.dir.lockUntil = 0;
       await this.wait(2600);
       m.root.alpha = 1; m.facing = -1;
-      await this.moveTo(m, LIFT.x, LANE.ground);
+      await this.moveTo(m, liftWait('messenger'), LANE.ground);
       await this.ride(m, 'mid');
       await this.returnToDesk(m);
     });
@@ -621,22 +625,70 @@ export class OfficeScene {
         this.shake = 26; this.sfx.thud();
         const s = this.seal(2440, 730, (e.orderId ?? '').slice(-8));
         this.sparkle(2440, 730, 0xd6d9de, 12);
-        this.wait(1200).then(() => {
-          this.want('meeting', 3200);
-          const pin = gsap.timeline(); this.tweens.add(pin);
-          pin.to([env, s], { x: WHITEBOARD.x1 - 70, y: WHITEBOARD.y0 + 70, duration: 1, ease: 'power2.inOut' })
-            .add(() => {
-              this.board.title.text = ''; this.board.body.text = ''; this.board.team.text = '';
-              this.write(this.board.title, `${name} · job #${(e.orderId ?? '').slice(-4)}`, 0.6);
-              this.wait(600).then(() => this.write(this.board.body, String(d.brief ?? 'Brief sealed in the job file.').slice(0, 120), 1.4));
-              this.wait(2000).then(() => this.write(this.board.team, `team: ${team.map((r) => NAME[r]).join(', ')}`, 0.9));
-            })
-            .to([env, s], { alpha: 0, duration: 0.6, delay: 2.4, onComplete: () => { this.fx.removeChild(env, s); env.destroy({ children: true }); s.destroy({ children: true }); } });
-        });
-      }, '+=0.35')
-      .add(() => { cfo.hold = CF.thumbs; }, '+=0.7')
-      .add(() => { cfo.hold = null; }, '+=1.2');
+        this.wait(900).then(() => this.presentBrief(env, s, e, name, team));
+      }, '+=0.35');
     for (const r of team) { const a = this.actors.get(r)!; a.busyUntil = performance.now() + 6000; }
+  }
+
+  /** The CFO walks the sealed brief over to the meeting-room whiteboard, presents it, and walks back. */
+  private presentBrief(env: PIXI.Container, seal: PIXI.Container, e: OfficeEvent, name: string, team: string[]) {
+    const cfo = this.actors.get('cfo')!, d = e.data ?? {};
+    const carry = () => { const x = cfo.pos.x - 70 * cfo.facing, y = cfo.pos.y - 205; env.position.set(x, y); seal.position.set(x + 4, y - 4); };
+    cfo.then(async () => {
+      cfo.hold = null;
+      this.followActor(cfo);
+      this.app.ticker.add(carry);
+      await this.moveTo(cfo, CFO_DESK.x0 - 70, CFO_SPOT.y); // out from behind his desk
+      this.seats.removeChild(cfo.root); this.lane.addChild(cfo.root);
+      await this.moveTo(cfo, CFO_DESK.x0 - 130, LANE.top);
+      await this.moveTo(cfo, TABLE.x1 + 80, LANE.top);
+      cfo.mode = 'stand'; cfo.facing = 1; cfo.hold = CF.talk;
+      this.app.ticker.remove(carry);
+      this.followActor(null); this.dir.lockUntil = 0; this.want('meeting', 4200);
+      // pin it up and write the job on the board
+      this.tw(env, { x: WHITEBOARD.x1 - 70, y: WHITEBOARD.y0 + 70, duration: 0.5, ease: 'power2.out' });
+      this.tw(seal, { x: WHITEBOARD.x1 - 66, y: WHITEBOARD.y0 + 66, duration: 0.5, ease: 'power2.out' });
+      this.board.title.text = ''; this.board.body.text = ''; this.board.team.text = '';
+      this.write(this.board.title, `${name} · job #${(e.orderId ?? '').slice(-4)}`, 0.6);
+      this.wait(600).then(() => this.write(this.board.body, String(d.brief ?? 'Brief sealed in the job file.').slice(0, 120), 1.4));
+      this.wait(2000).then(() => this.write(this.board.team, `team: ${team.map((r) => NAME[r]).join(', ')}`, 0.9));
+      this.say('cfo', `Team: ${team.map((r) => NAME[r]).slice(0, 4).join(', ')}${team.length > 4 ? ` +${team.length - 4}` : ''}. Let's go.`, 3000);
+      await this.wait(3300);
+      this.tw([env, seal], { alpha: 0, duration: 0.6, onComplete: () => { this.fx.removeChild(env, seal); env.destroy({ children: true }); seal.destroy({ children: true }); } });
+      cfo.hold = null;
+      await this.moveTo(cfo, CFO_DESK.x0 - 130, LANE.top);
+      this.lane.removeChild(cfo.root); this.seats.addChild(cfo.root);
+      await this.moveTo(cfo, CFO_DESK.x0 - 70, CFO_SPOT.y);
+      await this.moveTo(cfo, CFO_SPOT.x, CFO_SPOT.y);
+      cfo.mode = 'behind'; cfo.facing = 1;
+    });
+  }
+
+  /** The Auditor takes checked work upstairs to the CFO for sign-off, then goes back to her desk. */
+  private signOff(note: string) {
+    const a = this.actors.get('auditor'), cfo = this.actors.get('cfo')!;
+    if (!a || a.mode !== 'seat') return;
+    a.mode = 'behind'; // claim her now so a second check does not queue a second trip
+    a.then(async () => {
+      this.say('auditor', 'Checked. Taking it to the CFO.', 2400);
+      await this.wait(500);
+      this.followActor(a);
+      await this.leaveDesk(a);
+      await this.moveTo(a, liftWait('auditor'), LANE.mid);
+      await this.ride(a, 'top');
+      await this.moveTo(a, CFO_DESK.x1 - 90, LANE.top);
+      a.mode = 'stand'; a.facing = 1;
+      await cfo.queue; // if the CFO is off presenting a brief, she waits at his desk until he is back
+      this.followActor(null); this.dir.lockUntil = 0; this.want('cfo', 3000);
+      this.say('auditor', note.length > 60 ? note.slice(0, 58) + '…' : note, 2800);
+      await this.wait(900);
+      cfo.hold = CF.thumbs; this.say('cfo', 'Signed off. Ship it.', 2200);
+      await this.wait(2000);
+      if (cfo.hold === CF.thumbs) cfo.hold = null;
+      await this.moveTo(a, liftWait('auditor'), LANE.top);
+      await this.ride(a, 'mid');
+      await this.returnToDesk(a);
+    });
   }
 
   // ---------------------------------------------------------------- public API: real events in
@@ -659,6 +711,7 @@ export class OfficeScene {
     if (e.type === 'step') {
       const a = this.actors.get(d.agent); if (!a) return;
       a.busyUntil = performance.now() + 7000;
+      if (d.agent === 'auditor' && (d.step === 'check' || d.step === 'audit') && !/fail|missing|revise/i.test(String(d.note ?? ''))) { this.signOff(`${d.step} · ${d.note ?? 'pass'}`); return; }
       if (a.mode === 'seat' || a.id === 'cfo') this.say(d.agent, `${d.step}${d.note ? ` · ${d.note}` : ''}`);
       else a.last = `${d.step}${d.note ? ` · ${d.note}` : ''}`;
       this.want('work', 2600);
