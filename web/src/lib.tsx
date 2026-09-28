@@ -78,6 +78,13 @@ export function useApi<T>(path: string, refreshMs = 0) {
   return { data, error, setData };
 }
 
+/** A localStorage-backed string that is safe to render on the server (loads after mount). */
+export function useStored(key: string, initial = "") {
+  const [v, setV] = useState(initial);
+  useEffect(() => { try { const x = localStorage.getItem(key); if (x != null) setV(x); } catch {} }, [key]);
+  return [v, setV] as const;
+}
+
 export const timeAgo = (iso: string) => {
   const s = Math.round((Date.now() - Date.parse(iso)) / 1000);
   if (s < 60) return `${s}s ago`;

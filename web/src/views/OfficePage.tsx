@@ -1,7 +1,9 @@
+'use client';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import Office, { type FeedItem } from '../office/Office.tsx';
-import { Avatar, ROLE_NAME, SERVICE_NAME } from '../lib.tsx';
+import Link from 'next/link';
+import Office, { type FeedItem } from '@/office/Office.tsx';
+import { AnimatePresence, motion } from 'motion/react';
+import { Avatar, ROLE_NAME, SERVICE_NAME } from '@/lib.tsx';
 
 const ROSTER = ['cfo', 'scout', 'researcher', 'writer', 'reader', 'verifier', 'analyst', 'auditor', 'illustrator', 'mailer', 'messenger'];
 
@@ -17,16 +19,18 @@ export function Feed({ items }: { items: FeedItem[] }) {
   return (
     <ul className="feed">
       {items.length === 0 && <li className="muted" style={{ display: 'block', fontSize: 14 }}>Waiting for the next job…</li>}
+      <AnimatePresence initial={false}>
       {items.map((f, i) => {
         const x = describe(f);
         return (
-          <li key={items.length - i} className={f.kind}>
+          <motion.li key={`${f.at}-${f.e.type}-${items.length - i}`} layout initial={{ opacity: 0, y: -12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }} className={f.kind}>
             <Avatar role={x.who} />
-            <div><b>{ROLE_NAME[x.who] ?? x.who}</b> <span>{x.text}</span>{x.order && <div className="ref"><Link to={`/job/${x.order}`}>{x.order}</Link>{f.kind === 'replay' ? ' · replay' : ''}</div>}</div>
+            <div><b>{ROLE_NAME[x.who] ?? x.who}</b> <span>{x.text}</span>{x.order && <div className="ref"><Link href={`/job/${x.order}`}>{x.order}</Link>{f.kind === 'replay' ? ' · replay' : ''}</div>}</div>
             {x.amount && <span className={`amt ${x.amount.startsWith('+') ? 'in' : ''}`}>{x.amount}</span>}
-          </li>
+          </motion.li>
         );
       })}
+      </AnimatePresence>
     </ul>
   );
 }
@@ -58,7 +62,7 @@ export default function OfficePage() {
         <aside className="card pad">
           <h3 className="t">What just happened</h3>
           <Feed items={feed} />
-          <Link to="/hire/local-business-finder" className="btn primary block" style={{ marginTop: 14 }}>Give the team a job</Link>
+          <Link href="/hire/local-business-finder" className="btn primary block" style={{ marginTop: 14 }}>Give the team a job</Link>
         </aside>
       </div>
       <div className="roster">

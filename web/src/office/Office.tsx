@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { OfficeScene, OfficeEvent } from './scene.ts';
 
+type BooksApi = { pnl: { revenue: number; tools: number; grossMargin: number }; counters: { accepted: number; acceptanceRate: number | null; delivered: number } };
+
 export type FeedItem = { at: string; kind: 'live' | 'replay'; e: OfficeEvent };
 type Props = {
   orderId?: string; // job page: only this order's events
@@ -9,26 +11,40 @@ type Props = {
   onFeed?: (f: FeedItem) => void;
   onMode?: (m: { mode: 'live' | 'replay' | 'idle'; orderId?: string }) => void;
   replayToken?: number; // bump to force a replay (e.g. "Replay this job")
+  controls?: boolean; // show director / sound buttons over the stage
+  onAgentClick?: (id: string) => void;
 };
 
 const wait = (ms: number, signal: { stop: boolean }) => new Promise<void>((r) => { const t = setInterval(() => { if (signal.stop) { clearInterval(t); r(); } }, 100); setTimeout(() => { clearInterval(t); r(); }, ms); });
 
-export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, onMode, replayToken }: Props) {
+export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, onMode, replayToken, controls = true, onAgentClick }: Props) {
+  const [director, setDirector] = useState(true);
+  const [sound, setSound] = useState(false);
   const el = useRef<HTMLDivElement>(null);
   const scene = useRef<OfficeScene | null>(null);
   const [ready, setReady] = useState(false);
   const lastLive = useRef(0);
   const replaying = useRef<{ stop: boolean } | null>(null);
-  const cb = useRef({ onFeed, onMode });
-  cb.current = { onFeed, onMode };
+  const cb = useRef({ onFeed, onMode, onAgentClick });
+  cb.current = { onFeed, onMode, onAgentClick };
 
   // mount the scene
   useEffect(() => {
     let s: OfficeScene | null = null, cancelled = false;
-    import('./scene.ts').then((m) => (cancelled || !el.current ? null : m.OfficeScene.create(el.current))).then((x) => { if (!x) return; if (cancelled) x.destroy(); else { s = scene.current = x; setReady(true); } });
+    import('./scene.ts').then((m) => (cancelled || !el.current ? null : m.OfficeScene.create(el.current))).then((x) => { if (!x) return; if (cancelled) x.destroy(); else { s = scene.current = x; setReady(true); if (process.env.NODE_ENV !== 'production') (window as any).__office = x; } });
     return () => { cancelled = true; replaying.current && (replaying.current.stop = true); s?.destroy(); scene.current = null; };
   }, []);
   useEffect(() => { if (ready) scene.current?.focus(team ?? null); }, [ready, team?.join(',')]);
+  useEffect(() => { if (ready && scene.current) scene.current.onAgentClick = (id) => cb.current.onAgentClick?.(id); }, [ready]);
+
+  // the wall screen in the office shows the real books
+  useEffect(() => {
+    if (!ready) return;
+    const load = () => fetch('/api/books').then((r) => r.json()).then((b: BooksApi) => scene.current?.setBooks({ revenue: b.pnl.revenue, tools: b.pnl.tools, margin: b.pnl.grossMargin, accepted: b.counters.accepted, acceptance: b.counters.acceptanceRate, jobs: b.counters.delivered })).catch(() => {});
+    load();
+    const t = setInterval(load, 15000);
+    return () => clearInterval(t);
+  }, [ready]);
 
   // live events
   useEffect(() => {
@@ -89,5 +105,17 @@ export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, on
     playReplay(sig).finally(() => { if (replaying.current === sig) replaying.current = null; });
   }, [replayToken]);
 
-  return <div ref={el} className="office-canvas" style={{ aspectRatio: '1344 / 752', background: '#e9e2d3' }} />;
+  return (
+    <div className="office-wrap">
+      <div ref={el} className="office-canvas" />
+      {!ready && <div className="office-loading"><span className="dot pulse" />Opening the office…</div>}
+      {controls && ready && (
+        <div className="office-controls">
+          <button className={director ? 'on' : ''} onClick={() => { const v = !director; setDirector(v); scene.current?.setDirector(v); }} title="The camera follows the action">{director ? '● Director' : '○ Director'}</button>
+          <button onClick={() => { setDirector(false); scene.current?.setDirector(false); }} title="See the whole building">Wide</button>
+          <button className={sound ? 'on' : ''} onClick={() => { const v = !sound; setSound(v); scene.current?.setSound(v); }} title="Sound effects">{sound ? '♪ Sound on' : '♪ Sound off'}</button>
+        </div>
+      )}
+    </div>
+  );
 }

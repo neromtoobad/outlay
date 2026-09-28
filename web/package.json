@@ -1,25 +1,25 @@
 {
   "name": "outlay-web",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "vite --port 5174",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "next dev -p 5174",
+    "build": "next build",
+    "start": "next start -p 5174"
   },
   "dependencies": {
     "dompurify": "^3.4.16",
+    "gsap": "^3.15.0",
     "marked": "^18.0.14",
+    "motion": "^13.4.4",
+    "next": "^16.3.6",
     "pixi.js": "^8.21.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "react-router-dom": "^7.18.4"
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.1",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.1"
+    "typescript": "5.9"
   }
 }

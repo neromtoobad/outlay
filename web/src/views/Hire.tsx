@@ -1,6 +1,9 @@
-import { useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { api, useApi, usd, ngn, Avatar, Sprite, Seal, ROLE_NAME, DEPT_TINT, type Service, type Quote } from '../lib.tsx';
+'use client';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { motion, Reveal, Stagger, StaggerItem } from '@/components/motion.tsx';
+import { api, useApi, usd, ngn, Avatar, Sprite, Seal, ROLE_NAME, DEPT_TINT, useStored, type Service, type Quote } from '@/lib.tsx';
 
 type QuotedOrder = { id: string; status: string; quote: Quote; demo: boolean };
 
@@ -13,46 +16,46 @@ const EXAMPLES: Record<string, string[]> = {
 function QuoteDoc({ s, order }: { s: Service; order: QuotedOrder }) {
   const q = order.quote;
   return (
-    <div className="quotedoc">
+    <motion.div className="quotedoc" initial={{ opacity: 0, y: 40, rotate: -1.5 }} animate={{ opacity: 1, y: 0, rotate: 0 }} transition={{ type: 'spring', stiffness: 140, damping: 18 }}>
       <div className="top">
         <div><div className="k">Quote from the CFO</div><div className="id">{order.id}</div></div>
       </div>
-      <span className="stamp"><Seal size={78} /></span>
+      <motion.span className="stamp" initial={{ scale: 2.4, opacity: 0, rotate: -30 }} animate={{ scale: 1, opacity: 0.95, rotate: -12 }} transition={{ delay: 0.55, type: 'spring', stiffness: 420, damping: 16 }}><Seal size={78} /></motion.span>
       <div className="price">{q.promo ? 'Free' : usd(q.priceUsd)}{!q.promo && <small>USDC</small>}</div>
       <div className="ngn">{q.promo ? 'Your first job is on us' : ngn(q.priceUsd)}</div>
-      <div className="lines">
+      <Stagger className="lines">
         <div className="srow"><span className="lbl">{s.name}</span><span className="fill" /><span className="v">{usd(s.priceUsd)}</span></div>
         {q.promo && <div className="srow"><span className="lbl">First job free</span><span className="fill" /><span className="v">({usd(s.priceUsd)})</span></div>}
         <div className="srow"><span className="lbl">Bond paid to you if you reject<small>{q.promo ? 'n/a on free jobs' : `${Math.round(q.bondBps / 100)}% of price`}</small></span><span className="fill" /><span className="v">{q.promo ? '—' : `+${usd(q.bondUsd)}`}</span></div>
         <div className="srow"><span className="lbl">Tools the team will buy<small>we pay this</small></span><span className="fill" /><span className="v">~{usd(q.estCostUsd, 3)}</span></div>
         <div className="srow"><span className="lbl">Delivery</span><span className="fill" /><span className="v">~{s.etaMin} min</span></div>
         <div className="srow total"><span className="lbl">You pay, only if you accept</span><span className="fill" /><span className="v">{q.promo ? '0.00' : usd(q.priceUsd)} USDC</span></div>
-      </div>
+      </Stagger>
       <details>
         <summary>Why the CFO priced it this way</summary>
         <ol className="why">{q.reasons.map((r) => <li key={r}>{r}</li>)}</ol>
       </details>
       <div className="signed">
         <Avatar role="cfo" lg />
-        <div><div className="sig">The CFO</div><div className="muted">Chief Financial Officer, Outlay · {new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</div></div>
+        <div><motion.div className="sig" initial={{ clipPath: 'inset(0 100% 0 0)' }} animate={{ clipPath: 'inset(0 0% 0 0)' }} transition={{ delay: 0.9, duration: 0.9, ease: 'easeInOut' }}>The CFO</motion.div><div className="muted">Chief Financial Officer, Outlay · {new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</div></div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-export default function Hire() {
-  const { service = '' } = useParams();
-  const nav = useNavigate();
-  const loc = useLocation();
+export default function Hire({ service }: { service: string }) {
+  const router = useRouter();
   const { data } = useApi<{ services: Service[]; mode: string }>('/api/services');
   const s = data?.services.find((x) => x.id === service);
-  const [brief, setBrief] = useState<string>(() => (loc.state as any)?.brief ?? '');
-  const [email, setEmail] = useState(() => localStorage.getItem('outlay:email') ?? '');
+  const [brief, setBrief] = useState('');
+  const [email, setEmail] = useStored('outlay:email');
+  // a brief typed into the home page hero arrives here once
+  useEffect(() => { try { const b = sessionStorage.getItem('outlay:brief'); if (b) { setBrief(b); sessionStorage.removeItem('outlay:brief'); } } catch {} }, []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [order, setOrder] = useState<QuotedOrder | null>(null);
 
-  if (data && !s) return <main className="wrap section center"><h1 className="h1">We don't do that one (yet).</h1><p style={{ margin: '14px 0 24px' }}><Link to="/#services" className="btn secondary">See the services</Link></p></main>;
+  if (data && !s) return <main className="wrap section center"><h1 className="h1">We don't do that one (yet).</h1><p style={{ margin: '14px 0 24px' }}><Link href="/#services" className="btn secondary">See the services</Link></p></main>;
   if (!s) return <main className="wrap section"><div className="skel" style={{ height: 420 }} /></main>;
 
   async function getQuote() {
@@ -67,7 +70,7 @@ export default function Hire() {
     setBusy(true); setErr(null);
     try {
       await api(`/api/orders/${order.id}/start`, { method: 'POST', body: JSON.stringify({ mode }) });
-      nav(`/job/${order.id}`);
+      router.push(`/job/${order.id}`);
     } catch (e: any) { setErr(e.message); setBusy(false); }
   }
   const examples = EXAMPLES[s.id] ?? (s.example ? [s.example] : []);
@@ -77,16 +80,16 @@ export default function Hire() {
   return (
     <main className="wrap">
       <div className="pagehead" style={{ paddingBottom: 0 }}>
-        <div className="crumbs"><Link to="/#services">Services</Link><span>/</span><span>{s.dept}</span></div>
+        <div className="crumbs"><Link href="/#services">Services</Link><span>/</span><span>{s.dept}</span></div>
       </div>
       <div className="hire">
         <section>
           <h1 className="h1">{s.name}</h1>
           <p style={{ fontSize: 19, color: 'var(--ink-2)', marginTop: 12 }}>{s.tagline}</p>
 
-          <div className="teamphoto" style={{ ['--t' as any]: DEPT_TINT[s.dept] }}>
-            {s.team.map((r) => <Sprite key={r} role={r} />)}
-          </div>
+          <Stagger className="teamphoto" style={{ ['--t' as any]: DEPT_TINT[s.dept] }}>
+            {s.team.map((r) => <StaggerItem key={r} style={{ display: 'contents' }} variants={{ hidden: {}, show: {} }}><motion.img className="sprite" src={`/sprites/${r}/${r}-0.png`} alt={r} variants={{ hidden: { opacity: 0, y: 40 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 18 } } }} /></StaggerItem>)}
+          </Stagger>
           <div className="names">{s.team.map((r) => <span key={r} className="chip"><Avatar role={r} />{ROLE_NAME[r] ?? r}</span>)}</div>
 
           <ul className="youget">{s.youGet.map((g) => <li key={g}><i>✓</i>{g}</li>)}</ul>
@@ -96,7 +99,7 @@ export default function Hire() {
             <div><div className="k">Tools it usually needs</div><div className="v">~{s.listedCostUsd} USDC<small>paid by us, on a public receipt</small></div></div>
             <div><div className="k">Delivered in</div><div className="v">~{s.etaMin} min<small>you watch it happen</small></div></div>
           </div>
-          {others.length > 0 && <p className="muted" style={{ fontSize: 14, marginTop: 22 }}>Need something else? {others.map((o, i) => <span key={o.id}>{i ? ' · ' : ''}<Link to={`/hire/${o.id}`}>{o.name}</Link></span>)}</p>}
+          {others.length > 0 && <p className="muted" style={{ fontSize: 14, marginTop: 22 }}>Need something else? {others.map((o, i) => <span key={o.id}>{i ? ' · ' : ''}<Link href={`/hire/${o.id}`}>{o.name}</Link></span>)}</p>}
         </section>
 
         <section className="sticky">

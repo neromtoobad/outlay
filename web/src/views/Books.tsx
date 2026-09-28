@@ -1,6 +1,8 @@
+'use client';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useApi, usd, timeAgo, SERVICE_NAME, Avatar } from '../lib.tsx';
+import Link from 'next/link';
+import { useApi, usd, timeAgo, SERVICE_NAME, Avatar } from '@/lib.tsx';
+import { CountUp, Reveal } from '@/components/motion.tsx';
 
 type Entry = { date: string; narration: string; postings: { account: string; amount: number }[]; meta: { doc?: string; tx?: string; agent?: string; reason?: string; kind: string } };
 type Books = {
@@ -92,12 +94,12 @@ export default function Books() {
         {b.mode === 'demo' && <div className="banner"><span>●</span><div><b>Demo mode.</b> These numbers come from simulated jobs: no real money moved and every receipt is marked “demo”. Live figures from Arc mainnet replace them when the treasury is funded.</div></div>}
       </div>
 
-      <div className="kpirow">
-        <div><div className="k">Revenue</div><div className="v">{usd(p.revenue)}<small>USDC</small></div><div className="d">accepted, paid jobs only</div></div>
-        <div><div className="k">Tool spend on Arc</div><div className="v">{usd(p.tools, 3)}<small>USDC</small></div><div className="d">{c.toolCalls} x402 payments</div></div>
-        <div><div className="k">Gross margin</div><div className={`v${p.grossMargin < 0 ? ' neg' : ''}`}>{usd(p.grossMargin, 2)}<small>USDC</small></div><div className="d">{p.revenue ? `${Math.round((p.grossMargin / p.revenue) * 100)}% of revenue` : 'no revenue yet'}</div></div>
-        <div><div className="k">Acceptance</div><div className="v">{c.acceptanceRate == null ? '—' : `${Math.round(c.acceptanceRate * 100)}%`}</div><div className="d">{c.accepted} accepted · {c.rejected} rejected</div></div>
-      </div>
+      <Reveal className="kpirow">
+        <div><div className="k">Revenue</div><div className="v"><CountUp value={p.revenue} decimals={2} /><small>USDC</small></div><div className="d">accepted, paid jobs only</div></div>
+        <div><div className="k">Tool spend on Arc</div><div className="v"><CountUp value={p.tools} decimals={3} /><small>USDC</small></div><div className="d">{c.toolCalls} x402 payments</div></div>
+        <div><div className="k">Gross margin</div><div className={`v${p.grossMargin < 0 ? ' neg' : ''}`}><CountUp value={p.grossMargin} decimals={2} /><small>USDC</small></div><div className="d">{p.revenue ? `${Math.round((p.grossMargin / p.revenue) * 100)}% of revenue` : 'no revenue yet'}</div></div>
+        <div><div className="k">Acceptance</div><div className="v"><CountUp value={c.acceptanceRate == null ? null : Math.round(c.acceptanceRate * 100)} suffix="%" /></div><div className="d">{c.accepted} accepted · {c.rejected} rejected</div></div>
+      </Reveal>
       <div className="minis">
         <div><b>{c.delivered}</b>jobs delivered</div>
         <div><b>{c.customers}</b>customers · {c.freeJobs} free jobs</div>
@@ -154,7 +156,7 @@ export default function Books() {
             <tbody>
               {Object.entries(b.perService).map(([k, s]) => (
                 <tr key={k}>
-                  <td><Link to={`/hire/${k}`}>{SERVICE_NAME[k] ?? k}</Link></td>
+                  <td><Link href={`/hire/${k}`}>{SERVICE_NAME[k] ?? k}</Link></td>
                   <td className="num">{s.jobs}{s.free ? <span className="muted"> ({s.free} free)</span> : null}</td>
                   <td className="num">{usd(s.price)}</td>
                   <td className="num">{usd(s.avgCost, 4)}</td>
@@ -185,7 +187,7 @@ export default function Books() {
                     <td><span style={{ display: 'inline-flex', gap: 8, alignItems: 'flex-start' }}>{e.meta.agent && <Avatar role={e.meta.agent} />}<span>{e.narration}{e.meta.reason && <div className="ref">{e.meta.reason}</div>}</span></span></td>
                     <td className="ref">{e.postings.map((x) => <div key={x.account} className={x.amount > 0 ? 'dr' : 'cr'}>{x.amount > 0 ? 'Dr' : 'Cr'} {x.account}</div>)}</td>
                     <td className="num">{usd(debit.reduce((s, x) => s + x.amount, 0), 4)}</td>
-                    <td className="ref">{e.meta.doc ? <Link to={`/job/${e.meta.doc}`}>{e.meta.doc}</Link> : '—'}<div>{e.meta.tx === 'dry-run' ? 'demo' : e.meta.tx?.slice(0, 12)}</div></td>
+                    <td className="ref">{e.meta.doc ? <Link href={`/job/${e.meta.doc}`}>{e.meta.doc}</Link> : '—'}<div>{e.meta.tx === 'dry-run' ? 'demo' : e.meta.tx?.slice(0, 12)}</div></td>
                   </tr>
                 );
               })}

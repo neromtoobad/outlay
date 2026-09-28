@@ -1,9 +1,11 @@
+'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import Link from 'next/link';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { api, usd, ngn, Avatar, ROLE_NAME, SERVICE_NAME, timeAgo, type Order, type Receipt, type Step } from '../lib.tsx';
-import Office from '../office/Office.tsx';
+import { api, usd, ngn, Avatar, ROLE_NAME, SERVICE_NAME, timeAgo, useStored, type Order, type Receipt, type Step } from '@/lib.tsx';
+import Office from '@/office/Office.tsx';
+import { AnimatePresence, motion } from 'motion/react';
 
 function Stepper({ o }: { o: Order }) {
   const st = o.status;
@@ -18,16 +20,18 @@ function Stepper({ o }: { o: Order }) {
       cls: st === 'accepted' ? 'done' : st === 'rejected' ? 'bad' : st === 'delivered' ? 'now' : '',
     },
   ];
-  return <div className="stepper">{steps.map((s) => <div key={s.label} className={`s ${s.cls}`}><b>{s.label}</b><span>{s.note}</span></div>)}</div>;
+  return <div className="stepper">{steps.map((s, i) => <motion.div key={s.label} className={`s ${s.cls}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.08 }}><b>{s.label}</b><span>{s.note}</span></motion.div>)}</div>;
 }
 
 function Timeline({ steps }: { steps: Step[] }) {
   return (
     <ul className="timeline">
       {steps.length === 0 && <li><Avatar role="cfo" /><span>The CFO is staffing the job…</span><time /></li>}
+      <AnimatePresence initial={false}>
       {steps.map((s, i) => (
-        <li key={i}><Avatar role={s.agent} /><div><b>{ROLE_NAME[s.agent] ?? s.agent}</b><span>{s.step}{s.note ? ` · ${s.note}` : ''}</span></div><time>{new Date(s.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time></li>
+        <motion.li key={`${s.at}${i}`} initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.35 }}><Avatar role={s.agent} /><div><b>{ROLE_NAME[s.agent] ?? s.agent}</b><span>{s.step}{s.note ? ` · ${s.note}` : ''}</span></div><time>{new Date(s.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time></motion.li>
       ))}
+      </AnimatePresence>
     </ul>
   );
 }
@@ -44,11 +48,11 @@ function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
       <div className="scroll">
         {receipt.length === 0 && <div className="empty">Nothing bought yet</div>}
         {receipt.map((r, i) => (
-          <div key={i} className="ln">
+          <motion.div key={i} className="ln" initial={{ opacity: 0, y: -6, clipPath: 'inset(0 0 100% 0)' }} animate={{ opacity: 1, y: 0, clipPath: 'inset(0 0 0% 0)' }} transition={{ delay: Math.min(i, 12) * 0.05, duration: 0.3 }}>
             <span className="who"><Avatar role={r.agent} />{r.vendor}</span>
             <span className="v">{r.usd.toFixed(4)}</span>
             <span className="why">{r.reason}{r.dry ? ' · demo' : ` · ${r.transaction.slice(0, 10)}…`}</span>
-          </div>
+          </motion.div>
         ))}
       </div>
       <hr />
@@ -61,11 +65,10 @@ function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
   );
 }
 
-export default function Job() {
-  const { id = '' } = useParams();
+export default function Job({ id }: { id: string }) {
   const [o, setO] = useState<Order | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [email, setEmail] = useState(() => localStorage.getItem('outlay:email') ?? '');
+  const [email, setEmail] = useStored('outlay:email');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [replay, setReplay] = useState(0);
@@ -100,14 +103,14 @@ export default function Job() {
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   }
 
-  if (err && !o) return <main className="wrap section center"><h1 className="h1">Couldn't find this job.</h1><p className="muted" style={{ margin: '12px 0 24px' }}>{err}</p><Link to="/" className="btn secondary">Back to Outlay</Link></main>;
+  if (err && !o) return <main className="wrap section center"><h1 className="h1">Couldn't find this job.</h1><p className="muted" style={{ margin: '12px 0 24px' }}>{err}</p><Link href="/" className="btn secondary">Back to Outlay</Link></main>;
   if (!o) return <main className="wrap section"><div className="skel" style={{ height: 480 }} /></main>;
   const q = o.quote;
 
   return (
     <main className="wrap">
       <div className="pagehead" style={{ paddingBottom: 0 }}>
-        <div className="crumbs"><Link to={`/hire/${o.service}`}>{SERVICE_NAME[o.service] ?? o.service}</Link><span>/</span><span className="mono" style={{ fontSize: 13 }}>{o.id}</span></div>
+        <div className="crumbs"><Link href={`/hire/${o.service}`}>{SERVICE_NAME[o.service] ?? o.service}</Link><span>/</span><span className="mono" style={{ fontSize: 13 }}>{o.id}</span></div>
         <div className="jobhead">
           <div>
             <h1 className="h1">{o.brief.length > 110 ? o.brief.slice(0, 110) + '…' : o.brief}</h1>
@@ -207,7 +210,7 @@ export default function Job() {
               <ol className="why">{q.reasons.map((r) => <li key={r}>{r}</li>)}</ol>
             </details>
           </section>
-          <p className="muted" style={{ fontSize: 13.5 }}>Every receipt here is public. <Link to="/books">See the company's books →</Link></p>
+          <p className="muted" style={{ fontSize: 13.5 }}>Every receipt here is public. <Link href="/books">See the company's books →</Link></p>
         </aside>
       </div>
     </main>

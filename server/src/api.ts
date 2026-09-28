@@ -3,7 +3,6 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
-import { serveStatic } from '@hono/node-server/serve-static';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DATA_DIR, DRY } from './config.ts';
@@ -111,12 +110,7 @@ app.get('/api/events', (c) =>
   }),
 );
 
-// Production: serve the built web app
-const webDist = new URL('../../web/dist', import.meta.url).pathname;
-if (existsSync(webDist)) {
-  app.use('/*', serveStatic({ root: webDist }));
-  app.get('*', (c) => c.html(readFileSync(join(webDist, 'index.html'), 'utf8')));
-}
+// The web app (web/, Next.js) is its own service and proxies /api here (OUTLAY_API_URL).
 
 setInterval(() => autoAcceptDue(), 60_000);
 const port = Number(process.env.PORT ?? 8790);

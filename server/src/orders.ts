@@ -46,6 +46,7 @@ export function orderEventData(o: Order, status: string = o.status) {
   return {
     status, service: o.service, team: [...team], promo: o.quote.promo, price: o.quote.priceUsd, bond: o.quote.bondUsd,
     refund: o.refund ?? null, by: o.decision?.by ?? null,
+    brief: o.brief.length > 90 ? o.brief.slice(0, 88) + '…' : o.brief, // the office whiteboard; job pages already show it
   };
 }
 
