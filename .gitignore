@@ -16,3 +16,6 @@ PLAN.md
 # Higgsfield exploration outputs; the chosen assets live in assets/sheets and assets/scene
 assets/style-tests/
 assets/scene-tests/
+
+# local job data (may contain customer briefs)
+server/data/
