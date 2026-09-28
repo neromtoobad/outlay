@@ -12,6 +12,8 @@
   "type": "module",
   "private": "true",
   "dependencies": {
+    "@circle-fin/adapter-viem-v2": "^1.18.0",
+    "@circle-fin/bridge-kit": "^1.15.1",
     "@circle-fin/x402-batching": "^3.5.0",
     "viem": "^2.56.9"
   }
