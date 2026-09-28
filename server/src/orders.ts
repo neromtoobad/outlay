@@ -105,7 +105,7 @@ function bondPoolFree(): number {
   return Math.max(0, 3 - open.reduce((s, o) => s + o.quote.bondUsd, 0));
 }
 function promoLeft(): number {
-  const used = listOrders().filter((o) => o.demo === DRY && o.payment?.mode === 'promo').reduce((s, o) => s + o.quote.estCostUsd, 0);
+  const used = listOrders().filter((o) => o.demo === DRY && o.payment?.mode === 'promo' && o.status !== 'failed').reduce((s, o) => s + o.quote.estCostUsd, 0);
   return Math.max(0, 2 - used);
 }
 
@@ -113,7 +113,8 @@ export function createQuote(input: { service: string; brief: string; email: stri
   const item = CATALOG.find((c) => c.id === input.service);
   if (!item || !item.live) throw new Error('unknown or not-yet-live service');
   const email = input.email.trim().toLowerCase();
-  const firstJob = !listOrders().some((o) => o.demo === DRY && o.email === email && o.payment); // demo orders never use up a real free job
+  // demo orders, and free jobs we failed to deliver, never use up a customer's free first job
+  const firstJob = !listOrders().some((o) => o.demo === DRY && o.email === email && o.payment && o.status !== 'failed');
   const q = quote({
     service: item.id, priceUsd: item.priceUsd, listedCostUsd: item.listedCostUsd, history: historyFor(item.id),
     bondPoolFreeUsd: bondPoolFree(), firstJobForCustomer: firstJob, promoLeftUsd: promoLeft(), deliverHours: 1,
@@ -178,6 +179,15 @@ export function decide(o: Order, kind: 'accept' | 'reject' | 'revise', note?: st
     return;
   }
   saveOrder(o);
+}
+
+/** A free job we failed to deliver can be run again (paid ones were already refunded + bonded). */
+export function retry(o: Order) {
+  if (o.status !== 'failed') throw new Error(`order is ${o.status}`);
+  if (o.payment?.mode !== 'promo') throw new Error('paid orders that failed were refunded with the bond; place a new order');
+  o.status = 'queued';
+  saveOrder(o);
+  void run(o);
 }
 
 /** Silence means yes: delivered orders auto-accept after 48h (the escrow does the same on-chain). */

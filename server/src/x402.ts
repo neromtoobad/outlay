@@ -21,6 +21,11 @@ export type ReceiptLine = {
 
 export class SpendRefused extends Error {}
 
+// Vendors sometimes answer "verification temporarily unavailable" or time out. A payment that fails
+// verification is never settled (checked on mainnet: the balance does not move), so retrying is safe.
+const TRANSIENT = /temporarily unavailable|please retry|try again|timed? ?out|ETIMEDOUT|ECONNRESET|EAI_AGAIN|fetch failed|socket hang up|\b(429|502|503|504)\b|rate limit/i;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 // One client per agent, with ONE price-cap hook that reads the cap for the call in flight.
 // Calls for the same agent are serialized so the cap always belongs to the right call.
 type Slot = { client: GatewayClient; capAtomic: bigint; refused?: string; tail: Promise<unknown> };
@@ -84,7 +89,15 @@ export async function buy<T>(
     s.capAtomic = BigInt(Math.round(opts.maxUsd * 1e6));
     s.refused = undefined;
     try {
-      const res = await s.client.pay<T>(opts.url, { method: opts.method ?? 'POST', body: opts.body });
+      let res: Awaited<ReturnType<typeof s.client.pay<T>>> | undefined;
+      for (let attempt = 1; ; attempt++) {
+        try { res = await s.client.pay<T>(opts.url, { method: opts.method ?? 'POST', body: opts.body }); break; }
+        catch (e: any) {
+          if (s.refused || attempt >= 3 || !TRANSIENT.test(String(e?.message ?? e))) throw e;
+          job.log(opts.agent, 'retry', `${opts.vendor}: ${String(e?.message ?? e).slice(0, 60)}; trying again`);
+          await sleep(attempt * 2500);
+        }
+      }
       job.addReceipt({
         at: new Date().toISOString(), agent: opts.agent, vendor: opts.vendor, url: opts.url,
         amount: res.amount.toString(), usd: Number(res.amount) / 1e6, transaction: res.transaction,

@@ -51,7 +51,9 @@ export const localBusinessFinder = {
         for (const page of [1, 2]) {
           if (calls >= 6) break outer;
           job.log('scout', 'maps', `"${q}" page ${page}`);
-          const places = await mapsSearch(job, 'scout', q, `Google Maps: "${q}" p${page}`, page);
+          let places: Place[];
+          try { places = await mapsSearch(job, 'scout', q, `Google Maps: "${q}" p${page}`, page); }
+          catch (e: any) { job.log('scout', 'skip', `"${q}" failed (${String(e?.message ?? e).slice(0, 50)}); moving on`); calls++; break; }
           calls++;
           for (const p of places) {
             const key = p.cid ?? `${p.title}|${p.address}`.toLowerCase();
@@ -62,6 +64,7 @@ export const localBusinessFinder = {
         }
       }
 
+      if (!byKey.size) throw new Error('no search came back; nothing to deliver');
       job.log('verifier', 'clean', `${byKey.size} unique places → applying "${spec.filter}", normalizing phones`);
       const rows = [...byKey.values()]
         .filter(keep)

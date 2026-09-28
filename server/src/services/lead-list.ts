@@ -45,7 +45,9 @@ export const leadList = {
         for (const page of [1, 2, 3]) {
           if (mapsCalls >= 6 || byDomain.size >= spec.want * 2) break;
           job.log('scout', 'maps', `"${q}" page ${page}`);
-          const places = await mapsSearch(job, 'scout', q, `find ${spec.target} with websites`, page);
+          let places: Awaited<ReturnType<typeof mapsSearch>>;
+          try { places = await mapsSearch(job, 'scout', q, `find ${spec.target} with websites`, page); }
+          catch (e: any) { job.log('scout', 'skip', `"${q}" failed (${String(e?.message ?? e).slice(0, 50)}); moving on`); break; }
           mapsCalls++;
           for (const p of places) {
             const domain = hostOf(p.website);

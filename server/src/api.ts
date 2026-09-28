@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { DATA_DIR, DRY } from './config.ts';
 import { bus, type OutlayEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
-import { autoAcceptDue, createQuote, decide, getOrder, readJob, replay, start } from './orders.ts';
+import { autoAcceptDue, createQuote, decide, getOrder, readJob, replay, retry, start } from './orders.ts';
 import { books, beancount, team } from './books.ts';
 
 process.env.OUTLAY_QUIET ??= '1';
@@ -42,6 +42,19 @@ app.post('/api/orders/:id/start', async (c) => {
   const { mode } = await c.req.json().catch(() => ({ mode: 'promo' }));
   try {
     await start(o, mode === 'simulated' ? 'simulated' : 'promo');
+    return c.json(view(o.id));
+  } catch (e: any) {
+    return c.json({ error: e.message }, 400);
+  }
+});
+
+app.post('/api/orders/:id/retry', async (c) => {
+  const o = getOrder(c.req.param('id'));
+  if (!o) return c.json({ error: 'not found' }, 404);
+  const { email } = await c.req.json().catch(() => ({}));
+  if (String(email ?? '').trim().toLowerCase() !== o.email) return c.json({ error: 'Only the customer who placed this order can retry it.' }, 403);
+  try {
+    retry(o);
     return c.json(view(o.id));
   } catch (e: any) {
     return c.json({ error: e.message }, 400);

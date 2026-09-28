@@ -112,7 +112,7 @@ export default function Hire({ service }: { service: string }) {
                   <textarea value={brief} onChange={(e) => setBrief(e.target.value)} placeholder={examples[0] ?? 'Describe the job'} autoFocus={!brief} />
                 </label>
                 {examples.length > 0 && <div className="examples">{examples.map((x) => <button type="button" key={x} className="chip click" onClick={() => setBrief(x)}>{x}</button>)}</div>}
-                <label className="field">Your email <span className="hint">We send the work here and it's how you accept or reject it.</span>
+                <label className="field">Your email <span className="hint">It's your key to this job: you confirm with it to accept, revise or reject.</span>
                   <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" />
                 </label>
                 {err && <div className="error">{err}</div>}

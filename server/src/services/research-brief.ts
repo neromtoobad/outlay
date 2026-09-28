@@ -30,8 +30,10 @@ export const researchBrief = {
       // 2. Search
       job.log('scout', 'search', `${queries.length} Google queries + 1 Exa neural search`);
       const hits: SearchHit[] = [];
-      for (const q of queries) hits.push(...(await webSearch(job, 'scout', q, `Google search: "${q}"`)));
-      hits.push(...(await neuralSearch(job, 'scout', brief, 'neural search on the whole brief', 6)));
+      const tryHits = async (label: string, f: () => Promise<typeof hits>) => { try { hits.push(...(await f())); } catch (e: any) { job.log('scout', 'skip', `${label} failed (${String(e?.message ?? e).slice(0, 50)}); moving on`); } };
+      for (const q of queries) await tryHits(`"${q}"`, () => webSearch(job, 'scout', q, `Google search: "${q}"`));
+      await tryHits('neural search', () => neuralSearch(job, 'scout', brief, 'neural search on the whole brief', 6));
+      if (!hits.length) throw new Error('no search came back; nothing to research');
 
       // 3. Choose and read sources (dedupe by host, prefer diverse domains)
       const seen = new Set<string>();

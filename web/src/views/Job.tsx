@@ -95,7 +95,7 @@ export default function Job({ id }: { id: string }) {
   const receipt: Receipt[] = running?.receipt ?? last?.receipt ?? [];
   const html = useMemo(() => (last?.deliverable ? DOMPurify.sanitize(marked.parse(last.deliverable, { async: false }) as string) : ''), [last?.deliverable]);
 
-  async function decide(action: 'accept' | 'reject' | 'revise') {
+  async function decide(action: 'accept' | 'reject' | 'revise' | 'retry') {
     setBusy(true); setErr(null);
     try {
       localStorage.setItem('outlay:email', email);
@@ -191,9 +191,21 @@ export default function Job({ id }: { id: string }) {
             ) : o.status === 'rejected' ? (
               <div className="qa revise"><Avatar role="cfo" /><div>Rejected{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. The CFO will learn from this.</div></div>
             ) : o.status === 'failed' ? (
-              <div className="qa revise"><Avatar role="cfo" /><div>We couldn't deliver this one{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. {last?.error}</div></div>
+              <div className="form" style={{ gap: 12 }}>
+                <div className="qa revise"><Avatar role="cfo" /><div>We couldn't deliver this one{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. {last?.error}</div></div>
+                {o.payment?.mode === 'promo' && (
+                  <>
+                    <p style={{ fontSize: 14, color: 'var(--ink-2)' }}>It's still your free job. The team can try again; you only see what they spend on the receipt.</p>
+                    <label className="field">Confirm with your email
+                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" />
+                    </label>
+                    <button className="btn primary block" disabled={busy || !email} onClick={() => decide('retry')}>Try again</button>
+                    {err && <div className="error">{err}</div>}
+                  </>
+                )}
+              </div>
             ) : (
-              <p className="muted" style={{ fontSize: 14.5 }}>You'll decide once the work is delivered, usually within a few minutes. You can close this page; we'll email you.</p>
+              <p className="muted" style={{ fontSize: 14.5 }}>You'll decide once the work is delivered, usually within a few minutes. Keep this link: it's where your work and your decision live.</p>
             )}
           </section>
 
