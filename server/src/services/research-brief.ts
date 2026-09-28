@@ -12,8 +12,8 @@ export const researchBrief = {
   priceUsd: 3,
   policy: { budgetUsd: 0.6, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.exa] },
 
-  async run(brief: string): Promise<Job> {
-    const job = new Job(this.id, brief, this.policy);
+  async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
+    const job = new Job(this.id, brief, this.policy, opts.orderId);
     try {
       // 1. Plan
       job.log('researcher', 'plan', 'turning the brief into search queries and an outline');

@@ -28,8 +28,8 @@ export const localBusinessFinder = {
   priceUsd: 3,
   policy: { budgetUsd: 0.25, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal] },
 
-  async run(brief: string): Promise<Job> {
-    const job = new Job(this.id, brief, this.policy);
+  async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
+    const job = new Job(this.id, brief, this.policy, opts.orderId);
     try {
       job.log('researcher', 'parse', 'category, location, how many, which filter');
       const spec = parseJson<Spec>(

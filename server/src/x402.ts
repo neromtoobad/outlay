@@ -67,6 +67,9 @@ export async function buy<T>(
   }
 
   if (DRY) {
+    // Demo pacing so the live job page shows the team working (OUTLAY_DRY_DELAY ms per purchase).
+    const delay = Number(process.env.OUTLAY_DRY_DELAY ?? 0);
+    if (delay) await new Promise((r) => setTimeout(r, delay * (0.6 + Math.random() * 0.8)));
     const data = opts.dryData();
     job.addReceipt({
       at: new Date().toISOString(), agent: opts.agent, vendor: opts.vendor, url: opts.url,

@@ -24,8 +24,8 @@ export const leadList = {
   priceUsd: 5,
   policy: { budgetUsd: 0.6, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.apex] },
 
-  async run(brief: string): Promise<Job> {
-    const job = new Job(this.id, brief, this.policy);
+  async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
+    const job = new Job(this.id, brief, this.policy, opts.orderId);
     try {
       job.log('researcher', 'parse', 'who to target, where, how many, what the customer sells');
       const spec = parseJson<Spec>(
