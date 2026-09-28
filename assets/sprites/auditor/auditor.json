@@ -1,0 +1,92 @@
+{
+  "name": "auditor",
+  "source": "../../assets/sheets/auditor.png",
+  "frameWidth": 252,
+  "frameHeight": 345,
+  "anchor": {
+    "x": 0.557791836067106,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "auditor-0.png",
+      "bbox": [
+        100,
+        14,
+        227,
+        349
+      ]
+    },
+    {
+      "index": 1,
+      "file": "auditor-1.png",
+      "bbox": [
+        406,
+        14,
+        586,
+        352
+      ]
+    },
+    {
+      "index": 2,
+      "file": "auditor-2.png",
+      "bbox": [
+        749,
+        13,
+        931,
+        351
+      ]
+    },
+    {
+      "index": 3,
+      "file": "auditor-3.png",
+      "bbox": [
+        1057,
+        57,
+        1279,
+        306
+      ]
+    },
+    {
+      "index": 4,
+      "file": "auditor-4.png",
+      "bbox": [
+        68,
+        387,
+        266,
+        722
+      ]
+    },
+    {
+      "index": 5,
+      "file": "auditor-5.png",
+      "bbox": [
+        413,
+        399,
+        548,
+        717
+      ]
+    },
+    {
+      "index": 6,
+      "file": "auditor-6.png",
+      "bbox": [
+        739,
+        389,
+        929,
+        719
+      ]
+    },
+    {
+      "index": 7,
+      "file": "auditor-7.png",
+      "bbox": [
+        1077,
+        392,
+        1258,
+        724
+      ]
+    }
+  ]
+}

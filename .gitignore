@@ -1,0 +1,18 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+dist/
+build/
+out/
+cache/
+broadcast/
+
+# private planning notes (competitor analysis, strategy)
+PLAN.md
+
+# Higgsfield exploration outputs; the chosen assets live in assets/sheets and assets/scene
+assets/style-tests/
+assets/scene-tests/

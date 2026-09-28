@@ -1,0 +1,92 @@
+{
+  "name": "verifier",
+  "source": "../../assets/sheets/verifier.png",
+  "frameWidth": 272,
+  "frameHeight": 361,
+  "anchor": {
+    "x": 0.511532725766363,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "verifier-0.png",
+      "bbox": [
+        107,
+        10,
+        235,
+        364
+      ]
+    },
+    {
+      "index": 1,
+      "file": "verifier-1.png",
+      "bbox": [
+        407,
+        12,
+        584,
+        362
+      ]
+    },
+    {
+      "index": 2,
+      "file": "verifier-2.png",
+      "bbox": [
+        742,
+        11,
+        925,
+        363
+      ]
+    },
+    {
+      "index": 3,
+      "file": "verifier-3.png",
+      "bbox": [
+        1041,
+        65,
+        1301,
+        338
+      ]
+    },
+    {
+      "index": 4,
+      "file": "verifier-4.png",
+      "bbox": [
+        55,
+        385,
+        256,
+        735
+      ]
+    },
+    {
+      "index": 5,
+      "file": "verifier-5.png",
+      "bbox": [
+        406,
+        395,
+        552,
+        731
+      ]
+    },
+    {
+      "index": 6,
+      "file": "verifier-6.png",
+      "bbox": [
+        734,
+        385,
+        926,
+        733
+      ]
+    },
+    {
+      "index": 7,
+      "file": "verifier-7.png",
+      "bbox": [
+        1088,
+        386,
+        1258,
+        735
+      ]
+    }
+  ]
+}

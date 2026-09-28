@@ -1,0 +1,22 @@
+{
+  "name": "desk",
+  "source": "../../assets/scene-tests/desk-6c271cec.png",
+  "frameWidth": 813,
+  "frameHeight": 758,
+  "anchor": {
+    "x": 0.691782134810622,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "desk-0.png",
+      "bbox": [
+        181,
+        48,
+        982,
+        799
+      ]
+    }
+  ]
+}

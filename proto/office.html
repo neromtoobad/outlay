@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Outlay Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="office.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <defs><radialGradient id="lead" cx="40%" cy="35%"><stop offset="0" stop-color="#9aa0a8"/><stop offset="1" stop-color="#5a5f67"/></radialGradient></defs>
+        <circle cx="32" cy="32" r="30" fill="url(#lead)" stroke="#3f434a" stroke-width="2"/>
+        <circle cx="32" cy="32" r="23" fill="none" stroke="#c9ced6" stroke-opacity=".55" stroke-width="1.5" stroke-dasharray="2 3"/>
+        <text x="32" y="41" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="28" fill="#f2efe6">O</text>
+      </svg>
+      <div>
+        <div class="wordmark">OUTLAY</div>
+        <div class="sub">The AI company you can hire</div>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="kpi gold"><label>Treasury</label><div class="val" id="k-treasury">0.00<small>USDC</small></div></div>
+      <div class="kpi"><label>Spent today</label><div class="val" id="k-spent">0.000<small>USDC</small></div></div>
+      <div class="kpi"><label>x402 payments</label><div class="val" id="k-pays">0</div></div>
+      <div class="kpi epoch">
+        <svg class="ring" viewBox="0 0 36 36"><circle class="track" cx="18" cy="18" r="15"/><circle class="prog" id="k-ring" cx="18" cy="18" r="15" stroke-dasharray="94.25" stroke-dashoffset="0"/></svg>
+        <div><label>Epoch</label><div class="val" id="k-epoch">41</div></div>
+      </div>
+    </div>
+    <div class="top-right">
+      <span class="pill net"><i class="dot"></i>Arc · simulated</span>
+      <button class="inbox-btn" id="inbox-btn" title="Decisions that need your co-signature">Boss inbox <b id="inbox-count">0</b></button>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="left">
+      <section class="stage-card">
+        <div id="stage"></div>
+        <div class="stage-badge">Simulated events</div>
+        <div class="stage-hint">Click anyone to open their file</div>
+      </section>
+      <section class="cards">
+        <article class="card">
+          <h3>Guardrails <span class="muted">· enforced by the vault contract</span></h3>
+          <ul class="checks" id="guards"></ul>
+        </article>
+        <article class="card">
+          <h3>Spend by worker <span class="muted">· this session</span></h3>
+          <div class="spend" id="spend"></div>
+        </article>
+        <article class="card">
+          <h3>Latest sealed decision</h3>
+          <div id="last-dec" class="last-dec"><div class="empty">Waiting for the first review…</div></div>
+        </article>
+      </section>
+    </div>
+    <aside class="sidebar">
+      <nav class="tabs">
+        <button class="active" data-tab="activity">Activity</button>
+        <button data-tab="workforce">Workforce</button>
+        <button data-tab="decisions">Decisions</button>
+      </nav>
+      <div class="panel" id="p-activity"><ul class="list" id="feed"></ul></div>
+      <div class="panel hidden" id="p-workforce"><ul class="list" id="roster"></ul></div>
+      <div class="panel hidden" id="p-decisions"><ul class="list" id="decisions"><li class="empty">The first sealed decision appears after the next review.</li></ul></div>
+    </aside>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Worker file">
+  <div class="hero" id="d-hero"><img id="d-img" alt="" /><button class="close" id="d-close" aria-label="Close">✕</button></div>
+  <div class="body">
+    <h2 id="d-name"></h2>
+    <div class="tag" id="d-tag"></div>
+    <div class="stats">
+      <div class="stat"><label>Budget left</label><div id="d-budget"></div></div>
+      <div class="stat"><label>Spent</label><div id="d-spent"></div></div>
+      <div class="stat"><label>ROI vs holdout</label><div id="d-roi"></div></div>
+      <div class="stat"><label>Payments</label><div id="d-pays"></div></div>
+    </div>
+    <h3>Buys on Arc (x402)</h3>
+    <div class="buys" id="d-buys"></div>
+    <h3>Budget over time</h3>
+    <svg class="spark" id="d-spark" viewBox="0 0 300 64" preserveAspectRatio="none"></svg>
+    <h3>Recent activity</h3>
+    <ul class="list" id="d-feed"></ul>
+  </div>
+</aside>
+
+<div class="modal" id="modal">
+  <div class="card">
+    <h3>Boss inbox</h3>
+    <p>The CFO can't hire, fire or give big raises without your co-signature. The vault contract enforces this.</p>
+    <div id="m-list"></div>
+    <div class="actions"><button class="btn" id="m-close">Close</button></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script src="office.js"></script>
+</body>
+</html>

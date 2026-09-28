@@ -1,0 +1,92 @@
+{
+  "name": "researcher",
+  "source": "../../assets/sheets/researcher.png",
+  "frameWidth": 237,
+  "frameHeight": 346,
+  "anchor": {
+    "x": 0.4681808693531103,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "researcher-0.png",
+      "bbox": [
+        106,
+        16,
+        235,
+        355
+      ]
+    },
+    {
+      "index": 1,
+      "file": "researcher-1.png",
+      "bbox": [
+        409,
+        16,
+        583,
+        354
+      ]
+    },
+    {
+      "index": 2,
+      "file": "researcher-2.png",
+      "bbox": [
+        748,
+        16,
+        922,
+        354
+      ]
+    },
+    {
+      "index": 3,
+      "file": "researcher-3.png",
+      "bbox": [
+        1059,
+        77,
+        1284,
+        324
+      ]
+    },
+    {
+      "index": 4,
+      "file": "researcher-4.png",
+      "bbox": [
+        64,
+        391,
+        275,
+        723
+      ]
+    },
+    {
+      "index": 5,
+      "file": "researcher-5.png",
+      "bbox": [
+        434,
+        402,
+        560,
+        722
+      ]
+    },
+    {
+      "index": 6,
+      "file": "researcher-6.png",
+      "bbox": [
+        744,
+        392,
+        934,
+        722
+      ]
+    },
+    {
+      "index": 7,
+      "file": "researcher-7.png",
+      "bbox": [
+        1079,
+        391,
+        1256,
+        724
+      ]
+    }
+  ]
+}

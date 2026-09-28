@@ -1,0 +1,92 @@
+{
+  "name": "illustrator",
+  "source": "../../assets/sheets/illustrator.png",
+  "frameWidth": 236,
+  "frameHeight": 342,
+  "anchor": {
+    "x": 0.4764454647196041,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "illustrator-0.png",
+      "bbox": [
+        108,
+        19,
+        226,
+        352
+      ]
+    },
+    {
+      "index": 1,
+      "file": "illustrator-1.png",
+      "bbox": [
+        410,
+        20,
+        575,
+        350
+      ]
+    },
+    {
+      "index": 2,
+      "file": "illustrator-2.png",
+      "bbox": [
+        751,
+        21,
+        925,
+        352
+      ]
+    },
+    {
+      "index": 3,
+      "file": "illustrator-3.png",
+      "bbox": [
+        1059,
+        58,
+        1274,
+        319
+      ]
+    },
+    {
+      "index": 4,
+      "file": "illustrator-4.png",
+      "bbox": [
+        68,
+        391,
+        257,
+        722
+      ]
+    },
+    {
+      "index": 5,
+      "file": "illustrator-5.png",
+      "bbox": [
+        420,
+        404,
+        561,
+        718
+      ]
+    },
+    {
+      "index": 6,
+      "file": "illustrator-6.png",
+      "bbox": [
+        745,
+        392,
+        926,
+        721
+      ]
+    },
+    {
+      "index": 7,
+      "file": "illustrator-7.png",
+      "bbox": [
+        1066,
+        392,
+        1235,
+        727
+      ]
+    }
+  ]
+}

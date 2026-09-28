@@ -1,0 +1,92 @@
+{
+  "name": "writer",
+  "source": "../../assets/sheets/writer.png",
+  "frameWidth": 237,
+  "frameHeight": 360,
+  "anchor": {
+    "x": 0.5133082045278085,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "writer-0.png",
+      "bbox": [
+        85,
+        11,
+        224,
+        348
+      ]
+    },
+    {
+      "index": 1,
+      "file": "writer-1.png",
+      "bbox": [
+        409,
+        11,
+        581,
+        350
+      ]
+    },
+    {
+      "index": 2,
+      "file": "writer-2.png",
+      "bbox": [
+        746,
+        11,
+        917,
+        350
+      ]
+    },
+    {
+      "index": 3,
+      "file": "writer-3.png",
+      "bbox": [
+        1034,
+        47,
+        1259,
+        324
+      ]
+    },
+    {
+      "index": 4,
+      "file": "writer-4.png",
+      "bbox": [
+        57,
+        375,
+        257,
+        728
+      ]
+    },
+    {
+      "index": 5,
+      "file": "writer-5.png",
+      "bbox": [
+        427,
+        379,
+        547,
+        724
+      ]
+    },
+    {
+      "index": 6,
+      "file": "writer-6.png",
+      "bbox": [
+        727,
+        378,
+        913,
+        727
+      ]
+    },
+    {
+      "index": 7,
+      "file": "writer-7.png",
+      "bbox": [
+        1077,
+        384,
+        1251,
+        727
+      ]
+    }
+  ]
+}

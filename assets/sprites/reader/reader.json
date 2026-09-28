@@ -1,0 +1,92 @@
+{
+  "name": "reader",
+  "source": "../../assets/sheets/reader.png",
+  "frameWidth": 262,
+  "frameHeight": 349,
+  "anchor": {
+    "x": 0.44843035801294673,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "reader-0.png",
+      "bbox": [
+        87,
+        16,
+        235,
+        358
+      ]
+    },
+    {
+      "index": 1,
+      "file": "reader-1.png",
+      "bbox": [
+        405,
+        19,
+        595,
+        356
+      ]
+    },
+    {
+      "index": 2,
+      "file": "reader-2.png",
+      "bbox": [
+        735,
+        19,
+        925,
+        356
+      ]
+    },
+    {
+      "index": 3,
+      "file": "reader-3.png",
+      "bbox": [
+        1066,
+        53,
+        1294,
+        301
+      ]
+    },
+    {
+      "index": 4,
+      "file": "reader-4.png",
+      "bbox": [
+        55,
+        389,
+        276,
+        725
+      ]
+    },
+    {
+      "index": 5,
+      "file": "reader-5.png",
+      "bbox": [
+        421,
+        402,
+        553,
+        721
+      ]
+    },
+    {
+      "index": 6,
+      "file": "reader-6.png",
+      "bbox": [
+        725,
+        398,
+        910,
+        722
+      ]
+    },
+    {
+      "index": 7,
+      "file": "reader-7.png",
+      "bbox": [
+        1073,
+        399,
+        1260,
+        725
+      ]
+    }
+  ]
+}

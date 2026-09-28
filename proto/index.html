@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Outlay: CFO animation prototype</title>
+<style>
+  :root { --bg: #1d2127; --panel: #262b33; --ink: #e9e4d8; --muted: #9aa3ad; --teal: #1f6f6b; --gold: #c9a24a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0; font-size: 16px; letter-spacing: .02em; }
+  header p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+  #stage { width: 100%; max-width: 960px; aspect-ratio: 16 / 9; margin: 8px auto 0; display: block; border-radius: 12px; overflow: hidden; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 12px 16px 20px; }
+  button { background: var(--panel); color: var(--ink); border: 1px solid #39414c; border-radius: 999px; padding: 7px 14px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--gold); }
+  button.primary { background: var(--teal); border-color: var(--teal); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Outlay: the Chartoularios (CFO), code-driven animation</h1>
+  <p>8 poses from one 0.25-credit image. All motion below is code: no video, no extra credits. Events here are simulated.</p>
+</header>
+<div id="stage"></div>
+<div class="controls">
+  <button data-act="idle">Idle</button>
+  <button data-act="walk">Walk</button>
+  <button data-act="talk">Explain</button>
+  <button data-act="seal" class="primary">Seal a decision</button>
+  <button data-act="approve">Approve</button>
+  <button data-act="stern">Stern</button>
+  <button data-act="deny">Deny</button>
+  <button data-act="auto">Auto-play</button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.6.6/dist/pixi.min.js"></script>
+<script>
+(async () => {
+  const W = 960, H = 540;
+  const app = new PIXI.Application();
+  await app.init({ width: W, height: H, background: 0x2a2f37, antialias: true, resolution: window.devicePixelRatio || 1, autoDensity: true });
+  const host = document.getElementById('stage');
+  host.appendChild(app.canvas);
+  app.canvas.style.width = '100%'; app.canvas.style.height = '100%';
+
+  const meta = await (await fetch('../assets/sprites/cfo/cfo.json')).json();
+  const tex = await Promise.all(meta.frames.map((f) => PIXI.Assets.load('../assets/sprites/cfo/' + f.file)));
+  const F = { idle: 0, walkA: 1, walkB: 2, talk: 3, stamp: 4, stern: 5, thumbs: 6, deny: 7 };
+
+  // --- Scene: a warm mosaic floor, back wall, vault door and the Boss's door.
+  const world = new PIXI.Container(); app.stage.addChild(world);
+  const wall = new PIXI.Graphics().rect(0, 0, W, 250).fill(0x3a3f47); world.addChild(wall);
+  const trim = new PIXI.Graphics().rect(0, 244, W, 8).fill(0xc9a24a); world.addChild(trim);
+  const floor = new PIXI.Graphics();
+  const tw = 64, th = 32;
+  for (let row = 0; row < 12; row++) for (let col = -2; col < 18; col++) {
+    const x = col * tw + (row % 2 ? tw / 2 : 0), y = 252 + row * th / 2;
+    const c = (row + col) % 5 === 0 ? 0x1f6f6b : ((row + col) % 2 ? 0x6b5a45 : 0x75634c);
+    floor.poly([x, y, x + tw / 2, y + th / 2, x, y + th, x - tw / 2, y + th / 2]).fill(c);
+  }
+  world.addChild(floor);
+  const vault = new PIXI.Graphics().circle(820, 150, 70).fill(0x5b6068).stroke({ width: 8, color: 0xc9a24a })
+    .circle(820, 150, 18).fill(0xc9a24a); world.addChild(vault);
+  const vaultLabel = new PIXI.Text({ text: 'TREASURY', style: { fill: 0xc9a24a, fontSize: 13, fontWeight: '700', letterSpacing: 3 } });
+  vaultLabel.anchor.set(0.5); vaultLabel.position.set(820, 238); world.addChild(vaultLabel);
+  const door = new PIXI.Graphics().roundRect(90, 70, 110, 178, 6).fill(0x4a3a2c).stroke({ width: 4, color: 0x2c231b })
+    .circle(185, 165, 5).fill(0xc9a24a); world.addChild(door);
+  const doorLabel = new PIXI.Text({ text: 'THE BOSS', style: { fill: 0xe9e4d8, fontSize: 11, fontWeight: '700', letterSpacing: 2 } });
+  doorLabel.anchor.set(0.5); doorLabel.position.set(145, 58); world.addChild(doorLabel);
+
+  // --- The CFO: shadow + sprite, anchored on his feet.
+  const SCALE = 0.62, FLOOR_Y = 470;
+  const shadow = new PIXI.Graphics().ellipse(0, 0, 58, 14).fill({ color: 0x000000, alpha: 0.28 });
+  const cfo = new PIXI.Sprite(tex[F.idle]);
+  cfo.anchor.set(meta.anchor.x, 1);
+  const actor = new PIXI.Container(); actor.addChild(shadow, cfo);
+  actor.position.set(W / 2, FLOOR_Y); world.addChild(actor);
+  let facing = 1; // 1 = as drawn (facing left-ish), -1 = mirrored
+
+  // --- Effects layer
+  const fx = new PIXI.Container(); world.addChild(fx);
+  const particles = [];
+  function burst(x, y, n, color, speed = 6, grav = 0.35, life = 60, size = 5) {
+    for (let i = 0; i < n; i++) {
+      const g = new PIXI.Graphics().circle(0, 0, size * (0.6 + Math.random() * 0.6)).fill(color);
+      g.position.set(x, y); fx.addChild(g);
+      const a = Math.random() * Math.PI * 2, s = speed * (0.4 + Math.random());
+      particles.push({ g, vx: Math.cos(a) * s, vy: Math.sin(a) * s - speed * 0.6, grav, life, max: life });
+    }
+  }
+  function coin(fromX, fromY, toX, toY, delay = 0) {
+    const g = new PIXI.Graphics().circle(0, 0, 9).fill(0xe8c15a).stroke({ width: 2, color: 0x9c7a2b });
+    g.visible = false; fx.addChild(g);
+    particles.push({ g, coin: { fromX, fromY, toX, toY, t: -delay, dur: 42 } });
+  }
+  let bubble = null;
+  function say(text, frames = 150) {
+    if (bubble) fx.removeChild(bubble.c);
+    const t = new PIXI.Text({ text, style: { fill: 0x1d2127, fontSize: 15, fontWeight: '600', wordWrap: true, wordWrapWidth: 240 } });
+    const pad = 10, c = new PIXI.Container();
+    const bg = new PIXI.Graphics().roundRect(0, 0, t.width + pad * 2, t.height + pad * 2, 10).fill(0xf6f1e4)
+      .poly([18, t.height + pad * 2, 34, t.height + pad * 2, 16, t.height + pad * 2 + 12]).fill(0xf6f1e4);
+    t.position.set(pad, pad); c.addChild(bg, t);
+    bubble = { c, life: frames }; fx.addChild(c);
+  }
+  const hex = () => '0x' + [...crypto.getRandomValues(new Uint8Array(4))].map((b) => b.toString(16).padStart(2, '0')).join('') + '…';
+  function sealDecal(x, y) {
+    const c = new PIXI.Container();
+    const disc = new PIXI.Graphics().circle(0, 0, 34).fill(0x6e7178).stroke({ width: 4, color: 0x4a4d53 })
+      .circle(0, 0, 25).stroke({ width: 2, color: 0x8d9097 });
+    const label = new PIXI.Text({ text: 'SEALED', style: { fill: 0xf2efe6, fontSize: 11, fontWeight: '800', letterSpacing: 1 } });
+    label.anchor.set(0.5, 1); label.y = 2;
+    const h = new PIXI.Text({ text: hex(), style: { fill: 0xdfe2e6, fontSize: 9, fontFamily: 'ui-monospace, monospace' } });
+    h.anchor.set(0.5, 0); h.y = 3;
+    c.addChild(disc, label, h); c.position.set(x, y); c.scale.set(1.8); c.alpha = 0;
+    fx.addChild(c);
+    particles.push({ g: c, decal: { t: 0 } });
+  }
+
+  // --- Ticker (simulated chain events for the prototype)
+  const tickerBg = new PIXI.Graphics().rect(0, H - 30, W, 30).fill({ color: 0x14171b, alpha: 0.85 });
+  const tickerText = new PIXI.Text({ text: '', style: { fill: 0x9aa3ad, fontSize: 12, fontFamily: 'ui-monospace, monospace' } });
+  tickerText.position.set(12, H - 23); app.stage.addChild(tickerBg, tickerText);
+  const log = (s) => { tickerText.text = `demo event · ${s}`; };
+
+  // --- State machine (procedural)
+  let state = 'idle', t = 0, walkTarget = null, shake = 0;
+  function setState(s) { state = s; t = 0; }
+  const acts = {
+    idle() { setState('idle'); },
+    walk() {
+      walkTarget = actor.x < W / 2 ? 760 : 240;
+      setState('walk');
+    },
+    talk() { setState('talk'); say('Scout returned 2.1× on last epoch. Proposing +12% (within the ±15% band).'); log('AllocationProposed agent=scout +12%'); },
+    seal() { setState('seal'); say('Decision recorded. Sealing it on Arc…', 110); },
+    approve() { setState('approve'); say('Approved. Raise executes now.', 100); log('SpendCoSigned idem=' + hex()); },
+    stern() { setState('stern'); say('Two weak epochs. Mailer goes on probation.', 120); log('AgentProbation agent=mailer allowance −40%'); },
+    deny() { setState('deny'); say('No citation, no budget. Claim dropped.', 110); log('ClaimRejected reason=no-doc-id'); },
+  };
+  let autoTimer = null;
+  function auto() {
+    const seq = ['walk', 'talk', 'seal', 'approve', 'stern', 'deny', 'walk', 'idle'];
+    let i = 0; clearInterval(autoTimer);
+    const step = () => { acts[seq[i % seq.length]](); i++; };
+    step(); autoTimer = setInterval(step, 3200);
+  }
+  document.querySelectorAll('button[data-act]').forEach((b) => b.addEventListener('click', () => {
+    const a = b.dataset.act;
+    if (a === 'auto') return auto();
+    clearInterval(autoTimer); acts[a]();
+  }));
+
+  app.ticker.add((tk) => {
+    const dt = tk.deltaTime; t += dt;
+    const base = SCALE;
+    let sx = base * facing, sy = base, frame = F.idle, dy = 0, rot = 0;
+
+    if (state === 'idle') {
+      sy = base * (1 + 0.012 * Math.sin(t * 0.07)); rot = 0.012 * Math.sin(t * 0.035);
+    } else if (state === 'walk') {
+      const dir = Math.sign(walkTarget - actor.x);
+      facing = dir > 0 ? -1 : 1; sx = base * facing;
+      frame = Math.floor(t / 10) % 2 ? F.walkA : F.walkB;
+      dy = -Math.abs(Math.sin(t * 0.314)) * 6;
+      actor.x += dir * 2.6 * dt;
+      if (Math.abs(walkTarget - actor.x) < 3) { log('Director: CFO arrived'); setState('idle'); }
+    } else if (state === 'talk') {
+      frame = F.talk; dy = -Math.abs(Math.sin(t * 0.2)) * 2; rot = 0.02 * Math.sin(t * 0.12);
+      if (t > 170) setState('idle');
+    } else if (state === 'seal') {
+      frame = F.stamp;
+      if (t < 36) { // anticipation: rise and stretch
+        const k = t / 36; dy = -18 * k; sy = base * (1 + 0.06 * k); sx = base * facing * (1 - 0.03 * k);
+      } else if (t < 44) { // slam
+        const k = (t - 36) / 8; dy = -18 + 26 * k; sy = base * (1.06 - 0.2 * k); sx = base * facing * (0.97 + 0.12 * k);
+        if (t - dt < 40 && t >= 40) {
+          shake = 12; sealDecal(actor.x - 70 * facing, FLOOR_Y - 8);
+          burst(actor.x - 70 * facing, FLOOR_Y - 6, 18, 0xb9a47a, 5, 0.25, 40, 3);
+          log('AllocationCommitted epoch=41 hash=' + hex());
+        }
+      } else if (t < 70) { // recover
+        const k = (t - 44) / 26; dy = 8 * (1 - k); sy = base * (0.86 + 0.14 * k); sx = base * facing * (1.09 - 0.09 * k);
+      } else { frame = F.thumbs; if (t > 120) setState('idle'); }
+    } else if (state === 'approve') {
+      frame = F.thumbs;
+      const hop = Math.max(0, Math.sin(Math.min(t, 30) / 30 * Math.PI)); dy = -hop * 26; sy = base * (1 + hop * 0.05);
+      if (t - dt < 14 && t >= 14) {
+        burst(actor.x, FLOOR_Y - 240, 26, 0xe8c15a, 7, 0.3, 70, 5);
+        for (let i = 0; i < 6; i++) coin(820, 150, actor.x + 90, FLOOR_Y - 60, i * 6);
+      }
+      if (t > 110) setState('idle');
+    } else if (state === 'stern') {
+      frame = F.stern; sy = base * (1 + 0.008 * Math.sin(t * 0.05));
+      if (t > 150) setState('idle');
+    } else if (state === 'deny') {
+      frame = F.deny; rot = 0.05 * Math.sin(t * 0.45) * Math.max(0, 1 - t / 60);
+      if (t > 120) setState('idle');
+    }
+
+    cfo.texture = tex[frame];
+    cfo.scale.set(sx, sy); cfo.rotation = rot; cfo.y = dy;
+    shadow.scale.set(1 + dy / 120, 1 + dy / 120);
+
+    // camera shake
+    if (shake > 0) { world.position.set((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake); shake *= 0.85; if (shake < 0.5) { shake = 0; world.position.set(0, 0); } }
+
+    // speech bubble follows the CFO
+    if (bubble) {
+      bubble.c.position.set(actor.x - 20, FLOOR_Y - 250 - bubble.c.height + dy);
+      if (--bubble.life <= 0) { fx.removeChild(bubble.c); bubble = null; }
+    }
+    // particles, coins, decals
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      if (p.coin) {
+        const c = p.coin; c.t += dt; if (c.t < 0) continue;
+        p.g.visible = true; const k = Math.min(1, c.t / c.dur);
+        p.g.position.set(c.fromX + (c.toX - c.fromX) * k, c.fromY + (c.toY - c.fromY) * k - Math.sin(k * Math.PI) * 120);
+        p.g.scale.x = Math.cos(c.t * 0.3);
+        if (k >= 1) { burst(p.g.x, p.g.y, 5, 0xe8c15a, 3, 0.2, 25, 2.5); fx.removeChild(p.g); particles.splice(i, 1); }
+      } else if (p.decal) {
+        const d = p.decal; d.t += dt;
+        const k = Math.min(1, d.t / 8); p.g.alpha = k; p.g.scale.set(1.8 - 0.8 * k);
+        if (d.t > 150) p.g.alpha = Math.max(0, 1 - (d.t - 150) / 40);
+        if (d.t > 190) { fx.removeChild(p.g); particles.splice(i, 1); }
+      } else {
+        p.vy += p.grav * dt; p.g.x += p.vx * dt; p.g.y += p.vy * dt; p.life -= dt;
+        p.g.alpha = Math.max(0, p.life / p.max);
+        if (p.life <= 0) { fx.removeChild(p.g); particles.splice(i, 1); }
+      }
+    }
+  });
+  log('prototype ready. Press Auto-play');
+})();
+</script>
+</body>
+</html>

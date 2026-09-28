@@ -1,0 +1,92 @@
+{
+  "name": "cfo",
+  "source": "../../assets/style-tests/cfo-m-68a5ba6c.png",
+  "frameWidth": 224,
+  "frameHeight": 377,
+  "anchor": {
+    "x": 0.5779251316779538,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "cfo-0.png",
+      "bbox": [
+        128,
+        16,
+        260,
+        358
+      ]
+    },
+    {
+      "index": 1,
+      "file": "cfo-1.png",
+      "bbox": [
+        424,
+        16,
+        589,
+        358
+      ]
+    },
+    {
+      "index": 2,
+      "file": "cfo-2.png",
+      "bbox": [
+        741,
+        16,
+        913,
+        358
+      ]
+    },
+    {
+      "index": 3,
+      "file": "cfo-3.png",
+      "bbox": [
+        1017,
+        16,
+        1215,
+        358
+      ]
+    },
+    {
+      "index": 4,
+      "file": "cfo-4.png",
+      "bbox": [
+        90,
+        362,
+        268,
+        732
+      ]
+    },
+    {
+      "index": 5,
+      "file": "cfo-5.png",
+      "bbox": [
+        439,
+        391,
+        559,
+        733
+      ]
+    },
+    {
+      "index": 6,
+      "file": "cfo-6.png",
+      "bbox": [
+        741,
+        391,
+        910,
+        733
+      ]
+    },
+    {
+      "index": 7,
+      "file": "cfo-7.png",
+      "bbox": [
+        1073,
+        392,
+        1219,
+        733
+      ]
+    }
+  ]
+}

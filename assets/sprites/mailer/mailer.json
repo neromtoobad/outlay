@@ -1,0 +1,92 @@
+{
+  "name": "mailer",
+  "source": "../../assets/sheets/mailer.png",
+  "frameWidth": 228,
+  "frameHeight": 352,
+  "anchor": {
+    "x": 0.49486928956053544,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "mailer-0.png",
+      "bbox": [
+        115,
+        17,
+        250,
+        359
+      ]
+    },
+    {
+      "index": 1,
+      "file": "mailer-1.png",
+      "bbox": [
+        413,
+        17,
+        577,
+        356
+      ]
+    },
+    {
+      "index": 2,
+      "file": "mailer-2.png",
+      "bbox": [
+        764,
+        22,
+        927,
+        356
+      ]
+    },
+    {
+      "index": 3,
+      "file": "mailer-3.png",
+      "bbox": [
+        1047,
+        39,
+        1263,
+        319
+      ]
+    },
+    {
+      "index": 4,
+      "file": "mailer-4.png",
+      "bbox": [
+        79,
+        386,
+        273,
+        731
+      ]
+    },
+    {
+      "index": 5,
+      "file": "mailer-5.png",
+      "bbox": [
+        437,
+        391,
+        551,
+        731
+      ]
+    },
+    {
+      "index": 6,
+      "file": "mailer-6.png",
+      "bbox": [
+        717,
+        390,
+        895,
+        729
+      ]
+    },
+    {
+      "index": 7,
+      "file": "mailer-7.png",
+      "bbox": [
+        1078,
+        399,
+        1250,
+        731
+      ]
+    }
+  ]
+}

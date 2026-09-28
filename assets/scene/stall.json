@@ -1,0 +1,22 @@
+{
+  "name": "stall",
+  "source": "../../assets/scene-tests/stall-5b4d96c9.png",
+  "frameWidth": 832,
+  "frameHeight": 1067,
+  "anchor": {
+    "x": 0.6534640622063344,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "stall-0.png",
+      "bbox": [
+        30,
+        55,
+        850,
+        1115
+      ]
+    }
+  ]
+}

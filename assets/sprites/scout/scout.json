@@ -1,0 +1,92 @@
+{
+  "name": "scout",
+  "source": "../../assets/sheets/scout.png",
+  "frameWidth": 234,
+  "frameHeight": 351,
+  "anchor": {
+    "x": 0.49649721911840383,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "scout-0.png",
+      "bbox": [
+        97,
+        11,
+        226,
+        353
+      ]
+    },
+    {
+      "index": 1,
+      "file": "scout-1.png",
+      "bbox": [
+        404,
+        12,
+        579,
+        354
+      ]
+    },
+    {
+      "index": 2,
+      "file": "scout-2.png",
+      "bbox": [
+        759,
+        12,
+        934,
+        353
+      ]
+    },
+    {
+      "index": 3,
+      "file": "scout-3.png",
+      "bbox": [
+        1050,
+        40,
+        1272,
+        327
+      ]
+    },
+    {
+      "index": 4,
+      "file": "scout-4.png",
+      "bbox": [
+        56,
+        385,
+        266,
+        729
+      ]
+    },
+    {
+      "index": 5,
+      "file": "scout-5.png",
+      "bbox": [
+        437,
+        385,
+        562,
+        729
+      ]
+    },
+    {
+      "index": 6,
+      "file": "scout-6.png",
+      "bbox": [
+        737,
+        384,
+        917,
+        722
+      ]
+    },
+    {
+      "index": 7,
+      "file": "scout-7.png",
+      "bbox": [
+        1074,
+        387,
+        1249,
+        729
+      ]
+    }
+  ]
+}

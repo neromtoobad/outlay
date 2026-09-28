@@ -1,0 +1,92 @@
+{
+  "name": "analyst",
+  "source": "../../assets/sheets/analyst.png",
+  "frameWidth": 233,
+  "frameHeight": 351,
+  "anchor": {
+    "x": 0.5256138188201417,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "analyst-0.png",
+      "bbox": [
+        110,
+        14,
+        218,
+        358
+      ]
+    },
+    {
+      "index": 1,
+      "file": "analyst-1.png",
+      "bbox": [
+        413,
+        14,
+        578,
+        356
+      ]
+    },
+    {
+      "index": 2,
+      "file": "analyst-2.png",
+      "bbox": [
+        758,
+        14,
+        926,
+        358
+      ]
+    },
+    {
+      "index": 3,
+      "file": "analyst-3.png",
+      "bbox": [
+        1042,
+        65,
+        1263,
+        328
+      ]
+    },
+    {
+      "index": 4,
+      "file": "analyst-4.png",
+      "bbox": [
+        68,
+        391,
+        259,
+        731
+      ]
+    },
+    {
+      "index": 5,
+      "file": "analyst-5.png",
+      "bbox": [
+        426,
+        408,
+        554,
+        731
+      ]
+    },
+    {
+      "index": 6,
+      "file": "analyst-6.png",
+      "bbox": [
+        750,
+        391,
+        933,
+        732
+      ]
+    },
+    {
+      "index": 7,
+      "file": "analyst-7.png",
+      "bbox": [
+        1075,
+        396,
+        1237,
+        731
+      ]
+    }
+  ]
+}
