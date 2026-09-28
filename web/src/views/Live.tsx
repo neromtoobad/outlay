@@ -24,7 +24,7 @@ export default function Live() {
   const toggleFull = () => { if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen?.().catch(() => {}); };
 
   return (
-    <main className={`live${idle ? ' idle' : ''}`}>
+    <main className={`livestage${idle ? ' idle' : ''}`}>
       <Office fill idleReplayMs={6000} soundOnFirstClick onMode={setMode} onSound={setSound} />
       <div className={`live-hud${idle ? ' hidden' : ''}`}>
         <div className="live-brand">

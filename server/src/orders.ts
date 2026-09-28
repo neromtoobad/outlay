@@ -101,11 +101,11 @@ function historyFor(service: string) {
 
 /** Free BOND cover. Until the vault is deployed the policy number stands in (3 USDC). */
 function bondPoolFree(): number {
-  const open = listOrders().filter((o) => o.payment?.mode !== 'promo' && ['queued', 'running', 'delivered', 'revision'].includes(o.status));
+  const open = listOrders().filter((o) => o.demo === DRY && o.payment?.mode !== 'promo' && ['queued', 'running', 'delivered', 'revision'].includes(o.status));
   return Math.max(0, 3 - open.reduce((s, o) => s + o.quote.bondUsd, 0));
 }
 function promoLeft(): number {
-  const used = listOrders().filter((o) => o.payment?.mode === 'promo').reduce((s, o) => s + o.quote.estCostUsd, 0);
+  const used = listOrders().filter((o) => o.demo === DRY && o.payment?.mode === 'promo').reduce((s, o) => s + o.quote.estCostUsd, 0);
   return Math.max(0, 2 - used);
 }
 
@@ -113,7 +113,7 @@ export function createQuote(input: { service: string; brief: string; email: stri
   const item = CATALOG.find((c) => c.id === input.service);
   if (!item || !item.live) throw new Error('unknown or not-yet-live service');
   const email = input.email.trim().toLowerCase();
-  const firstJob = !listOrders().some((o) => o.email === email && o.payment);
+  const firstJob = !listOrders().some((o) => o.demo === DRY && o.email === email && o.payment); // demo orders never use up a real free job
   const q = quote({
     service: item.id, priceUsd: item.priceUsd, listedCostUsd: item.listedCostUsd, history: historyFor(item.id),
     bondPoolFreeUsd: bondPoolFree(), firstJobForCustomer: firstJob, promoLeftUsd: promoLeft(), deliverHours: 1,

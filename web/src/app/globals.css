@@ -525,8 +525,8 @@ footer.site p { margin-top: 12px; max-width: 360px; }
 .office-controls .office-full:hover { background: rgba(23, 71, 59, 0.95); text-decoration: none; }
 
 /* ---------- /live: the office and nothing else */
-.live { position: fixed; inset: 0; background: #0f1512; overflow: hidden; }
-.live .office-wrap { border-radius: 0; }
+.livestage { position: fixed; inset: 0; background: #0f1512; overflow: hidden; }
+.livestage .office-wrap { border-radius: 0; }
 .live-hud { position: absolute; inset: 0; pointer-events: none; z-index: 5; transition: opacity .6s ease; }
 .live-hud.hidden { opacity: 0; }
 .live-hud > * { pointer-events: auto; }
@@ -537,7 +537,7 @@ footer.site p { margin-top: 12px; max-width: 360px; }
 .live-exit a, .live-exit button { font: 500 13px/1 var(--sans); padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(15, 21, 18, 0.55); color: #f4ecda; backdrop-filter: blur(10px); cursor: pointer; text-decoration: none; }
 .live-exit a:hover, .live-exit button:hover { background: rgba(23, 71, 59, 0.9); text-decoration: none; }
 .live-hint { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); padding: 10px 16px; border-radius: 999px; background: rgba(15, 21, 18, 0.6); color: #f4ecda; font-size: 13.5px; backdrop-filter: blur(10px); border: 1px solid rgba(226, 171, 69, 0.4); animation: floatin .6s ease both 1.2s; }
-.live.idle { cursor: none; }
-.live .office-controls { left: 20px; bottom: 20px; transition: opacity .6s ease; }
-.live.idle .office-controls { opacity: 0; }
+.livestage.idle { cursor: none; }
+.livestage .office-controls { left: 20px; bottom: 20px; transition: opacity .6s ease; }
+.livestage.idle .office-controls { opacity: 0; }
 @media (max-width: 560px) { .live-brand .wordmark { display: none; } .live-exit a, .live-exit button { padding: 8px 11px; font-size: 12px; } }
