@@ -4,7 +4,7 @@
 // no duplicates, every row has a name and address, and the customer's filter actually holds.
 import { Job } from '../job.ts';
 import { MODELS } from '../config.ts';
-import { HOSTS, llm, mapsSearch, parseJson, type Place } from '../tools.ts';
+import { HOSTS, llm, mapsSearch, parseJson, webPlaces, type Place } from '../tools.ts';
 
 type Spec = { category: string; location: string; want: number; filter: 'none' | 'no_website' | 'has_website' | 'has_phone'; queries: string[] };
 
@@ -26,7 +26,7 @@ export const localBusinessFinder = {
   id: 'local-business-finder',
   name: 'Local Business Finder',
   priceUsd: 3,
-  policy: { budgetUsd: 0.25, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal] },
+  policy: { budgetUsd: 0.25, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.exa] },
 
   async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);
@@ -46,14 +46,20 @@ export const localBusinessFinder = {
       const byKey = new Map<string, Place>();
       const keep = (p: Place) =>
         spec.filter === 'no_website' ? !p.website : spec.filter === 'has_website' ? !!p.website : spec.filter === 'has_phone' ? !!p.phone : true;
-      let calls = 0;
+      let calls = 0, mapsDown = false, source = 'Google Maps via Serper';
       outer: for (const q of spec.queries.slice(0, 3)) {
         for (const page of [1, 2]) {
           if (calls >= 6) break outer;
           job.log('scout', 'maps', `"${q}" page ${page}`);
           let places: Place[];
           try { places = await mapsSearch(job, 'scout', q, `Google Maps: "${q}" p${page}`, page); }
-          catch (e: any) { job.log('scout', 'skip', `"${q}" failed (${String(e?.message ?? e).slice(0, 50)}); moving on`); calls++; break; }
+          catch (e: any) {
+            calls++;
+            const msg = String(e?.message ?? e);
+            // the seller's payment check is down: no point asking it again, go to the fallback
+            if (/verification|temporarily unavailable/i.test(msg)) { mapsDown = true; job.log('scout', 'switch', 'the Maps seller cannot take payments right now; searching the open web instead'); break outer; }
+            job.log('scout', 'skip', `"${q}" failed (${msg.slice(0, 50)}); moving on`); break;
+          }
           calls++;
           for (const p of places) {
             const key = p.cid ?? `${p.title}|${p.address}`.toLowerCase();
@@ -64,6 +70,10 @@ export const localBusinessFinder = {
         }
       }
 
+      if (!byKey.size || mapsDown) {
+        for (const p of await webPlaces(job, spec, spec.want)) { const key = `${p.title}|${p.address ?? ''}`.toLowerCase(); if (!byKey.has(key)) byKey.set(key, p); }
+        source = mapsDown ? 'the open web via Exa (the Maps seller was down)' : 'the open web via Exa';
+      }
       if (!byKey.size) throw new Error('no search came back; nothing to deliver');
       job.log('verifier', 'clean', `${byKey.size} unique places → applying "${spec.filter}", normalizing phones`);
       const rows = [...byKey.values()]
@@ -75,13 +85,16 @@ export const localBusinessFinder = {
       // Deterministic QA
       const names = rows.map((r) => `${r.title}|${r.address}`.toLowerCase());
       const dupes = names.length - new Set(names).size;
-      const missing = rows.filter((r) => !r.title || !r.address).length;
+      const fromWeb = source.includes('web');
+      const missing = rows.filter((r) => !r.title || (!fromWeb && !r.address)).length;
+      const noAddress = fromWeb ? rows.filter((r) => !r.address).length : 0;
       const filterBroken = rows.filter((r) => !keep(r)).length;
       const issues = [
         dupes ? `${dupes} duplicate rows` : '',
         missing ? `${missing} rows missing name/address` : '',
+        noAddress ? `${noAddress} listings did not state an address` : '',
         filterBroken ? `${filterBroken} rows violate the filter` : '',
-        rows.length < spec.want ? `found ${rows.length} of ${spec.want} requested (Maps had no more matches)` : '',
+        rows.length < spec.want ? `found ${rows.length} of ${spec.want} requested (${fromWeb ? 'the pages we read named no more' : 'Maps had no more matches'})` : '',
       ].filter(Boolean);
       const hardFail = dupes > 0 || missing > 0 || filterBroken > 0;
       job.log('auditor', 'check', hardFail ? issues.join('; ') : `pass${issues.length ? ` (note: ${issues.join('; ')})` : ''}`);
@@ -97,7 +110,7 @@ export const localBusinessFinder = {
       const top = rows.slice(0, 10).map((r, i) => `| ${i + 1} | ${r.title} | ${r.address ?? ''} | ${r.phone ?? '—'} | ${r.rating ?? '—'} (${r.ratingCount ?? 0}) |`).join('\n');
       job.deliverable = `# ${spec.category} in ${spec.location}\n\n` +
         `**${rows.length} businesses** (filter: ${spec.filter.replace('_', ' ')}). ${withPhone} have a phone number. Average rating ${avg.toFixed(1)}.\n` +
-        `Source: Google Maps via Serper, ${calls} searches on ${new Date().toISOString().slice(0, 10)}. Full list in \`businesses.csv\`.\n\n` +
+        `Source: ${source}, on ${new Date().toISOString().slice(0, 10)}. Full list in \`businesses.csv\`.\n\n` +
         `| # | Name | Address | Phone | Rating (reviews) |\n|---|---|---|---|---|\n${top}\n\n` +
         (issues.length ? `> Notes: ${issues.join('; ')}\n` : '');
       job.status = hardFail ? 'failed' : 'delivered';

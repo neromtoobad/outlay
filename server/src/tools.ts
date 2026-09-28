@@ -145,6 +145,38 @@ export async function mapsSearch(job: Job, agent: Role, q: string, reason: strin
   }));
 }
 
+/**
+ * Fallback when the Maps seller is down: find listings on the open web (Exa), read the best pages
+ * (Exa contents) and extract businesses with an LLM that may only copy what the pages say.
+ */
+export async function webPlaces(job: Job, spec: { category: string; location: string; queries: string[] }, want: number): Promise<Place[]> {
+  const hits: SearchHit[] = [];
+  for (const q of [`${spec.category} in ${spec.location}`, ...spec.queries].slice(0, 2)) {
+    try { hits.push(...(await neuralSearch(job, 'scout', `${q}: list of businesses with addresses and phone numbers`, `web listings: "${q}"`, 8))); }
+    catch (e: any) { job.log('scout', 'skip', `web search "${q}" failed (${String(e?.message ?? e).slice(0, 50)})`); }
+  }
+  const urls = [...new Set(hits.map((h) => h.link))].slice(0, 5);
+  if (!urls.length) return [];
+  job.log('scout', 'read', `${urls.length} listing pages`);
+  let pages: Page[];
+  try { pages = await readPages(job, 'scout', urls, `read ${urls.length} listing pages`); }
+  catch (e: any) {
+    job.log('scout', 'skip', `reading pages failed (${String(e?.message ?? e).slice(0, 50)}); using the search snippets`);
+    pages = hits.map((h) => ({ url: h.link, title: h.title, text: `${h.title}\n${h.snippet}` }));
+  }
+  job.log('researcher', 'extract', 'businesses named on those pages (no guessing)');
+  const text = pages.map((p, i) => `[${i + 1}] ${p.url}\n${p.text.slice(0, 3500)}`).join('\n\n');
+  const out = parseJson<{ places: { name: string; address?: string; phone?: string; website?: string; category?: string }[] }>(
+    await llm(job, 'researcher', [
+      { role: 'system', content: `Extract real businesses from web pages. Only include a business whose name appears in the text and that is located in ${spec.location}. Copy address, phone and website exactly as written; leave a field out if the page does not state it. Never invent or guess. Reply JSON only: {"places":[{"name","address","phone","website","category"}]} with at most ${want} places.` },
+      { role: 'user', content: `Category: ${spec.category}\nLocation: ${spec.location}\n\n${text}` },
+    ], 'extract businesses from the listing pages', { model: MODELS.fast, maxTokens: 2000, json: true,
+      dry: () => JSON.stringify({ places: [1, 2, 3].map((i) => ({ name: `${spec.category} spot ${i}`, address: `${i} Main Road, ${spec.location}`, phone: i % 2 ? `0803 111 22${i}` : undefined, website: i === 2 ? undefined : `https://${spec.category.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '')}-${i}.ng` })) }) }),
+    { places: [] },
+  );
+  return (out.places ?? []).filter((p) => p?.name).map((p) => ({ title: p.name, address: p.address, phone: p.phone, website: p.website, category: p.category ?? spec.category }));
+}
+
 // ---------- LLM (BlockRun, OpenAI-compatible)
 
 export type Msg = { role: 'system' | 'user' | 'assistant'; content: string };

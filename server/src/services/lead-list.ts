@@ -5,7 +5,7 @@
 // checks every address (APEX, 100 per $0.009) → Writer drafts one opener per lead → deterministic QA.
 import { Job } from '../job.ts';
 import { MODELS } from '../config.ts';
-import { HOSTS, domainEmails, emailsIn, llm, mapsSearch, parseJson, verifyEmails, webRead, type Place } from '../tools.ts';
+import { HOSTS, domainEmails, emailsIn, llm, mapsSearch, webPlaces, parseJson, verifyEmails, webRead, type Place } from '../tools.ts';
 
 type Spec = { target: string; location: string; want: number; offer: string; queries: string[] };
 type Lead = Place & { domain: string; email?: string; emailSource?: 'website' | 'tomba'; verdict?: string; opener?: string };
@@ -22,7 +22,7 @@ export const leadList = {
   id: 'lead-list',
   name: 'Lead List',
   priceUsd: 5,
-  policy: { budgetUsd: 0.6, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.apex] },
+  policy: { budgetUsd: 0.6, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.apex, HOSTS.exa] },
 
   async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);
@@ -40,14 +40,18 @@ export const leadList = {
 
       // 1. Businesses with a website (we need a domain to find an email)
       const byDomain = new Map<string, Lead>();
-      let mapsCalls = 0;
-      for (const q of spec.queries.slice(0, 3)) {
+      let mapsCalls = 0, mapsDown = false;
+      outer: for (const q of spec.queries.slice(0, 3)) {
         for (const page of [1, 2, 3]) {
           if (mapsCalls >= 6 || byDomain.size >= spec.want * 2) break;
           job.log('scout', 'maps', `"${q}" page ${page}`);
           let places: Awaited<ReturnType<typeof mapsSearch>>;
           try { places = await mapsSearch(job, 'scout', q, `find ${spec.target} with websites`, page); }
-          catch (e: any) { job.log('scout', 'skip', `"${q}" failed (${String(e?.message ?? e).slice(0, 50)}); moving on`); break; }
+          catch (e: any) {
+            const msg = String(e?.message ?? e);
+            if (/verification|temporarily unavailable/i.test(msg)) { mapsDown = true; job.log('scout', 'switch', 'the Maps seller cannot take payments right now; searching the open web instead'); break outer; }
+            job.log('scout', 'skip', `"${q}" failed (${msg.slice(0, 50)}); moving on`); break;
+          }
           mapsCalls++;
           for (const p of places) {
             const domain = hostOf(p.website);
@@ -55,6 +59,13 @@ export const leadList = {
             if (!byDomain.has(domain)) byDomain.set(domain, { ...p, domain });
           }
           if (places.length < 10) break;
+        }
+      }
+      if (mapsDown || !byDomain.size) {
+        for (const p of await webPlaces(job, { category: spec.target, location: spec.location, queries: spec.queries }, spec.want * 2)) {
+          const domain = hostOf(p.website);
+          if (!domain || /facebook|instagram|linktr|wa\.me|google|booking\.com|tripadvisor/.test(domain)) continue;
+          if (!byDomain.has(domain)) byDomain.set(domain, { ...p, domain });
         }
       }
       const leads = [...byDomain.values()].slice(0, spec.want * 2);

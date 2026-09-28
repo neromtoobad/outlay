@@ -72,6 +72,8 @@ export async function buy<T>(
   }
 
   if (DRY) {
+    // test hook: OUTLAY_DRY_FAIL="Serper Maps" makes that vendor fail like a seller whose payment check is down
+    if (process.env.OUTLAY_DRY_FAIL && opts.vendor.includes(process.env.OUTLAY_DRY_FAIL)) throw new Error('Payment failed: Payment verification temporarily unavailable, please retry');
     // Demo pacing so the live job page shows the team working (OUTLAY_DRY_DELAY ms per purchase).
     const delay = Number(process.env.OUTLAY_DRY_DELAY ?? 0);
     if (delay) await new Promise((r) => setTimeout(r, delay * (0.6 + Math.random() * 0.8)));
