@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {IERC20, OutlayVault} from "./OutlayVault.sol";
+import {IERC20, SynclyVault} from "./SynclyVault.sol";
 
 /// @title JobEscrow: pay only for work you accept. If you don't accept it, you get your money back plus a bond.
-/// @notice The customer is the evaluator. The operator (Outlay's server) can open and deliver
+/// @notice The customer is the evaluator. The operator (Syncly's server) can open and deliver
 /// jobs but can never accept them. Payment releases only on the customer's acceptance, or on
 /// silence after the acceptance window. A rejection, or a missed deadline, refunds the price and
 /// pays the bond from the vault's BOND bucket.
@@ -25,7 +25,7 @@ contract JobEscrow {
     }
 
     IERC20 public immutable usdc;
-    OutlayVault public immutable vault;
+    SynclyVault public immutable vault;
     address public operator;
     address public admin;
     uint64 public acceptWindow = 48 hours;
@@ -55,7 +55,7 @@ contract JobEscrow {
         _;
     }
 
-    constructor(IERC20 usdc_, OutlayVault vault_, address operator_, address admin_) {
+    constructor(IERC20 usdc_, SynclyVault vault_, address operator_, address admin_) {
         usdc = usdc_;
         vault = vault_;
         operator = operator_;
@@ -153,7 +153,7 @@ contract JobEscrow {
         emit JobRejected(id, j.amount, j.bond);
     }
 
-    /// Outlay missed its deadline: full refund plus the bond, claimable by anyone for the customer.
+    /// Syncly missed its deadline: full refund plus the bond, claimable by anyone for the customer.
     function refundLate(bytes32 id) external {
         Job storage j = jobs[id];
         if (j.state != State.Funded) revert BadState(j.state);

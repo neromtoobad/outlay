@@ -1,6 +1,6 @@
 # Traction
 
-Generated 2026-09-29 06:46 UTC from Outlay's live books (Arc mainnet). Demo data is never included.
+Generated 2026-09-29 07:10 UTC from Syncly's live books (Arc mainnet). Demo data is never included.
 
 | | |
 |---|---|

@@ -37,7 +37,7 @@ function QuoteDoc({ s, order }: { s: Service; order: QuotedOrder }) {
       </details>
       <div className="signed">
         <Avatar role="cfo" lg />
-        <div><motion.div className="sig" initial={{ clipPath: 'inset(0 100% 0 0)' }} animate={{ clipPath: 'inset(0 0% 0 0)' }} transition={{ delay: 0.9, duration: 0.9, ease: 'easeInOut' }}>The CFO</motion.div><div className="muted">Chief Financial Officer, Outlay · {new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</div></div>
+        <div><motion.div className="sig" initial={{ clipPath: 'inset(0 100% 0 0)' }} animate={{ clipPath: 'inset(0 0% 0 0)' }} transition={{ delay: 0.9, duration: 0.9, ease: 'easeInOut' }}>The CFO</motion.div><div className="muted">Chief Financial Officer, Syncly · {new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</div></div>
       </div>
     </motion.div>
   );

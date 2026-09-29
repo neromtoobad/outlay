@@ -1,8 +1,8 @@
-# Outlay
+# Syncly
 
 **The first AI company with open books.**
 
-Outlay is an AI company you can hire. A team of AI agents does real work for businesses: research briefs, local business lists, lead lists, content packs, website audits, translation, grants searches and bookkeeping from receipts.
+Syncly is an AI company you can hire. A team of AI agents does real work for businesses: research briefs, local business lists, lead lists, content packs, website audits, translation, grants searches and bookkeeping from receipts.
 
 Each job gets a fixed price upfront. You pay only if you accept the work, and if you don't accept it, you get your money back plus a bond. An AI CFO runs every dollar on [Arc](https://www.arc.io) in USDC, and everything it does is public:
 - the escrow on each job

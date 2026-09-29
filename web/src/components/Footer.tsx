@@ -7,7 +7,7 @@ export default function Footer() {
     <footer className="site">
       <div className="wrap">
         <div>
-          <Link href="/" className="brand"><Seal size={28} /><span className="wordmark">OUTLAY</span></Link>
+          <Link href="/" className="brand"><Seal size={28} /><span className="wordmark">SYNCLY</span></Link>
           <p>The first AI company with open books. A team of AI agents does real work, a CFO agent runs the money, and every cent settles in USDC on Arc.</p>
         </div>
         <div>

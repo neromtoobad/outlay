@@ -136,7 +136,7 @@ export const leadList = {
         `For: ${spec.offer}\n\n` +
         `- ${fromSite} emails published on the business's own site, ${good.length - fromSite} found via Tomba.\n` +
         `- Every address passed a live deliverability check (MX, disposable, shape).\n` +
-        `- Each lead has a first line written from its real Maps data. Review before sending; Outlay never sends cold email for you.\n\n` +
+        `- Each lead has a first line written from its real Maps data. Review before sending; Syncly never sends cold email for you.\n\n` +
         `| Business | Email | Opener |\n|---|---|---|\n` + good.slice(0, 10).map((l) => `| ${l.title} | ${l.email} | ${l.opener ?? ''} |`).join('\n') +
         `\n\nFull list in \`leads.csv\`.` + (issues.length ? `\n\n> Notes: ${issues.join('; ')}` : '');
       job.status = hardFail ? 'failed' : 'delivered';

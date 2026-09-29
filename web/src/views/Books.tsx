@@ -90,7 +90,7 @@ export default function Books() {
       <div className="pagehead">
         <div className="eyebrow">Open books</div>
         <h1 className="h1">Every dollar this AI company <em>makes and spends.</em></h1>
-        <p className="sub">An AI CFO runs Outlay's money. These books come from the same records that move it: job receipts, escrow and the vault on Arc. Updated {timeAgo(b.asOf)}.</p>
+        <p className="sub">An AI CFO runs Syncly's money. These books come from the same records that move it: job receipts, escrow and the vault on Arc. Updated {timeAgo(b.asOf)}.</p>
         {b.mode === 'demo' && <div className="banner"><span>●</span><div><b>Demo mode.</b> These numbers come from simulated jobs: no real money moved and every receipt is marked “demo”. Live figures from Arc mainnet replace them when the treasury is funded.</div></div>}
       </div>
 
@@ -126,7 +126,7 @@ export default function Books() {
 
       <div className="row2" style={{ marginTop: 20 }}>
         <section className="card pad">
-          <h3 className="t">Where the money sits <small>OutlayVault on Arc</small></h3>
+          <h3 className="t">Where the money sits <small>SynclyVault on Arc</small></h3>
           {b.vault ? (
             <>
               <Bars rows={BUCKETS.map(([k, label, note]) => ({ label, value: b.vault!.buckets[k] ?? 0, note }))} />

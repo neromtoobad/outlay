@@ -28,7 +28,7 @@ export default function Live() {
       <Office fill idleReplayMs={6000} soundOnFirstClick onMode={setMode} onSound={setSound} />
       <div className={`live-hud${idle ? ' hidden' : ''}`}>
         <div className="live-brand">
-          <Seal size={28} /><span className="wordmark">OUTLAY HQ</span>
+          <Seal size={28} /><span className="wordmark">SYNCLY HQ</span>
           {mode.mode === 'live' ? <span className="chip live"><span className="dot" />Live</span>
             : mode.mode === 'replay' ? <span className="chip dark">↺ Replay · real events</span>
             : <span className="chip dark">Quiet</span>}

@@ -9,7 +9,7 @@ const [cmd = 'status', ...rest] = process.argv.slice(2);
 
 if (cmd === 'init') {
   const { created } = initSeed();
-  console.log(created ? `created ${SEED_FILE} (mode 600). Back it up somewhere safe; it controls every Outlay wallet.` : 'seed already exists; nothing changed');
+  console.log(created ? `created ${SEED_FILE} (mode 600). Back it up somewhere safe; it controls every Syncly wallet.` : 'seed already exists; nothing changed');
   process.exit(0);
 }
 

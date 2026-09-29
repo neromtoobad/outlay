@@ -1,4 +1,4 @@
-// Deploy OutlayVault + JobEscrow and configure them.
+// Deploy SynclyVault + JobEscrow and configure them.
 //   node scripts/deploy.ts local          → anvil on :8545 (tests the whole sequence)
 //   node scripts/deploy.ts arc [0xBoss]   → Arc mainnet; ownership handed to the Boss's own wallet
 // Deployer = treasury key. CFO + escrow operator = the cfo role. Every agent role is hired.
@@ -18,7 +18,7 @@ const forge = join(process.env.HOME!, '.foundry/bin/forge');
 
 execFileSync(forge, ['build', '--silent'], { cwd: contractsDir, stdio: 'inherit' });
 const art = (name: string) => JSON.parse(readFileSync(join(contractsDir, 'out', `${name}.sol`, `${name}.json`), 'utf8'));
-const Vault = art('OutlayVault');
+const Vault = art('SynclyVault');
 const Escrow = art('JobEscrow');
 
 const local: Chain = { id: 31337, name: 'anvil', nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['http://127.0.0.1:8545'] } } };
@@ -58,7 +58,7 @@ async function call(label: string, address: Address, abi: any, functionName: str
 }
 
 console.log(`deploying to ${network} (chain ${chain.id}) from ${deployer.address}`);
-const vault = await deploy('OutlayVault', Vault, [usdc, gatewayWallet, deployer.address, cfo]);
+const vault = await deploy('SynclyVault', Vault, [usdc, gatewayWallet, deployer.address, cfo]);
 const escrow = await deploy('JobEscrow', Escrow, [usdc, vault, cfo, boss]);
 await call('setEscrow', vault, Vault.abi, 'setEscrow', [escrow]);
 // Starting policy for a $10–20 company: reserve ≥ 1, CFO moves ≤ 2 alone, agents ≤ 3/epoch, promo ≤ 2/epoch

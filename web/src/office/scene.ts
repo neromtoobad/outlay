@@ -1,4 +1,4 @@
-// Outlay HQ: a three-storey building in cutaway, driven only by real events (SSE from the API, or a
+// Syncly HQ: a three-storey building in cutaway, driven only by real events (SSE from the API, or a
 // labelled replay of recorded ones). Nothing is simulated: an agent types because it just took a step,
 // a coin flies because a purchase was just paid, the Messenger walks out of the door because a job was
 // just delivered. PixiJS draws; GSAP choreographs; an auto-director moves the camera to the action.
@@ -330,7 +330,7 @@ export class OfficeScene {
 
   private buildScreen() {
     const c = new PIXI.Container(); c.position.set(SCREEN.x0 + 26, SCREEN.y0 + 18);
-    const title = this.txt('OUTLAY · OPEN BOOKS', { fontFamily: this.fonts.mono, fontSize: 19, fill: 0xe2ab45, letterSpacing: 3, fontWeight: '600' }, 3);
+    const title = this.txt('SYNCLY · OPEN BOOKS', { fontFamily: this.fonts.mono, fontSize: 19, fill: 0xe2ab45, letterSpacing: 3, fontWeight: '600' }, 3);
     const clock = this.txt('', { fontFamily: this.fonts.mono, fontSize: 19, fill: 0x9fb8ae }, 3); clock.anchor.set(1, 0); clock.x = SCREEN.x1 - SCREEN.x0 - 52;
     const rev = this.txt('—', { fontFamily: this.fonts.serif, fontSize: 64, fill: 0xf4ecda }, 3); rev.y = 30;
     const sub = this.txt('', { fontFamily: this.fonts.mono, fontSize: 18, fill: 0xc9d6cf }, 3); sub.y = 108;

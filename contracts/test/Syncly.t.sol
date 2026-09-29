@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {OutlayVault, IERC20, IGatewayWallet} from "../src/OutlayVault.sol";
+import {SynclyVault, IERC20, IGatewayWallet} from "../src/SynclyVault.sol";
 import {JobEscrow} from "../src/JobEscrow.sol";
 
 interface Vm {
@@ -55,13 +55,13 @@ contract MockGateway {
     }
 }
 
-contract OutlayTest {
+contract SynclyTest {
     Vm constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
     uint256 constant U = 1e6; // 1 USDC
 
     MockUSDC usdc;
     MockGateway gw;
-    OutlayVault vault;
+    SynclyVault vault;
     JobEscrow esc;
 
     address boss = address(0xB055);
@@ -75,7 +75,7 @@ contract OutlayTest {
     function setUp() public {
         usdc = new MockUSDC();
         gw = new MockGateway(usdc);
-        vault = new OutlayVault(IERC20(address(usdc)), IGatewayWallet(address(gw)), boss, cfo);
+        vault = new SynclyVault(IERC20(address(usdc)), IGatewayWallet(address(gw)), boss, cfo);
         esc = new JobEscrow(IERC20(address(usdc)), vault, operator, boss);
         vm.startPrank(boss);
         vault.setEscrow(address(esc));
@@ -87,15 +87,15 @@ contract OutlayTest {
         usdc.mint(address(vault), 20 * U);
         vault.sync();
         vm.startPrank(cfo);
-        vault.move(OutlayVault.Bucket.OPERATING, OutlayVault.Bucket.BOND, 3 * U, "bond pool");
-        vault.move(OutlayVault.Bucket.OPERATING, OutlayVault.Bucket.RESERVE, 3 * U, "reserve");
-        vault.move(OutlayVault.Bucket.OPERATING, OutlayVault.Bucket.TOOLS, 3 * U, "tools");
-        vault.move(OutlayVault.Bucket.OPERATING, OutlayVault.Bucket.PROMO, 2 * U, "promo");
+        vault.move(SynclyVault.Bucket.OPERATING, SynclyVault.Bucket.BOND, 3 * U, "bond pool");
+        vault.move(SynclyVault.Bucket.OPERATING, SynclyVault.Bucket.RESERVE, 3 * U, "reserve");
+        vault.move(SynclyVault.Bucket.OPERATING, SynclyVault.Bucket.TOOLS, 3 * U, "tools");
+        vault.move(SynclyVault.Bucket.OPERATING, SynclyVault.Bucket.PROMO, 2 * U, "promo");
         vm.stopPrank();
         usdc.mint(customer, 50 * U);
     }
 
-    function b(OutlayVault.Bucket x) internal view returns (uint256) {
+    function b(SynclyVault.Bucket x) internal view returns (uint256) {
         return vault.bucket(uint256(x));
     }
 
@@ -111,28 +111,28 @@ contract OutlayTest {
     // ---------------------------------------------------------------- escrow
 
     function test_accept_pays_company_and_frees_bond() public {
-        uint256 op0 = b(OutlayVault.Bucket.OPERATING);
+        uint256 op0 = b(SynclyVault.Bucket.OPERATING);
         openFunded("j1", uint96(3 * U), uint96(6e5));
         require(vault.bondsOutstanding() == 6e5, "bond locked");
         vm.prank(operator);
         esc.submit("j1", keccak256("deliverable"));
         vm.prank(customer);
         esc.accept("j1");
-        require(b(OutlayVault.Bucket.OPERATING) == op0 + 3 * U, "revenue to OPERATING");
+        require(b(SynclyVault.Bucket.OPERATING) == op0 + 3 * U, "revenue to OPERATING");
         require(vault.bondsOutstanding() == 0, "bond released");
         require(vault.total() == usdc.balanceOf(address(vault)), "books == chain");
     }
 
     function test_reject_refunds_price_plus_bond() public {
         uint256 before = usdc.balanceOf(customer);
-        uint256 bond0 = b(OutlayVault.Bucket.BOND);
+        uint256 bond0 = b(SynclyVault.Bucket.BOND);
         openFunded("j2", uint96(3 * U), uint96(6e5));
         vm.prank(operator);
         esc.submit("j2", keccak256("deliverable"));
         vm.prank(customer);
         esc.reject("j2");
         require(usdc.balanceOf(customer) == before + 6e5, "customer ends +bond");
-        require(b(OutlayVault.Bucket.BOND) == bond0 - 6e5, "bond paid from BOND");
+        require(b(SynclyVault.Bucket.BOND) == bond0 - 6e5, "bond paid from BOND");
         require(vault.total() == usdc.balanceOf(address(vault)), "books == chain");
     }
 
@@ -183,7 +183,7 @@ contract OutlayTest {
     function test_bond_must_be_covered_when_quoting() public {
         // BOND bucket holds 3 USDC; a 4 USDC bond cannot be quoted
         vm.prank(operator);
-        vm.expectRevert(OutlayVault.BondCoverage.selector);
+        vm.expectRevert(SynclyVault.BondCoverage.selector);
         esc.open("j7", customer, uint96(10 * U), uint96(4 * U), keccak256("s"), uint64(block.timestamp + 1 days), uint64(block.timestamp + 2 days));
     }
 
@@ -192,36 +192,36 @@ contract OutlayTest {
     function test_cfo_cannot_drain_bond_below_outstanding() public {
         openFunded("j8", uint96(3 * U), uint96(2 * U));
         vm.prank(cfo);
-        vm.expectRevert(OutlayVault.BondCoverage.selector);
-        vault.move(OutlayVault.Bucket.BOND, OutlayVault.Bucket.OPERATING, 2 * U, "try");
+        vm.expectRevert(SynclyVault.BondCoverage.selector);
+        vault.move(SynclyVault.Bucket.BOND, SynclyVault.Bucket.OPERATING, 2 * U, "try");
     }
 
     function test_cfo_cannot_break_reserve_floor() public {
         vm.prank(cfo);
-        vm.expectRevert(OutlayVault.ReserveFloor.selector);
-        vault.move(OutlayVault.Bucket.RESERVE, OutlayVault.Bucket.TOOLS, 2 * U, "try"); // 3 → 1 < floor 2
+        vm.expectRevert(SynclyVault.ReserveFloor.selector);
+        vault.move(SynclyVault.Bucket.RESERVE, SynclyVault.Bucket.TOOLS, 2 * U, "try"); // 3 → 1 < floor 2
     }
 
     function test_big_moves_need_the_boss() public {
         vm.prank(cfo);
-        vm.expectRevert(OutlayVault.NeedsCoSign.selector);
-        vault.move(OutlayVault.Bucket.OPERATING, OutlayVault.Bucket.TOOLS, 4 * U, "big");
+        vm.expectRevert(SynclyVault.NeedsCoSign.selector);
+        vault.move(SynclyVault.Bucket.OPERATING, SynclyVault.Bucket.TOOLS, 4 * U, "big");
         vm.prank(cfo);
-        uint256 id = vault.propose(OutlayVault.Kind.MOVE, address(0), OutlayVault.Bucket.OPERATING, OutlayVault.Bucket.TOOLS, 4 * U, "big");
+        uint256 id = vault.propose(SynclyVault.Kind.MOVE, address(0), SynclyVault.Bucket.OPERATING, SynclyVault.Bucket.TOOLS, 4 * U, "big");
         vm.prank(cfo);
-        vm.expectRevert(OutlayVault.NotOwner.selector);
+        vm.expectRevert(SynclyVault.NotOwner.selector);
         vault.coSign(id);
         vm.prank(boss);
         vault.coSign(id);
-        require(b(OutlayVault.Bucket.TOOLS) == 7 * U, "moved after co-sign");
+        require(b(SynclyVault.Bucket.TOOLS) == 7 * U, "moved after co-sign");
     }
 
     function test_cfo_has_no_withdraw_path() public {
         vm.prank(cfo);
-        vm.expectRevert(OutlayVault.NotOwner.selector);
-        vault.ownerWithdraw(OutlayVault.Bucket.OPERATING, cfo, 1 * U);
+        vm.expectRevert(SynclyVault.NotOwner.selector);
+        vault.ownerWithdraw(SynclyVault.Bucket.OPERATING, cfo, 1 * U);
         vm.prank(cfo);
-        vm.expectRevert(OutlayVault.NotOwner.selector);
+        vm.expectRevert(SynclyVault.NotOwner.selector);
         vault.fire(agent);
     }
 
@@ -232,9 +232,9 @@ contract OutlayTest {
         vault.setAllowance(agent, uint128(1 * U));
         vault.topUp(agent, 6e5, "scout budget");
         require(gw.balanceFor(agent) == 6e5, "credited in Gateway under the agent");
-        vm.expectRevert(OutlayVault.OverAllowance.selector);
+        vm.expectRevert(SynclyVault.OverAllowance.selector);
         vault.topUp(agent, 5e5, "too much");
-        vm.expectRevert(OutlayVault.OverEpochBudget.selector);
+        vm.expectRevert(SynclyVault.OverEpochBudget.selector);
         vault.setAllowance(agent, uint128(6 * U)); // epoch budget is 5
         vm.stopPrank();
         require(vault.total() == usdc.balanceOf(address(vault)), "books == chain");
@@ -246,7 +246,7 @@ contract OutlayTest {
         vm.prank(boss);
         vault.fire(agent);
         vm.prank(cfo);
-        vm.expectRevert(OutlayVault.NotActive.selector);
+        vm.expectRevert(SynclyVault.NotActive.selector);
         vault.topUp(agent, 1e5, "after firing");
     }
 
@@ -255,7 +255,7 @@ contract OutlayTest {
         vault.setAllowance(agent, uint128(1 * U));
         vault.topUp(agent, 1 * U, "e1");
         vault.openEpoch(keccak256("sealed allocation"));
-        vm.expectRevert(OutlayVault.OverAllowance.selector);
+        vm.expectRevert(SynclyVault.OverAllowance.selector);
         vault.topUp(agent, 1, "no allowance yet this epoch");
         vault.setAllowance(agent, uint128(1 * U));
         vault.topUp(agent, 1 * U, "e2");
@@ -265,7 +265,7 @@ contract OutlayTest {
     function test_promo_is_capped_per_epoch() public {
         vm.startPrank(cfo);
         vault.promoToTools(8e5, "free job 1");
-        vm.expectRevert(OutlayVault.OverPromoCap.selector);
+        vm.expectRevert(SynclyVault.OverPromoCap.selector);
         vault.promoToTools(3e5, "free job 2");
         vm.stopPrank();
     }
@@ -273,9 +273,9 @@ contract OutlayTest {
     function test_expert_payout_is_idempotent_and_whitelisted() public {
         vm.startPrank(cfo);
         vault.payExpert(expertA, 1 * U, "j1", keccak256("review-j1"));
-        vm.expectRevert(OutlayVault.AlreadyPaid.selector);
+        vm.expectRevert(SynclyVault.AlreadyPaid.selector);
         vault.payExpert(expertA, 1 * U, "j1", keccak256("review-j1"));
-        vm.expectRevert(OutlayVault.NotExpert.selector);
+        vm.expectRevert(SynclyVault.NotExpert.selector);
         vault.payExpert(stranger, 1 * U, "j1", keccak256("review-j1"));
         vm.stopPrank();
         require(usdc.balanceOf(expertA) == 1 * U, "expert paid once");

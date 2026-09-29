@@ -42,7 +42,7 @@ function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
   const price = q.promo ? 0 : q.priceUsd;
   return (
     <div className="receipt">
-      <div className="rh"><b>OUTLAY</b><span>{o.id} · {new Date(o.createdAt).toLocaleDateString()}</span></div>
+      <div className="rh"><b>SYNCLY</b><span>{o.id} · {new Date(o.createdAt).toLocaleDateString()}</span></div>
       <div style={{ fontSize: 11.5, color: 'var(--muted)', textAlign: 'center' }}>Every tool the team bought for this job</div>
       <hr />
       <div className="scroll">
@@ -59,7 +59,7 @@ function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
       <div className="tot"><span>Tools ({receipt.length})</span><span>{spent.toFixed(4)}</span></div>
       <div className="tot"><span>You pay{q.promo ? ' (free)' : ''}</span><span>{price.toFixed(2)}</span></div>
       <hr />
-      <div className="tot big"><span>Outlay's margin</span><span>{(price - spent).toFixed(4)}</span></div>
+      <div className="tot big"><span>Syncly's margin</span><span>{(price - spent).toFixed(4)}</span></div>
       <div className="foot">USDC · {o.demo ? 'demo receipt, no money moved' : 'paid per call via x402 on Arc'}</div>
     </div>
   );
@@ -103,7 +103,7 @@ export default function Job({ id }: { id: string }) {
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   }
 
-  if (err && !o) return <main className="wrap section center"><h1 className="h1">Couldn't find this job.</h1><p className="muted" style={{ margin: '12px 0 24px' }}>{err}</p><Link href="/" className="btn secondary">Back to Outlay</Link></main>;
+  if (err && !o) return <main className="wrap section center"><h1 className="h1">Couldn't find this job.</h1><p className="muted" style={{ margin: '12px 0 24px' }}>{err}</p><Link href="/" className="btn secondary">Back to Syncly</Link></main>;
   if (!o) return <main className="wrap section"><div className="skel" style={{ height: 480 }} /></main>;
   const q = o.quote;
 

@@ -31,7 +31,7 @@ const revenue = paidAccepted.reduce((s, o) => s + o.quote.priceUsd, 0);
 
 const md = `# Traction
 
-Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC from Outlay's live books (Arc mainnet). Demo data is never included.
+Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC from Syncly's live books (Arc mainnet). Demo data is never included.
 
 | | |
 |---|---|

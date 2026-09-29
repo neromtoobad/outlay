@@ -1,4 +1,4 @@
-// Outlay API: quotes, orders, live job progress (SSE), the public books.
+// Syncly API: quotes, orders, live job progress (SSE), the public books.
 //   PORT=8790 node src/api.ts          (OUTLAY_DRY=1 for demo mode: no money moves, clearly labelled)
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
@@ -6,7 +6,7 @@ import { serve } from '@hono/node-server';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DATA_DIR, DRY } from './config.ts';
-import { bus, type OutlayEvent } from './bus.ts';
+import { bus, type SynclyEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
 import { autoAcceptDue, createQuote, decide, getOrder, readJob, replay, retry, start } from './orders.ts';
 import { books, beancount, team } from './books.ts';
@@ -104,7 +104,7 @@ app.get('/api/books.beancount', (c) => {
 
 // Live progress of the job currently running for each order (steps + purchases), for the job page.
 const liveJobs = new Map<string, { jobId: string; steps: unknown[]; receipt: unknown[] }>();
-bus.on('event', (e: OutlayEvent) => {
+bus.on('event', (e: SynclyEvent) => {
   if (!e.orderId || !e.jobId) return;
   let l = liveJobs.get(e.orderId);
   if (!l || l.jobId !== e.jobId) liveJobs.set(e.orderId, (l = { jobId: e.jobId, steps: [], receipt: [] }));
@@ -115,7 +115,7 @@ bus.on('event', (e: OutlayEvent) => {
 app.get('/api/events', (c) =>
   streamSSE(c, async (stream) => {
     const only = c.req.query('order');
-    const send = (e: OutlayEvent) => { if (!only || e.orderId === only) void stream.writeSSE({ data: JSON.stringify(e), event: e.type }); };
+    const send = (e: SynclyEvent) => { if (!only || e.orderId === only) void stream.writeSSE({ data: JSON.stringify(e), event: e.type }); };
     bus.on('event', send);
     const ping = setInterval(() => void stream.writeSSE({ data: '{}', event: 'ping' }), 20_000);
     await new Promise<void>((resolve) => stream.onAbort(() => resolve()));

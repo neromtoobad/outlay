@@ -30,7 +30,7 @@ export default function Nav() {
   return (
     <div className="navshell">
       <header className="nav">
-        <Link href="/" className="brand" aria-label="Outlay home"><Seal size={30} /><span className="wordmark">OUTLAY</span></Link>
+        <Link href="/" className="brand" aria-label="Syncly home"><Seal size={30} /><span className="wordmark">SYNCLY</span></Link>
         <nav className="navlinks"><Links /></nav>
         <span className="spacer" />
         {data && (data.mode === 'demo'

@@ -53,7 +53,7 @@ export function Seal({ size = 32 }: { size?: number }) {
       <defs><radialGradient id="lead" cx="40%" cy="35%"><stop offset="0" stopColor="#a4a9b0" /><stop offset="1" stopColor="#5d626a" /></radialGradient></defs>
       <circle cx="32" cy="32" r="30" fill="url(#lead)" stroke="#43474e" strokeWidth="2" />
       <circle cx="32" cy="32" r="23" fill="none" stroke="#d6dae0" strokeOpacity=".6" strokeWidth="1.5" strokeDasharray="2 3" />
-      <text x="32" y="41.5" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="700" fontSize="27" fill="#f4f1ea">O</text>
+      <text x="32" y="41.5" textAnchor="middle" fontFamily="Cinzel, serif" fontWeight="700" fontSize="27" fill="#f4f1ea">S</text>
     </svg>
   );
 }

@@ -13,12 +13,12 @@ interface IGatewayWallet {
     function depositFor(address token, address depositor, uint256 value) external;
 }
 
-/// @title OutlayVault: the treasury of an AI-run company, in public.
+/// @title SynclyVault: the treasury of an AI-run company, in public.
 /// @notice All USDC the company holds sits in one of five buckets. The AI CFO can move money
 /// between buckets and fund agents' Gateway balances within the owner's policy, but it has no
 /// function that sends money anywhere else. The owner (a human, "the Boss") co-signs anything
 /// bigger. Customers' guarantees are always covered: BOND >= outstanding bonds.
-contract OutlayVault {
+contract SynclyVault {
     enum Bucket { OPERATING, TOOLS, BOND, RESERVE, PROMO }
     enum Kind { HIRE, FIRE, MOVE }
 

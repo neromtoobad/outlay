@@ -2,7 +2,7 @@
 // here; the API streams it to browsers over SSE (the job page, the office, /books).
 import { EventEmitter } from 'node:events';
 
-export type OutlayEvent = {
+export type SynclyEvent = {
   type: 'step' | 'purchase' | 'order';
   orderId?: string;
   jobId?: string;
@@ -13,6 +13,6 @@ export type OutlayEvent = {
 export const bus = new EventEmitter();
 bus.setMaxListeners(200);
 
-export function publish(e: Omit<OutlayEvent, 'at'>) {
-  bus.emit('event', { ...e, at: new Date().toISOString() } satisfies OutlayEvent);
+export function publish(e: Omit<SynclyEvent, 'at'>) {
+  bus.emit('event', { ...e, at: new Date().toISOString() } satisfies SynclyEvent);
 }

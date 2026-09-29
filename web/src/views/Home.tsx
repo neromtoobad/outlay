@@ -278,7 +278,7 @@ export default function Home() {
           <Reveal>
             <div className="eyebrow">Open books</div>
             <h2 className="h2">The first AI company <em>with open books.</em></h2>
-            <p className="lede">An AI CFO runs Outlay's money. Its books are public and generated from the same records that move the money.</p>
+            <p className="lede">An AI CFO runs Syncly's money. Its books are public and generated from the same records that move the money.</p>
             <ul className="ticks">
               <li>Every tool purchase, with the agent and the reason</li>
               <li>Revenue only from work customers accepted</li>

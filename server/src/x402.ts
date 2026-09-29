@@ -1,4 +1,4 @@
-// buy(): the only way an Outlay agent spends money. It pays an x402 endpoint from the agent's
+// buy(): the only way an Syncly agent spends money. It pays an x402 endpoint from the agent's
 // Circle Gateway balance on Arc, enforces a per-call price cap and a host allowlist BEFORE
 // signing, and appends a receipt line to the job. No receipt, no spend.
 import { GatewayClient } from '@circle-fin/x402-batching/client';

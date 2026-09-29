@@ -1,4 +1,4 @@
-// Every Outlay wallet derives from one mnemonic. It lives in OUTLAY_MNEMONIC (Railway) or
+// Every Syncly wallet derives from one mnemonic. It lives in OUTLAY_MNEMONIC (Railway) or
 // ~/.outlay-seed (local, mode 600). It is never committed.
 import { readFileSync, existsSync, writeFileSync, chmodSync } from 'node:fs';
 import { homedir } from 'node:os';

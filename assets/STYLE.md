@@ -1,4 +1,4 @@
-# Outlay style bible
+# Syncly style bible
 
 **Direction:** cozy stylized 3D, in the look of modern feature animation. Byzantine touches: teal and gold, embroidered trim, lead seals, mosaic floor.
 
@@ -68,4 +68,5 @@ Review boards: `sprites/cast-a.png` and `sprites/cast-b.png`. The worker frame o
 | Sep 28 | messenger side-view walk ×4 + carry-box walk ×4 (medium 2k, ref sheet); chosen carry w5 → `sprites/messenger-carry` | 2 |
 | Sep 28 | messenger walk ×4 with explicit contact/down/passing/up poses; chosen w10 → `sprites/messenger-walk` | 1 |
 | Sep 28 | CFO walk ×4 + Auditor walk ×4 (medium 2k, refs = their sheets); chosen CFO s1 → `sprites/cfo-walk`, Auditor s5 → `sprites/auditor-walk` | 2 |
-| **Total** | | **21.88 / 500** |
+| Sep 29 | rename to Syncly: rooftop sign edit ×2 (high 2k, crop of the sign only; chosen db298faf, blended into `scene/building.webp`) | 2.75 |
+| **Total** | | **24.63 / 500** |
