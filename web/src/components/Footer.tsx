@@ -24,7 +24,7 @@ export default function Footer() {
           <ul>
             <li><a href="/api/books.beancount">Ledger (beancount)</a></li>
             <li><a href="https://arcscan.app" target="_blank" rel="noreferrer">Arc explorer</a></li>
-            <li><a href="https://github.com/neromtoobad/outlay" target="_blank" rel="noreferrer">Source code</a></li>
+            <li><a href="https://github.com/neromtoobad/syncly" target="_blank" rel="noreferrer">Source code</a></li>
           </ul>
         </div>
       </div>
