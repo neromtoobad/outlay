@@ -4,16 +4,19 @@
 //   quoted → (free | paid) → queued → running → delivered → accepted | revision → … | rejected
 //                                            ↘ failed (refund + bond)
 // Payment modes: 'promo' (first job free, no escrow), 'simulated' (demo mode only, clearly labelled),
-// 'escrow' (JobEscrow on Arc, once deployed).
+// 'escrow' (JobEscrow on Arc). An escrow order follows the chain: syncEscrow() reads the job's on-chain
+// state and mirrors it here. Only the customer's wallet can accept, revise or reject.
 import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { isAddress, type Address, type Hex } from 'viem';
 import { DATA_DIR, DRY } from './config.ts';
 import { publish } from './bus.ts';
 import { quote, type Quote } from './cfo/quote.ts';
 import { CATALOG, SERVICES } from './services/index.ts';
+import * as chain from './escrow.ts';
 
-export type OrderStatus = 'quoted' | 'queued' | 'running' | 'delivered' | 'revision' | 'accepted' | 'rejected' | 'failed' | 'declined';
+export type OrderStatus = 'quoted' | 'queued' | 'running' | 'delivered' | 'revision' | 'accepted' | 'rejected' | 'failed' | 'declined' | 'expired';
 export type Order = {
   id: string;
   service: string;
@@ -27,7 +30,24 @@ export type Order = {
   revisionNote?: string;
   deliveredAt?: string;
   decision?: { kind: 'accepted' | 'rejected'; at: string; by: 'customer' | 'auto'; note?: string };
-  refund?: { priceUsd: number; bondUsd: number; at: string };
+  refund?: { priceUsd: number; bondUsd: number; at: string; tx?: string };
+  escrow?: {
+    id: Hex; // keccak256(order id)
+    customer: Address; // the only wallet that can accept, revise or reject
+    spec: string; // the terms shown before payment; keccak256(spec) is on-chain as specHash
+    specHash: Hex;
+    fundBy: string;
+    deliverBy: string;
+    acceptBy?: string;
+    state: chain.EscrowState;
+    openTx: Hex;
+    openBlock: string;
+    fundTx?: Hex;
+    submitTx?: Hex; // cleared when the customer asks for a revision
+    deliverableHash?: Hex;
+    closeTx?: Hex; // accept, reject, auto-release, late refund or cancel
+  };
+  pendingNote?: string; // a revision note sent before the customer's on-chain revision request
   demo: boolean;
 };
 
@@ -99,8 +119,9 @@ function historyFor(service: string) {
   };
 }
 
-/** Free BOND cover. Until the vault is deployed the policy number stands in (3 USDC). */
+/** Free BOND cover: read from the vault when escrow is on; otherwise the policy number stands in (3 USDC). */
 function bondPoolFree(): number {
+  if (chain.DEP) return chain.bondFreeUsd() ?? 0;
   const open = listOrders().filter((o) => o.demo === DRY && o.payment?.mode !== 'promo' && ['queued', 'running', 'delivered', 'revision'].includes(o.status));
   return Math.max(0, 3 - open.reduce((s, o) => s + o.quote.bondUsd, 0));
 }
@@ -154,13 +175,16 @@ async function run(o: Order) {
   } else {
     // We failed to deliver: the guarantee applies (refund + bond) for paid orders.
     fresh.status = 'failed';
-    if (fresh.payment?.mode !== 'promo') fresh.refund = { priceUsd: fresh.quote.priceUsd, bondUsd: fresh.quote.bondUsd, at: new Date().toISOString() };
+    // escrow refunds happen on-chain once the deadline passes (syncEscrow records them)
+    if (fresh.payment?.mode !== 'promo' && !fresh.escrow) fresh.refund = { priceUsd: fresh.quote.priceUsd, bondUsd: fresh.quote.bondUsd, at: new Date().toISOString() };
   }
   saveOrder(fresh);
+  if (fresh.escrow) void syncEscrow(fresh.id).catch((e) => console.error(`escrow ${fresh.id}: ${e.message}`));
 }
 
 export function decide(o: Order, kind: 'accept' | 'reject' | 'revise', note?: string, by: 'customer' | 'auto' = 'customer') {
   if (o.status !== 'delivered') throw new Error(`order is ${o.status}`);
+  if (o.escrow) throw new Error('This job is paid through escrow on Arc: accept, revise or reject from the wallet that paid.');
   const at = new Date().toISOString();
   if (kind === 'accept') {
     o.status = 'accepted';
@@ -171,14 +195,18 @@ export function decide(o: Order, kind: 'accept' | 'reject' | 'revise', note?: st
     if (o.payment?.mode !== 'promo') o.refund = { priceUsd: o.quote.priceUsd, bondUsd: o.quote.bondUsd, at };
   } else {
     if (o.revisionNote !== undefined) throw new Error('one revision per order');
-    o.revisionNote = (note ?? '').slice(0, 800) || 'Please improve it.';
-    o.status = 'revision';
-    saveOrder(o);
-    o.status = 'queued';
-    void run(o);
+    revise(o, note);
     return;
   }
   saveOrder(o);
+}
+
+function revise(o: Order, note?: string) {
+  o.revisionNote = (note ?? '').slice(0, 800) || 'Please improve it.';
+  o.status = 'revision';
+  saveOrder(o);
+  o.status = 'queued';
+  void run(o);
 }
 
 /** A free job we failed to deliver can be run again (paid ones were already refunded + bonded). */
@@ -192,5 +220,138 @@ export function retry(o: Order) {
 
 /** Silence means yes: delivered orders auto-accept after 48h (the escrow does the same on-chain). */
 export function autoAcceptDue(windowMs = 48 * 3600_000) {
-  for (const o of listOrders()) if (o.status === 'delivered' && o.deliveredAt && Date.now() - Date.parse(o.deliveredAt) > windowMs) decide(o, 'accept', undefined, 'auto');
+  for (const o of listOrders()) if (!o.escrow && o.status === 'delivered' && o.deliveredAt && Date.now() - Date.parse(o.deliveredAt) > windowMs) decide(o, 'accept', undefined, 'auto');
+}
+
+// ---------------------------------------------------------------- escrow on Arc
+
+/** The terms the customer pays against. Their hash is sealed on-chain when the escrow opens. */
+function specFor(o: Order, customer: Address) {
+  const item = CATALOG.find((c) => c.id === o.service)!;
+  return JSON.stringify({
+    order: o.id, service: item.name, brief: o.brief, customer, priceUsdc: o.quote.priceUsd, bondUsdc: o.quote.bondUsd,
+    deliverHours: o.quote.deliverHours, acceptWindowHours: 48, oneFreeRevision: true, youGet: item.youGet,
+  });
+}
+
+const busy = new Set<string>();
+async function locked<T>(id: string, f: () => Promise<T>): Promise<T> {
+  while (busy.has(id)) await new Promise((r) => setTimeout(r, 200));
+  busy.add(id);
+  try { return await f(); } finally { busy.delete(id); }
+}
+
+/** The CFO opens this quote's escrow on Arc for the customer's wallet and locks the bond in the vault. */
+export function openEscrow(orderId: string, customer: string) {
+  return locked(orderId, async () => {
+    const o = getOrder(orderId);
+    if (!o) throw new Error('not found');
+    if (!chain.DEP) throw new Error('Escrow payment is not switched on yet.');
+    if (!isAddress(customer)) throw new Error('That is not a wallet address.');
+    if (o.escrow) {
+      if (o.escrow.customer.toLowerCase() === customer.toLowerCase() && o.escrow.state === 'Open') return o;
+      throw new Error('This quote already has an escrow for another wallet. Get a new quote.');
+    }
+    if (o.status !== 'quoted' || o.quote.promo || o.quote.decision !== 'quote') throw new Error(`This quote can't be paid (${o.status}).`);
+    if (Date.now() - Date.parse(o.createdAt) > 6 * 3600_000) throw new Error('This quote is more than 6 hours old. Get a new quote.');
+    // Opening costs the CFO gas and locks a bond, so only for a wallet that can actually pay, and never too many at once.
+    if (listOrders().filter((x) => x.escrow?.state === 'Open').length >= 5) throw new Error('Several unpaid escrows are open right now. Try again in a few minutes.');
+    const has = await chain.usdcOf(customer as Address);
+    if (has < o.quote.priceUsd) throw new Error(`This wallet has ${has.toFixed(2)} USDC; the job needs ${o.quote.priceUsd.toFixed(2)} USDC plus a few cents for gas.`);
+    const free = await chain.refreshBondFree();
+    if (free !== null && o.quote.bondUsd > free + 1e-9) throw new Error('The bond pool changed since your quote. Get a new quote.');
+    const spec = specFor(o, customer as Address);
+    const id = chain.jobKey(o.id), specHash = chain.hashText(spec);
+    const now = await chain.chainNow(), fundBy = now + 30 * 60, deliverBy = fundBy + Math.max(1, o.quote.deliverHours) * 3600;
+    const r = await chain.openJob(id, customer as Address, o.quote.priceUsd, o.quote.bondUsd, specHash, fundBy, deliverBy);
+    o.escrow = {
+      id, customer: customer as Address, spec, specHash, fundBy: new Date(fundBy * 1000).toISOString(), deliverBy: new Date(deliverBy * 1000).toISOString(),
+      state: 'Open', openTx: r.hash, openBlock: r.block.toString(),
+    };
+    saveOrder(o);
+    void chain.refreshBondFree().catch(() => {});
+    return o;
+  });
+}
+
+/** Store a revision note ahead of the customer's on-chain request (the email on the order must match). */
+export function noteForRevision(o: Order, email: string, note: string) {
+  if (!o.escrow || o.status !== 'delivered' || o.revisionNote !== undefined) return;
+  if (email.trim().toLowerCase() !== o.email) throw new Error('Only the customer who placed this order can add a revision note.');
+  o.pendingNote = note.slice(0, 800);
+  saveOrder(o);
+}
+
+/**
+ * Bring an escrow order in line with the chain, and do the CFO's part: start the work once funded,
+ * submit each delivery, release after 48 h of silence, refund a failed job once its deadline passes,
+ * and cancel a quote nobody funded. `tx` is a transaction the browser just sent (checked on-chain).
+ */
+export function syncEscrow(orderId: string, tx?: string) {
+  return locked(orderId, async () => {
+    let o = getOrder(orderId);
+    if (!o?.escrow || !chain.DEP) return o;
+    const e = o.escrow, from = BigInt(e.openBlock);
+    const [c, now] = await Promise.all([chain.readEscrow(e.id), chain.chainNow()]);
+    const theirs = async (ev: 'JobFunded' | 'RevisionRequested' | 'JobAccepted' | 'JobRejected') =>
+      tx && (await chain.txEmitted(tx, ev, e.id)) ? (tx as Hex) : await chain.txOf(ev, e.id, from);
+    e.state = c.state;
+
+    if (o.status === 'quoted') {
+      if (c.state === 'Funded') {
+        e.fundTx = await theirs('JobFunded');
+        saveOrder(o);
+        await start(o, 'escrow', e.fundTx);
+        return getOrder(orderId);
+      }
+      if (c.state === 'Open' && now > c.fundBy) {
+        e.closeTx = (await chain.cancelUnfunded(e.id)).hash;
+        e.state = 'Cancelled';
+      }
+      if (e.state === 'Cancelled') o.status = 'expired';
+    } else if (o.status === 'delivered' && c.state === 'Funded' && c.revised && e.submitTx && o.revisionNote === undefined) {
+      // the customer asked for their one revision on-chain
+      e.submitTx = undefined;
+      e.deliverBy = new Date(c.deliverBy * 1000).toISOString();
+      const note = o.pendingNote;
+      o.pendingNote = undefined;
+      revise(o, note);
+      return getOrder(orderId);
+    } else if (o.status === 'delivered' && c.state === 'Funded' && !e.submitTx) {
+      const last = readJob(o.runs[o.runs.length - 1]);
+      e.deliverableHash = chain.hashText(last?.deliverable ?? '');
+      e.submitTx = (await chain.submitJob(e.id, e.deliverableHash)).hash;
+      const after = await chain.readEscrow(e.id);
+      e.state = after.state;
+      e.acceptBy = new Date(after.acceptBy * 1000).toISOString();
+    } else if (o.status === 'delivered' && c.state === 'Submitted' && now > c.acceptBy) {
+      e.closeTx = (await chain.autoRelease(e.id)).hash;
+      e.state = 'Accepted';
+      o.status = 'accepted';
+      o.decision = { kind: 'accepted', at: new Date().toISOString(), by: 'auto' };
+    } else if (c.state === 'Accepted' && o.status !== 'accepted') {
+      e.closeTx = await theirs('JobAccepted');
+      o.status = 'accepted';
+      o.decision = { kind: 'accepted', at: new Date().toISOString(), by: 'customer' };
+    } else if (c.state === 'Rejected' && o.status !== 'rejected') {
+      e.closeTx = await theirs('JobRejected');
+      const at = new Date().toISOString();
+      o.status = 'rejected';
+      o.decision = { kind: 'rejected', at, by: 'customer', note: o.pendingNote };
+      o.refund = { priceUsd: o.quote.priceUsd, bondUsd: o.quote.bondUsd, at, tx: e.closeTx };
+    } else if (['failed', 'queued', 'running', 'revision'].includes(o.status) && c.state === 'Funded' && now > c.deliverBy) {
+      // not delivered by the deadline (or the run died with the server): refund plus the bond
+      e.closeTx = (await chain.refundLate(e.id)).hash;
+      e.state = 'Refunded';
+      o.status = 'failed';
+      o.refund = { priceUsd: o.quote.priceUsd, bondUsd: o.quote.bondUsd, at: new Date().toISOString(), tx: e.closeTx };
+    }
+    saveOrder(o);
+    return o;
+  });
+}
+
+/** Escrow orders the CFO still has something to do for, or is waiting on the chain for. */
+export function escrowPending(): string[] {
+  return listOrders().filter((o) => o.escrow && !['Accepted', 'Rejected', 'Refunded', 'Cancelled'].includes(o.escrow.state)).map((o) => o.id);
 }

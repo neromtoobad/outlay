@@ -3,11 +3,8 @@
 //   • revenue = accepted, paid orders only; free (promo) jobs never count as revenue
 //   • demo-mode (simulated) data is never mixed with real data
 //   • refunds and bonds are costs the day they are paid
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { createPublicClient, http, type Address } from 'viem';
-import { CHAIN_CONFIGS } from '@circle-fin/x402-batching/client';
-import { DRY, ARC } from './config.ts';
+import { DRY } from './config.ts';
+import { readVault } from './escrow.ts';
 import { listOrders, readJob, type Order } from './orders.ts';
 import { toolPurchase, jobFunded, jobAccepted, jobRejected, pnl, toBeancount, type Entry } from './ledger.ts';
 import { CATALOG } from './services/index.ts';
@@ -23,31 +20,18 @@ export function entriesFor(orders: Order[]): Entry[] {
     }
     if (o.payment && o.payment.mode !== 'promo') {
       out.push(jobFunded(o.payment.at, o.id, o.quote.priceUsd, o.payment.tx ?? o.payment.mode));
-      if (o.decision?.kind === 'accepted') out.push(jobAccepted(o.decision.at, o.id, o.service, o.quote.priceUsd, o.payment.tx ?? o.payment.mode, o.decision.by === 'auto'));
-      if (o.refund) out.push(jobRejected(o.refund.at, o.id, o.refund.priceUsd, o.refund.bondUsd, o.payment.tx ?? o.payment.mode));
+      // the release or refund transaction when there is one (escrow), else the payment reference
+      const closed = o.escrow?.closeTx ?? o.refund?.tx ?? o.payment.tx ?? o.payment.mode;
+      if (o.decision?.kind === 'accepted') out.push(jobAccepted(o.decision.at, o.id, o.service, o.quote.priceUsd, closed, o.decision.by === 'auto'));
+      if (o.refund) out.push(jobRejected(o.refund.at, o.id, o.refund.priceUsd, o.refund.bondUsd, closed));
     }
   }
   return out;
 }
 
 async function vaultState() {
-  const f = new URL('../../deployments/arc.json', import.meta.url).pathname;
-  if (!existsSync(f)) return null;
   try {
-    const dep = JSON.parse(readFileSync(f, 'utf8'));
-    const client = createPublicClient({ chain: CHAIN_CONFIGS.arc.chain, transport: http(ARC.rpc) });
-    const abi = [
-      { name: 'balances', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256[5]' }] },
-      { name: 'bondsOutstanding', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-      { name: 'reserveFloor', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-    ] as const;
-    const [b, bonds, floor] = await Promise.all([
-      client.readContract({ address: dep.vault as Address, abi, functionName: 'balances' }),
-      client.readContract({ address: dep.vault as Address, abi, functionName: 'bondsOutstanding' }),
-      client.readContract({ address: dep.vault as Address, abi, functionName: 'reserveFloor' }),
-    ]);
-    const n = (x: bigint) => Number(x) / 1e6;
-    return { vault: dep.vault, escrow: dep.escrow, buckets: { operating: n(b[0]), tools: n(b[1]), bond: n(b[2]), reserve: n(b[3]), promo: n(b[4]) }, bondsOutstanding: n(bonds), reserveFloor: n(floor) };
+    return await readVault();
   } catch {
     return null;
   }

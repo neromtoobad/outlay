@@ -3,7 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { api, usd, ngn, Avatar, ROLE_NAME, SERVICE_NAME, timeAgo, useStored, type Order, type Receipt, type Step } from '@/lib.tsx';
+import { api, useApi, usd, ngn, Avatar, ROLE_NAME, SERVICE_NAME, timeAgo, useStored, type Order, type Receipt, type Step } from '@/lib.tsx';
+import { connect, decideOnChain, hasWallet, short, txUrl, walletError, type EscrowCfg } from '@/wallet.ts';
+import type { Address } from 'viem';
+import type { ReactNode } from 'react';
 import Office from '@/office/Office.tsx';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -39,7 +42,8 @@ function Timeline({ steps }: { steps: Step[] }) {
 function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
   const q = o.quote;
   const spent = receipt.reduce((s, r) => s + r.usd, 0);
-  const price = q.promo ? 0 : q.priceUsd;
+  const price = q.promo || o.refund ? 0 : q.priceUsd; // a refunded job earned nothing
+  const bond = o.refund?.bondUsd ?? 0;
   return (
     <div className="receipt">
       <div className="rh"><b>SYNCLY</b><span>{o.id} · {new Date(o.createdAt).toLocaleDateString()}</span></div>
@@ -57,10 +61,76 @@ function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
       </div>
       <hr />
       <div className="tot"><span>Tools ({receipt.length})</span><span>{spent.toFixed(4)}</span></div>
-      <div className="tot"><span>You pay{q.promo ? ' (free)' : ''}</span><span>{price.toFixed(2)}</span></div>
+      <div className="tot"><span>You pay{q.promo ? ' (free)' : o.refund ? ' (refunded)' : ''}</span><span>{price.toFixed(2)}</span></div>
+      {bond > 0 && <div className="tot"><span>Bond paid to you</span><span>−{bond.toFixed(2)}</span></div>}
       <hr />
-      <div className="tot big"><span>Syncly's margin</span><span>{(price - spent).toFixed(4)}</span></div>
+      <div className="tot big"><span>Syncly's margin</span><span>{(price - spent - bond).toFixed(4)}</span></div>
       <div className="foot">USDC · {o.demo ? 'demo receipt, no money moved' : 'paid per call via x402 on Arc'}</div>
+    </div>
+  );
+}
+
+const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+const Tx = ({ cfg, hash, children }: { cfg: EscrowCfg | null; hash?: string; children: ReactNode }) => {
+  const href = txUrl(cfg, hash);
+  return href ? <a href={href} target="_blank" rel="noreferrer">{children} ↗</a> : hash ? <span className="mono" title={hash}>{children}</span> : null;
+};
+
+/** A paid job's decision is signed by the wallet that funded the escrow. The server only reads the chain. */
+function EscrowDecision({ o, cfg, onUpdate }: { o: Order; cfg: EscrowCfg; onUpdate: (o: Order) => void }) {
+  const e = o.escrow!, q = o.quote;
+  const [wallet, setWallet] = useState<boolean | null>(null);
+  useEffect(() => setWallet(hasWallet()), []);
+  const [who, setWho] = useState<Address | null>(null);
+  const [email, setEmail] = useStored('outlay:email');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const sealed = e.state === 'Submitted';
+
+  async function act(action: 'accept' | 'reject' | 'requestRevision') {
+    setErr(null); setBusy(action);
+    try {
+      const a = who ?? (await connect(cfg));
+      setWho(a);
+      if (a.toLowerCase() !== e.customer.toLowerCase()) throw new Error(`This is ${short(a)}. Switch to the wallet that paid (${short(e.customer)}): only it can decide.`);
+      if (action === 'requestRevision') {
+        localStorage.setItem('outlay:email', email);
+        await api(`/api/orders/${o.id}/sync`, { method: 'POST', body: JSON.stringify({ note, email }) }); // the chain records the request, not the note
+      }
+      const tx = await decideOnChain(cfg, a, e.id, action);
+      onUpdate(await api<Order>(`/api/orders/${o.id}/sync`, { method: 'POST', body: JSON.stringify({ tx }) }));
+    } catch (x: any) { setErr(walletError(x)); } finally { setBusy(null); }
+  }
+
+  if (!sealed) return <p className="muted" style={{ fontSize: 14.5 }}>The CFO is sealing the delivery's fingerprint on Arc. Your decision opens in a moment…</p>;
+  return (
+    <div className="form" style={{ gap: 14 }}>
+      <p style={{ fontSize: 14.5, color: 'var(--ink-2)' }}>
+        Accept to release <b>{usd(q.priceUsd)} USDC</b> from escrow to Syncly. Reject and the contract returns it <b>plus a {usd(q.bondUsd)} USDC bond</b>. Decide by <b>{when(e.acceptBy)}</b>; silence counts as acceptance.
+      </p>
+      <p className="muted" style={{ fontSize: 13 }}>Signed by the wallet that paid: <span className="mono">{short(e.customer)}</span>{who && who.toLowerCase() === e.customer.toLowerCase() && ' · connected ✓'}</p>
+      {wallet === false && <div className="note">Open this page in the wallet app that paid ({short(e.customer)}) to decide.</div>}
+      {o.revisionNote === undefined && (
+        <>
+          <label className="field">Want changes? <span className="hint">One free revision. The team re-runs the job with your note.</span>
+            <textarea style={{ minHeight: 76 }} value={note} onChange={(ev) => setNote(ev.target.value)} placeholder="e.g. focus on Ikoyi too, and add opening hours" />
+          </label>
+          {note.trim() && (
+            <label className="field">Your email <span className="hint">the one on this order, so only you can add the note</span>
+              <input type="email" value={email} onChange={(ev) => setEmail(ev.target.value)} placeholder="you@business.com" />
+            </label>
+          )}
+        </>
+      )}
+      <div className="decide">
+        <button className="btn primary block" disabled={!!busy || wallet === false} onClick={() => act('accept')}>{busy === 'accept' ? 'Confirm in your wallet…' : `Accept & release ${usd(q.priceUsd)} USDC`}</button>
+        <div className="row">
+          {o.revisionNote === undefined && <button className="btn secondary" disabled={!!busy || wallet === false || !note.trim() || !email} onClick={() => act('requestRevision')}>{busy === 'requestRevision' ? 'Confirm…' : 'Revise'}</button>}
+          <button className="btn danger" disabled={!!busy || wallet === false} onClick={() => act('reject')} style={o.revisionNote !== undefined ? { gridColumn: 'span 2' } : undefined}>{busy === 'reject' ? 'Confirm…' : 'Reject & refund'}</button>
+        </div>
+      </div>
+      {err && <div className="error">{err}</div>}
     </div>
   );
 }
@@ -72,12 +142,14 @@ export default function Job({ id }: { id: string }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [replay, setReplay] = useState(0);
+  const { data: escCfg } = useApi<EscrowCfg | { enabled: false }>('/api/escrow');
+  const cfg = escCfg?.enabled ? escCfg : null;
 
   const load = () => api<Order>(`/api/orders/${id}`).then(setO).catch((e) => setErr(e.message));
   useEffect(() => { load(); }, [id]);
   const active = o && ['queued', 'running', 'revision'].includes(o.status);
   // A delivered order can still change from elsewhere (another tab, the 48 h auto-accept), so keep listening.
-  const listening = active || o?.status === 'delivered';
+  const listening = active || o?.status === 'delivered' || (o?.status === 'failed' && o.escrow?.state === 'Funded');
   useEffect(() => {
     if (!listening) return;
     const es = new EventSource(`/api/events?order=${id}`);
@@ -164,7 +236,9 @@ export default function Job({ id }: { id: string }) {
         <aside>
           <section className="card pad">
             <h3 className="t">Your decision</h3>
-            {o.status === 'delivered' ? (
+            {o.status === 'delivered' && o.escrow ? (
+              cfg ? <EscrowDecision o={o} cfg={cfg} onUpdate={setO} /> : <p className="muted">Loading the escrow…</p>
+            ) : o.status === 'delivered' ? (
               <div className="form" style={{ gap: 14 }}>
                 <p style={{ fontSize: 14.5, color: 'var(--ink-2)' }}>
                   {q.promo ? 'This one was free. Tell us if it was good.' : <>Accept to release <b>{usd(q.priceUsd)} USDC</b>. Reject and you get it all back <b>plus a {usd(q.bondUsd)} USDC bond</b>.</>} Silence for 48 h counts as acceptance.
@@ -187,12 +261,13 @@ export default function Job({ id }: { id: string }) {
                 {err && <div className="error">{err}</div>}
               </div>
             ) : o.status === 'accepted' ? (
-              <div className="qa pass"><Avatar role="cfo" /><div>Accepted {o.decision?.by === 'auto' ? 'automatically after 48 h' : 'by you'} · {timeAgo(o.decision!.at)}. Thank you.</div></div>
+              <div className="qa pass"><Avatar role="cfo" /><div>Accepted {o.decision?.by === 'auto' ? 'automatically after 48 h' : 'by you'} · {timeAgo(o.decision!.at)}. Thank you.{o.escrow?.closeTx && <> <Tx cfg={cfg} hash={o.escrow.closeTx}>Payment released on Arc</Tx></>}</div></div>
             ) : o.status === 'rejected' ? (
-              <div className="qa revise"><Avatar role="cfo" /><div>Rejected{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. The CFO will learn from this.</div></div>
+              <div className="qa revise"><Avatar role="cfo" /><div>Rejected{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. The CFO will learn from this.{o.refund?.tx && <> <Tx cfg={cfg} hash={o.refund.tx}>Refund on Arc</Tx></>}</div></div>
             ) : o.status === 'failed' ? (
               <div className="form" style={{ gap: 12 }}>
-                <div className="qa revise"><Avatar role="cfo" /><div>We couldn't deliver this one{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. {last?.error}</div></div>
+                <div className="qa revise"><Avatar role="cfo" /><div>We couldn't deliver this one{o.refund ? `: ${usd(o.refund.priceUsd)} refunded + ${usd(o.refund.bondUsd)} bond paid` : ''}. {last?.error}{o.refund?.tx && <> <Tx cfg={cfg} hash={o.refund.tx}>Refund on Arc</Tx></>}</div></div>
+                {o.escrow && !o.refund && <p style={{ fontSize: 14, color: 'var(--ink-2)' }}>Your {usd(q.priceUsd)} USDC is safe in escrow. At the deadline ({when(o.escrow.deliverBy)}) the contract refunds it plus the {usd(q.bondUsd)} USDC bond. The CFO triggers the refund, and anyone can.</p>}
                 {o.payment?.mode === 'promo' && (
                   <>
                     <p style={{ fontSize: 14, color: 'var(--ink-2)' }}>It's still your free job. The team can try again; you only see what they spend on the receipt.</p>
@@ -204,6 +279,8 @@ export default function Job({ id }: { id: string }) {
                   </>
                 )}
               </div>
+            ) : o.status === 'expired' ? (
+              <p className="muted" style={{ fontSize: 14.5 }}>This quote expired before it was paid. Nothing was taken. <Link href={`/hire/${o.service}`}>Get a new quote →</Link></p>
             ) : (
               <p className="muted" style={{ fontSize: 14.5 }}>You'll decide once the work is delivered, usually within a few minutes. Keep this link: it's where your work and your decision live.</p>
             )}
@@ -217,6 +294,23 @@ export default function Job({ id }: { id: string }) {
             {!q.promo && <div className="srow"><span className="lbl">In naira</span><span className="fill" /><span className="v">{ngn(q.priceUsd)}</span></div>}
             <div className="srow"><span className="lbl">Bond if rejected</span><span className="fill" /><span className="v">{q.promo ? '—' : `${usd(q.bondUsd)} USDC`}</span></div>
             <div className="srow"><span className="lbl">Paid via</span><span className="fill" /><span className="v" style={{ fontFamily: 'var(--sans)' }}>{o.payment ? (o.payment.mode === 'promo' ? 'Free first job' : o.payment.mode === 'simulated' ? 'Demo escrow' : 'Escrow on Arc') : '—'}</span></div>
+            {o.escrow && (
+              <>
+                <div className="srow"><span className="lbl">Paid by</span><span className="fill" /><span className="v">{short(o.escrow.customer)}</span></div>
+                <div className="srow"><span className="lbl">Escrow</span><span className="fill" /><span className="v" style={{ fontFamily: 'var(--sans)' }}>{o.escrow.state}</span></div>
+                <div className="txlinks">
+                  <Tx cfg={cfg} hash={o.escrow.openTx}>Opened</Tx>
+                  <Tx cfg={cfg} hash={o.escrow.fundTx}>Funded</Tx>
+                  <Tx cfg={cfg} hash={o.escrow.submitTx}>Delivery sealed</Tx>
+                  <Tx cfg={cfg} hash={o.escrow.closeTx}>{o.escrow.state === 'Accepted' ? 'Released' : o.escrow.state === 'Cancelled' ? 'Cancelled' : 'Refunded'}</Tx>
+                </div>
+                <details style={{ marginTop: 8 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>The terms sealed on-chain</summary>
+                  <p className="muted" style={{ fontSize: 12.5, margin: '8px 0 6px' }}>keccak256 of this text is the job's specHash on Arc: <span className="mono" style={{ wordBreak: 'break-all' }}>{o.escrow.specHash}</span></p>
+                  <pre className="spec">{o.escrow.spec}</pre>
+                </details>
+              </>
+            )}
             <details style={{ marginTop: 10 }}>
               <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>Why the CFO priced it this way</summary>
               <ol className="why">{q.reasons.map((r) => <li key={r}>{r}</li>)}</ol>

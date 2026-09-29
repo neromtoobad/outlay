@@ -104,8 +104,14 @@ export type Run = { id: string; status: string; steps: Step[]; receipt: Receipt[
 export type Order = {
   id: string; service: string; brief: string; email: string; createdAt: string; quote: Quote; status: string;
   payment?: { mode: string; at: string; tx?: string }; runs: Run[]; revisionNote?: string; deliveredAt?: string;
-  decision?: { kind: string; at: string; by: string; note?: string }; refund?: { priceUsd: number; bondUsd: number }; demo: boolean;
+  decision?: { kind: string; at: string; by: string; note?: string }; refund?: { priceUsd: number; bondUsd: number; tx?: string }; demo: boolean;
   live: { jobId: string; steps: Step[]; receipt: Receipt[] } | null;
+  escrow?: Escrow;
+};
+/** A paid job's escrow on Arc. `spec` is the exact text whose keccak256 is sealed on-chain as specHash. */
+export type Escrow = {
+  id: `0x${string}`; customer: `0x${string}`; spec: string; specHash: string; state: string; fundBy: string; deliverBy: string; acceptBy?: string;
+  openTx: string; fundTx?: string; submitTx?: string; deliverableHash?: string; closeTx?: string;
 };
 export type AgentStats = { jobs: number; steps: number; calls: number; usd: number; vendors: string[]; last?: { at: string; step: string; orderId: string } };
 export type BooksSummary = {

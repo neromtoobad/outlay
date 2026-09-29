@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, Reveal, Stagger, StaggerItem } from '@/components/motion.tsx';
 import { api, useApi, usd, ngn, Avatar, Sprite, Seal, ROLE_NAME, DEPT_TINT, useStored, type Service, type Quote } from '@/lib.tsx';
+import { connect, fundEscrow, hasWallet, short, txUrl, usdcBalance, walletError, type EscrowCfg } from '@/wallet.ts';
+import type { Address, Hex } from 'viem';
 
 type QuotedOrder = { id: string; status: string; quote: Quote; demo: boolean };
 
@@ -43,9 +45,82 @@ function QuoteDoc({ s, order }: { s: Service; order: QuotedOrder }) {
   );
 }
 
+type PayPhase = 'idle' | 'connecting' | 'opening' | 'approve' | 'approving' | 'fund' | 'funding' | 'starting';
+const PAY_LABEL: Record<PayPhase, string> = {
+  idle: '', connecting: 'Connecting your wallet…', opening: 'The CFO is opening your escrow on Arc…', approve: 'Approve in your wallet…',
+  approving: 'Waiting for Arc…', fund: 'Confirm the payment in your wallet…', funding: 'Paying into escrow…', starting: 'Paid. Starting the team…',
+};
+
+/** Paid jobs: the customer's own wallet funds a JobEscrow on Arc. Only that wallet can later accept or reject. */
+function EscrowPay({ order, cfg, onPaid }: { order: QuotedOrder; cfg: EscrowCfg; onPaid: () => void }) {
+  const q = order.quote;
+  const [wallet, setWallet] = useState<boolean | null>(null);
+  useEffect(() => setWallet(hasWallet()), []);
+  const [who, setWho] = useState<Address | null>(null);
+  const [openTx, setOpenTx] = useState<string>();
+  const [phase, setPhase] = useState<PayPhase>('idle');
+  const [err, setErr] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function pay() {
+    setErr(null);
+    try {
+      setPhase('connecting');
+      const a = await connect(cfg);
+      setWho(a);
+      const bal = await usdcBalance(cfg, a);
+      if (bal < q.priceUsd) {
+        setPhase('idle');
+        setErr(`This wallet has ${bal.toFixed(2)} USDC on ${cfg.chainName}. The job needs ${usd(q.priceUsd)} USDC, plus a few cents for gas.`);
+        return;
+      }
+      setPhase('opening');
+      const o = await api<{ escrow: { id: Hex; openTx: string } }>(`/api/orders/${order.id}/escrow`, { method: 'POST', body: JSON.stringify({ customer: a }) });
+      setOpenTx(o.escrow.openTx);
+      const tx = await fundEscrow(cfg, a, o.escrow.id, q.priceUsd, setPhase);
+      setPhase('starting');
+      await api(`/api/orders/${order.id}/sync`, { method: 'POST', body: JSON.stringify({ tx }) });
+      onPaid();
+    } catch (e: any) {
+      setErr(walletError(e));
+      setPhase('idle');
+    }
+  }
+
+  if (wallet === false) return (
+    <div className="card pad paybox">
+      <b>Pay {usd(q.priceUsd)} USDC from a crypto wallet</b>
+      <p>This browser has no wallet. Open this page in your wallet app's browser (MetaMask, Rabby, OKX or Coinbase Wallet) and pay from there. You'll need {usd(q.priceUsd)} USDC on Arc.</p>
+      <button className="btn secondary block" onClick={() => { void navigator.clipboard?.writeText(location.href); setCopied(true); }}>{copied ? 'Link copied ✓' : 'Copy the link to this page'}</button>
+    </div>
+  );
+
+  const at = ['connecting', 'opening', 'approve', 'approving', 'fund', 'funding', 'starting'].indexOf(phase);
+  const steps = [
+    { label: 'Connect your wallet', sub: who ? short(who) : 'MetaMask, Rabby, OKX, Coinbase Wallet…', done: !!who, now: phase === 'connecting' },
+    { label: 'The CFO opens your escrow on Arc', sub: openTx ? <a href={txUrl(cfg, openTx)} target="_blank" rel="noreferrer">opened ↗</a> : `and locks your ${usd(q.bondUsd)} USDC bond`, done: !!openTx, now: phase === 'opening' },
+    { label: `Let the escrow take ${usd(q.priceUsd)} USDC`, sub: 'one approval in your wallet', done: at >= 4, now: phase === 'approve' || phase === 'approving' },
+    { label: `Pay ${usd(q.priceUsd)} USDC into escrow`, sub: 'the money waits there until you decide', done: phase === 'starting', now: phase === 'fund' || phase === 'funding' },
+  ];
+  return (
+    <div className="card pad paybox">
+      <ol className="paysteps">
+        {steps.map((s, i) => <li key={i} className={s.done ? 'done' : s.now ? 'now' : ''}><i>{s.done ? '✓' : i + 1}</i><div><b>{s.label}</b><small>{s.sub}</small></div></li>)}
+      </ol>
+      {err && <div className="error">{err}</div>}
+      <button className="btn primary lg block" disabled={phase !== 'idle' || wallet === null} onClick={pay}>{phase === 'idle' ? `Pay ${usd(q.priceUsd)} USDC into escrow →` : PAY_LABEL[phase]}</button>
+      <p className="muted" style={{ fontSize: 13 }}>
+        Your USDC goes into a <a href={cfg.explorer ? `${cfg.explorer}/address/${cfg.escrow}` : undefined} target="_blank" rel="noreferrer">contract on {cfg.chainName}</a>, not to us.
+        Syncly is paid only when you accept, or after 48 h of silence. Reject it and the contract refunds you, plus the {usd(q.bondUsd)} USDC bond. Gas on Arc is paid in USDC too, a few cents.
+      </p>
+    </div>
+  );
+}
+
 export default function Hire({ service }: { service: string }) {
   const router = useRouter();
   const { data } = useApi<{ services: Service[]; mode: string }>('/api/services');
+  const { data: esc } = useApi<EscrowCfg | { enabled: false }>('/api/escrow');
   const s = data?.services.find((x) => x.id === service);
   const [brief, setBrief] = useState('');
   const [email, setEmail] = useStored('outlay:email');
@@ -128,13 +203,15 @@ export default function Hire({ service }: { service: string }) {
               {err && <div className="error">{err}</div>}
               {q!.promo ? (
                 <button className="btn primary lg block" disabled={busy} onClick={() => begin('promo')}>Start my free job →</button>
+              ) : esc?.enabled ? (
+                <EscrowPay order={order} cfg={esc} onPaid={() => router.push(`/job/${order.id}`)} />
               ) : data?.mode === 'demo' ? (
                 <>
                   <button className="btn primary lg block" disabled={busy} onClick={() => begin('simulated')}>Pay {usd(q!.priceUsd)} USDC into escrow (demo)</button>
                   <p className="muted center" style={{ fontSize: 13 }}>Demo mode simulates the escrow payment. On the live site this funds the job's escrow on Arc.</p>
                 </>
               ) : (
-                <p className="note">Escrow payment on Arc is being switched on. Check back shortly.</p>
+                <p className="note">Paid jobs through escrow on Arc are being switched on. Your first job is free in the meantime.</p>
               )}
               <button className="btn ghost sm" style={{ justifySelf: 'center' }} onClick={() => setOrder(null)}>Change the brief</button>
             </div>

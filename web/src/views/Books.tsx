@@ -11,7 +11,7 @@ type Books = {
   pnl: { revenue: number; tools: number; experts: number; guarantee: number; grossMargin: number; byVendor: Record<string, number>; byService: Record<string, number>; bondsPaid: number; refunds: number };
   perService: Record<string, { jobs: number; avgCost: number; price: number; accepted: number; decided: number; free: number }>;
   daily: { date: string; revenue: number; costs: number }[];
-  vault: null | { vault: string; escrow: string; buckets: Record<string, number>; bondsOutstanding: number; reserveFloor: number };
+  vault: null | { vault: string; escrow: string; explorer: string | null; buckets: Record<string, number>; bondsOutstanding: number; reserveFloor: number };
   ledger: Entry[];
 };
 
@@ -130,7 +130,7 @@ export default function Books() {
           {b.vault ? (
             <>
               <Bars rows={BUCKETS.map(([k, label, note]) => ({ label, value: b.vault!.buckets[k] ?? 0, note }))} />
-              <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>Bonds outstanding {usd(b.vault.bondsOutstanding)} USDC (the bond pool must always cover them) · reserve floor {usd(b.vault.reserveFloor)} USDC · vault <span className="mono">{b.vault.vault.slice(0, 10)}…</span></p>
+              <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>Bonds outstanding {usd(b.vault.bondsOutstanding)} USDC (the bond pool must always cover them) · reserve floor {usd(b.vault.reserveFloor)} USDC · {b.vault.explorer ? <><a href={`${b.vault.explorer}/address/${b.vault.vault}`} target="_blank" rel="noreferrer">vault ↗</a> · <a href={`${b.vault.explorer}/address/${b.vault.escrow}`} target="_blank" rel="noreferrer">job escrow ↗</a></> : <>vault <span className="mono">{b.vault.vault.slice(0, 10)}…</span></>}</p>
             </>
           ) : (
             <>

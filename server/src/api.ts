@@ -10,7 +10,8 @@ import { DATA_DIR, DRY } from './config.ts';
 import { account, hasSeed } from './wallets.ts';
 import { bus, type SynclyEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
-import { autoAcceptDue, createQuote, decide, getOrder, readJob, replay, retry, start } from './orders.ts';
+import { autoAcceptDue, createQuote, decide, escrowPending, getOrder, noteForRevision, openEscrow, readJob, replay, retry, start, syncEscrow } from './orders.ts';
+import { escrowConfig, refreshBondFree } from './escrow.ts';
 import { books, beancount, team } from './books.ts';
 import { resolveSettlements } from './settle.ts';
 
@@ -41,6 +42,7 @@ function treasury() {
 }
 app.get('/api/health', (c) => c.json({ ok: true, mode: DRY ? 'demo' : 'live', keys: DRY || hasSeed(), treasury: treasury() }));
 app.get('/api/services', (c) => c.json({ mode: DRY ? 'demo' : 'live', services: CATALOG }));
+app.get('/api/escrow', (c) => c.json(escrowConfig()));
 
 app.post('/api/quote', async (c) => {
   const b = await c.req.json().catch(() => ({}));
@@ -71,6 +73,36 @@ app.post('/api/orders/:id/start', async (c) => {
     return c.json(view(o.id));
   } catch (e: any) {
     return c.json({ error: e.message }, 400);
+  }
+});
+
+// Paid jobs: the CFO opens the escrow for the customer's wallet; the browser then approves and funds it.
+app.post('/api/orders/:id/escrow', async (c) => {
+  const o = getOrder(c.req.param('id'));
+  if (!o) return c.json({ error: 'not found' }, 404);
+  if (!DRY && !hasSeed()) return c.json({ error: 'The team is still clocking in. Try again in a few minutes.' }, 503);
+  const { customer } = await c.req.json().catch(() => ({}));
+  try {
+    await openEscrow(o.id, String(customer ?? ''));
+    return c.json(view(o.id));
+  } catch (e: any) {
+    console.error(`escrow open ${o.id}: ${e.shortMessage ?? e.message}`);
+    return c.json({ error: e.shortMessage ?? e.message }, 400);
+  }
+});
+
+// After the customer's wallet acts on the escrow (fund, accept, revise, reject), read the chain and follow it.
+// A revision note is sent first, with the email on the order, because the chain only records the request.
+app.post('/api/orders/:id/sync', async (c) => {
+  const o = getOrder(c.req.param('id'));
+  if (!o?.escrow) return c.json({ error: 'not found' }, 404);
+  const { tx, note, email } = await c.req.json().catch(() => ({}));
+  try {
+    if (note) noteForRevision(o, String(email ?? ''), String(note));
+    await syncEscrow(o.id, tx ? String(tx) : undefined);
+    return c.json(view(o.id));
+  } catch (e: any) {
+    return c.json({ error: e.shortMessage ?? e.message }, 400);
   }
 });
 
@@ -152,6 +184,20 @@ app.get('/api/events', (c) =>
 // The web app (web/, Next.js) is its own service and proxies /api here (OUTLAY_API_URL).
 
 setInterval(() => autoAcceptDue(), 60_000);
+// the CFO's side of every open escrow: start funded jobs, submit deliveries, release, refund, cancel
+let ticking = false;
+async function escrowTick() {
+  if (ticking || !escrowConfig().enabled || (!DRY && !hasSeed())) return;
+  ticking = true;
+  try {
+    await refreshBondFree().catch(() => {});
+    for (const id of escrowPending()) await syncEscrow(id).catch((e) => console.error(`escrow ${id}: ${e.shortMessage ?? e.message}`));
+  } finally {
+    ticking = false;
+  }
+}
+setTimeout(escrowTick, 2000);
+setInterval(escrowTick, 15_000);
 // link each live receipt to its on-chain settlement once Circle Gateway has batched it
 const settle = () => void resolveSettlements().then((n) => n && console.log(`settled ${n} receipts on Arc`)).catch(() => {});
 setTimeout(settle, 3000);

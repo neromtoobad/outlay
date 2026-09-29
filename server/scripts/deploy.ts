@@ -1,6 +1,6 @@
 // Deploy SynclyVault + JobEscrow and configure them.
 //   node scripts/deploy.ts local          → anvil on :8545 (tests the whole sequence)
-//   node scripts/deploy.ts arc [0xBoss]   → Arc mainnet; ownership handed to the Boss's own wallet
+//   node scripts/deploy.ts arc 0xBoss     → Arc mainnet; ownership handed to the Boss's own wallet (required)
 // Deployer = treasury key. CFO + escrow operator = the cfo role. Every agent role is hired.
 // Writes deployments/<network>.json (public: addresses and tx hashes only).
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -12,6 +12,10 @@ import { account, ROLES, type Role } from '../src/wallets.ts';
 import { ARC } from '../src/config.ts';
 
 const [network = 'local', bossArg] = process.argv.slice(2);
+if (network !== 'local' && !/^0x[0-9a-fA-F]{40}$/.test(bossArg ?? '')) {
+  console.error('usage: node scripts/deploy.ts arc 0xBoss   (the Boss owns the vault and must be a wallet outside the server)');
+  process.exit(1);
+}
 const root = new URL('../../', import.meta.url).pathname;
 const contractsDir = join(root, 'contracts');
 const forge = join(process.env.HOME!, '.foundry/bin/forge');
@@ -21,9 +25,10 @@ const art = (name: string) => JSON.parse(readFileSync(join(contractsDir, 'out', 
 const Vault = art('SynclyVault');
 const Escrow = art('JobEscrow');
 
-const local: Chain = { id: 31337, name: 'anvil', nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: ['http://127.0.0.1:8545'] } } };
+const LOCAL_RPC = process.env.LOCAL_RPC ?? 'http://127.0.0.1:8545';
+const local: Chain = { id: 31337, name: 'anvil', nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [LOCAL_RPC] } } };
 const chain: Chain = network === 'arc' ? CHAIN_CONFIGS.arc.chain : network === 'arc-testnet' ? CHAIN_CONFIGS.arcTestnet.chain : local;
-const rpc = network === 'arc' ? ARC.rpc : network === 'arc-testnet' ? 'https://rpc.testnet.arc.io' : 'http://127.0.0.1:8545';
+const rpc = network === 'arc' ? ARC.rpc : network === 'arc-testnet' ? 'https://rpc.testnet.arc.io' : LOCAL_RPC;
 const usdc = (network === 'local' ? '0x' + '36'.padEnd(40, '0') : CHAIN_CONFIGS[network === 'arc' ? 'arc' : 'arcTestnet'].usdc) as Address;
 const gatewayWallet = (network === 'local' ? '0x' + '77'.padEnd(40, '7') : CHAIN_CONFIGS[network === 'arc' ? 'arc' : 'arcTestnet'].gatewayWallet) as Address;
 
@@ -39,7 +44,7 @@ if (network === 'local') {
 
 const cfo = account('cfo').address;
 const boss = (bossArg ?? deployer.address) as Address;
-const log: Record<string, unknown> = { network, chainId: chain.id, deployer: deployer.address, cfo, boss, usdc, gatewayWallet, txs: {} as Record<string, Hex> };
+const log: Record<string, unknown> = { network, chainId: chain.id, rpc, deployer: deployer.address, cfo, boss, usdc, gatewayWallet, txs: {} as Record<string, Hex> };
 const txs = log.txs as Record<string, Hex>;
 
 async function deploy(name: string, a: any, args: unknown[]): Promise<Address> {
