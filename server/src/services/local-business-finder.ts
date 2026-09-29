@@ -10,7 +10,11 @@ type Spec = { category: string; location: string; want: number; filter: 'none' |
 
 function normPhone(p?: string): string | undefined {
   if (!p) return undefined;
-  const d = p.replace(/[^\d+]/g, '');
+  // listings often give two numbers ("0817 070 9525 / 0813 835 3390"): keep the first
+  const first = p.split(/[\/,;|]|\bor\b/i).find((x) => (x.match(/\d/g) ?? []).length >= 7) ?? p;
+  let d = first.replace(/[^\d+]/g, '');
+  if (/^0\d{21}$/.test(d)) d = d.slice(0, 11); // two local numbers run together
+  if (/^\+?234\d{20,}$/.test(d)) d = d.replace(/^(\+?234\d{10}).*/, '$1');
   if (d.startsWith('+234')) return d;
   if (d.startsWith('234')) return '+' + d;
   if (d.startsWith('0') && d.length === 11) return '+234' + d.slice(1);
@@ -106,10 +110,11 @@ export const localBusinessFinder = {
 
       job.log('analyst', 'summarize', 'counts, ratings, contactability');
       const withPhone = rows.filter((r) => r.phone).length;
-      const avg = rows.filter((r) => r.rating).reduce((s, r) => s + (r.rating ?? 0), 0) / Math.max(1, rows.filter((r) => r.rating).length);
-      const top = rows.slice(0, 10).map((r, i) => `| ${i + 1} | ${r.title} | ${r.address ?? ''} | ${r.phone ?? '—'} | ${r.rating ?? '—'} (${r.ratingCount ?? 0}) |`).join('\n');
+      const rated = rows.filter((r) => r.rating);
+      const avg = rated.reduce((s, r) => s + (r.rating ?? 0), 0) / Math.max(1, rated.length);
+      const top = rows.slice(0, 10).map((r, i) => `| ${i + 1} | ${r.title} | ${r.address ?? ''} | ${r.phone ?? '—'} | ${r.rating ? `${r.rating} (${r.ratingCount ?? 0})` : '—'} |`).join('\n');
       job.deliverable = `# ${spec.category} in ${spec.location}\n\n` +
-        `**${rows.length} businesses** (filter: ${spec.filter.replace('_', ' ')}). ${withPhone} have a phone number. Average rating ${avg.toFixed(1)}.\n` +
+        `**${rows.length} businesses** (filter: ${fromWeb && spec.filter === 'no_website' ? 'no website listed on the pages we read' : spec.filter.replace('_', ' ')}). ${withPhone} have a phone number. ${rated.length ? `Average rating ${avg.toFixed(1)} across ${rated.length} rated.` : 'The pages we read gave no ratings.'}\n` +
         `Source: ${source}, on ${new Date().toISOString().slice(0, 10)}. Full list in \`businesses.csv\`.\n\n` +
         `| # | Name | Address | Phone | Rating (reviews) |\n|---|---|---|---|---|\n${top}\n\n` +
         (issues.length ? `> Notes: ${issues.join('; ')}\n` : '');

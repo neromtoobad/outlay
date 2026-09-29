@@ -17,7 +17,7 @@ export type Entry = {
   date: string; // YYYY-MM-DD
   narration: string;
   postings: Posting[];
-  meta: { doc?: string; tx?: string; agent?: string; reason?: string; kind: string };
+  meta: { doc?: string; tx?: string; agent?: string; reason?: string; kind: string; settled?: boolean };
 };
 
 const acct = (s: string) => s.replace(/[^A-Za-z0-9:-]/g, '').replace(/:([a-z])/g, (_, c) => ':' + c.toUpperCase());
@@ -26,11 +26,11 @@ const roleAcct = (r: string) => 'Assets:Gateway:' + r.replace(/^./, (c) => c.toU
 const serviceAcct = (s: string) => 'Income:Services:' + s.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join('');
 const day = (iso: string) => iso.slice(0, 10);
 
-export function toolPurchase(r: { at: string; agent: string; vendor: string; usd: number; transaction: string; reason: string }, jobId: string): Entry {
+export function toolPurchase(r: { at: string; agent: string; vendor: string; usd: number; transaction: string; reason: string; settledTx?: string }, jobId: string): Entry {
   return {
     date: day(r.at), narration: `${r.agent} bought ${r.vendor}`,
     postings: [{ account: vendorAcct(r.vendor), amount: r.usd }, { account: roleAcct(r.agent), amount: -r.usd }],
-    meta: { doc: jobId, tx: r.transaction, agent: r.agent, reason: r.reason, kind: 'tool' },
+    meta: { doc: jobId, tx: r.settledTx ?? r.transaction, agent: r.agent, reason: r.reason, kind: 'tool', settled: !!r.settledTx },
   };
 }
 

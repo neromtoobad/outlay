@@ -17,6 +17,8 @@ export type ReceiptLine = {
   reason: string;
   status: number;
   dry: boolean;
+  settledTx?: string; // the Arc transaction that settled this payment (filled in by settle.ts)
+  settledAt?: string;
 };
 
 export class SpendRefused extends Error {}

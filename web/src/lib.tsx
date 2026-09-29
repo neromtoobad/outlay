@@ -98,7 +98,7 @@ export type Service = {
   tagline: string; youGet: string[]; team: string[]; example: string;
 };
 export type Quote = { priceUsd: number; promo: boolean; bondUsd: number; bondBps: number; estCostUsd: number; pAccept: number; expectedProfitUsd: number; decision: 'quote' | 'decline'; deliverHours: number; reasons: string[] };
-export type Receipt = { at: string; agent: string; vendor: string; usd: number; transaction: string; reason: string; dry: boolean };
+export type Receipt = { at: string; agent: string; vendor: string; usd: number; transaction: string; reason: string; dry: boolean; settledTx?: string };
 export type Step = { at: string; agent: string; step: string; note: string };
 export type Run = { id: string; status: string; steps: Step[]; receipt: Receipt[]; deliverable: string; files: string[]; qa?: { verdict: string; notes: string; model: string }; spentUsd: number; error?: string };
 export type Order = {

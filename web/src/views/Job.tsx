@@ -51,7 +51,7 @@ function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
           <motion.div key={i} className="ln" initial={{ opacity: 0, y: -6, clipPath: 'inset(0 0 100% 0)' }} animate={{ opacity: 1, y: 0, clipPath: 'inset(0 0 0% 0)' }} transition={{ delay: Math.min(i, 12) * 0.05, duration: 0.3 }}>
             <span className="who"><Avatar role={r.agent} />{r.vendor}</span>
             <span className="v">{r.usd.toFixed(4)}</span>
-            <span className="why">{r.reason}{r.dry ? ' · demo' : ` · ${r.transaction.slice(0, 10)}…`}</span>
+            <span className="why">{r.reason}{r.dry ? ' · demo' : r.settledTx ? <> · <a href={`https://arcscan.app/tx/${r.settledTx}`} target="_blank" rel="noreferrer">settled on Arc ↗</a></> : ' · paid, settling on Arc…'}</span>
           </motion.div>
         ))}
       </div>

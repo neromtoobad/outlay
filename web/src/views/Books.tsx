@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useApi, usd, timeAgo, SERVICE_NAME, Avatar } from '@/lib.tsx';
 import { CountUp, Reveal } from '@/components/motion.tsx';
 
-type Entry = { date: string; narration: string; postings: { account: string; amount: number }[]; meta: { doc?: string; tx?: string; agent?: string; reason?: string; kind: string } };
+type Entry = { date: string; narration: string; postings: { account: string; amount: number }[]; meta: { doc?: string; tx?: string; agent?: string; reason?: string; kind: string; settled?: boolean } };
 type Books = {
   mode: 'demo' | 'live'; asOf: string;
   counters: { orders: number; customers: number; delivered: number; accepted: number; rejected: number; acceptanceRate: number | null; freeJobs: number; toolCalls: number };
@@ -187,7 +187,7 @@ export default function Books() {
                     <td><span style={{ display: 'inline-flex', gap: 8, alignItems: 'flex-start' }}>{e.meta.agent && <Avatar role={e.meta.agent} />}<span>{e.narration}{e.meta.reason && <div className="ref">{e.meta.reason}</div>}</span></span></td>
                     <td className="ref">{e.postings.map((x) => <div key={x.account} className={x.amount > 0 ? 'dr' : 'cr'}>{x.amount > 0 ? 'Dr' : 'Cr'} {x.account}</div>)}</td>
                     <td className="num">{usd(debit.reduce((s, x) => s + x.amount, 0), 4)}</td>
-                    <td className="ref">{e.meta.doc ? <Link href={`/job/${e.meta.doc}`}>{e.meta.doc}</Link> : '—'}<div>{e.meta.tx === 'dry-run' ? 'demo' : e.meta.tx?.slice(0, 12)}</div></td>
+                    <td className="ref">{e.meta.doc ? <Link href={`/job/${e.meta.doc}`}>{e.meta.doc}</Link> : '—'}<div>{e.meta.tx === 'dry-run' ? 'demo' : e.meta.settled ? <a href={`https://arcscan.app/tx/${e.meta.tx}`} target="_blank" rel="noreferrer">{e.meta.tx?.slice(0, 10)}… ↗</a> : 'settling…'}</div></td>
                   </tr>
                 );
               })}

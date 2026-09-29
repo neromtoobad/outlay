@@ -10,6 +10,7 @@ import { bus, type OutlayEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
 import { autoAcceptDue, createQuote, decide, getOrder, readJob, replay, retry, start } from './orders.ts';
 import { books, beancount, team } from './books.ts';
+import { resolveSettlements } from './settle.ts';
 
 process.env.OUTLAY_QUIET ??= '1';
 const app = new Hono();
@@ -126,5 +127,9 @@ app.get('/api/events', (c) =>
 // The web app (web/, Next.js) is its own service and proxies /api here (OUTLAY_API_URL).
 
 setInterval(() => autoAcceptDue(), 60_000);
+// link each live receipt to its on-chain settlement once Circle Gateway has batched it
+const settle = () => void resolveSettlements().then((n) => n && console.log(`settled ${n} receipts on Arc`)).catch(() => {});
+setTimeout(settle, 3000);
+setInterval(settle, 120_000);
 const port = Number(process.env.PORT ?? 8790);
 serve({ fetch: app.fetch, port }, () => console.log(`outlay api on :${port} (${DRY ? 'DEMO mode: no money moves' : 'LIVE'})`));
