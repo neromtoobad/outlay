@@ -5,6 +5,7 @@ import { GatewayClient } from '@circle-fin/x402-batching/client';
 import { ARC, DRY } from './config.ts';
 import { privateKey, type Role } from './wallets.ts';
 import type { Job } from './job.ts';
+import { checkPayee } from './payees.ts';
 
 export type ReceiptLine = {
   at: string;
@@ -23,27 +24,39 @@ export type ReceiptLine = {
 
 export class SpendRefused extends Error {}
 
-// Vendors sometimes answer "verification temporarily unavailable" or time out. A payment that fails
-// verification is never settled (checked on mainnet: the balance does not move), so retrying is safe.
+// When a retry is safe. Before a payment is signed (the free first request that returns the 402), any
+// network hiccup can be retried: nothing was paid. After signing, only a seller that says it did not
+// take the payment ("verification temporarily unavailable") is retried; checked on mainnet that such a
+// payment never settles. A timeout or dropped connection after signing is ambiguous: the seller may
+// already have taken it. Retrying then is how an agent pays twice, so we stop and say so instead.
 const TRANSIENT = /temporarily unavailable|please retry|try again|timed? ?out|ETIMEDOUT|ECONNRESET|EAI_AGAIN|fetch failed|socket hang up|\b(429|502|503|504)\b|rate limit/i;
+const SELLER_DECLINED = /verification temporarily unavailable|please retry/i;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // One client per agent, with ONE price-cap hook that reads the cap for the call in flight.
 // Calls for the same agent are serialized so the cap always belongs to the right call.
-type Slot = { client: GatewayClient; capAtomic: bigint; refused?: string; tail: Promise<unknown> };
+type Slot = { client: GatewayClient; capAtomic: bigint; refused?: string; signed: boolean; call?: { url: string; agent: string; vendor: string }; tail: Promise<unknown> };
 const slots = new Map<Role, Slot>();
 
 function slot(role: Role): Slot {
   let s = slots.get(role);
   if (s) return s;
   const client = new GatewayClient({ chain: 'arc', privateKey: privateKey(role), rpcUrl: ARC.rpc });
-  const created: Slot = { client, capAtomic: 0n, tail: Promise.resolve() };
+  const created: Slot = { client, capAtomic: 0n, signed: false, tail: Promise.resolve() };
+  // Runs just before a payment is signed: price cap, then payee change control and screening.
   client.onBeforePaymentCreation(async (ctx: any) => {
     const amt = BigInt(ctx.selectedRequirements.amount);
     if (amt > created.capAtomic) {
       created.refused = `price ${Number(amt) / 1e6} USDC > cap ${Number(created.capAtomic) / 1e6}`;
       return { abort: true, reason: created.refused };
     }
+    const call = created.call!;
+    const refusal = await checkPayee(call.url, String(ctx.selectedRequirements.payTo), call);
+    if (refusal) {
+      created.refused = refusal;
+      return { abort: true, reason: refusal };
+    }
+    created.signed = true;
   });
   slots.set(role, created);
   return created;
@@ -92,13 +105,19 @@ export async function buy<T>(
   const run = async () => {
     s.capAtomic = BigInt(Math.round(opts.maxUsd * 1e6));
     s.refused = undefined;
+    s.call = { url: opts.url, agent: opts.agent, vendor: opts.vendor };
     try {
       let res: Awaited<ReturnType<typeof s.client.pay<T>>> | undefined;
       for (let attempt = 1; ; attempt++) {
+        s.signed = false;
         try { res = await s.client.pay<T>(opts.url, { method: opts.method ?? 'POST', body: opts.body }); break; }
         catch (e: any) {
-          if (s.refused || attempt >= 3 || !TRANSIENT.test(String(e?.message ?? e))) throw e;
-          job.log(opts.agent, 'retry', `${opts.vendor}: ${String(e?.message ?? e).slice(0, 60)}; trying again`);
+          const msg = String(e?.message ?? e);
+          if (s.signed && !SELLER_DECLINED.test(msg)) {
+            throw new Error(`${opts.vendor}: the call failed after the payment was signed (${msg.slice(0, 80)}). Not retried, so it can't be paid twice.`);
+          }
+          if (s.refused || attempt >= 3 || !TRANSIENT.test(msg)) throw e;
+          job.log(opts.agent, 'retry', `${opts.vendor}: ${msg.slice(0, 60)}; ${s.signed ? 'the seller did not take the payment' : 'nothing was paid yet'}, trying again`);
           await sleep(attempt * 2500);
         }
       }

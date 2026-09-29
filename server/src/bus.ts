@@ -3,7 +3,7 @@
 import { EventEmitter } from 'node:events';
 
 export type SynclyEvent = {
-  type: 'step' | 'purchase' | 'order';
+  type: 'step' | 'purchase' | 'order' | 'cfo';
   orderId?: string;
   jobId?: string;
   at: string;

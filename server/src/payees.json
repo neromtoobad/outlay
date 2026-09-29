@@ -1,0 +1,11 @@
+{
+  "_": "Who each seller's payments go to, per service (host + first path segment). A payee that differs from this list is refused and escalated: a changed payee address is how money goes to the wrong party, and no reconciliation can catch it afterwards. Changing an entry is a reviewed commit.",
+  "nano.blockrun.ai/api": "0xe9030014F5DAe217d0A152f02A043567b16c1aBf",
+  "np.orthogonal.com/serper": "0x1563CdE0042d17F53b23d91Fd9B73ACE9Da26a09",
+  "np.orthogonal.com/tomba": "0xaC9ad2609466fB92C69640fa2b9Ee7B22a76E8fe",
+  "np.orthogonal.com/agentmail": "0xaA4a75114b5BdA671844ae10256d2B048dF8fdc3",
+  "api.exa.ai/search": "0xB98eF29eb2be19Ae646A8FC0248255B90A332dbC",
+  "api.exa.ai/contents": "0xB98eF29eb2be19Ae646A8FC0248255B90A332dbC",
+  "apexfaucet.xyz/api": "0xd334ab5151c624cada654854e2879903dc4217ed",
+  "api.aisa.one/apis": "0xBd7b9f3e0CD3E1f6e698D0eeBb99F96E093BdeE3"
+}

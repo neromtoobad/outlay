@@ -16,6 +16,7 @@ import { quote, type Quote } from './cfo/quote.ts';
 import { CATALOG, SERVICES } from './services/index.ts';
 import * as chain from './escrow.ts';
 import { emailDelivery } from './mail.ts';
+import { blacklisted } from './payees.ts';
 
 export type OrderStatus = 'quoted' | 'queued' | 'running' | 'delivered' | 'revision' | 'accepted' | 'rejected' | 'failed' | 'declined' | 'expired';
 export type Order = {
@@ -258,6 +259,7 @@ export function openEscrow(orderId: string, customer: string) {
     if (Date.now() - Date.parse(o.createdAt) > 6 * 3600_000) throw new Error('This quote is more than 6 hours old. Get a new quote.');
     // Opening costs the CFO gas and locks a bond, so only for a wallet that can actually pay, and never too many at once.
     if (listOrders().filter((x) => x.escrow?.state === 'Open').length >= 5) throw new Error('Several unpaid escrows are open right now. Try again in a few minutes.');
+    if (await blacklisted(customer)) throw new Error("This wallet is on Circle's USDC blacklist, so we can't take payment from it.");
     const has = await chain.usdcOf(customer as Address);
     if (has < o.quote.priceUsd) throw new Error(`This wallet has ${has.toFixed(2)} USDC; the job needs ${o.quote.priceUsd.toFixed(2)} USDC plus a few cents for gas.`);
     const free = await chain.refreshBondFree();
