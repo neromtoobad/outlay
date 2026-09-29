@@ -5,6 +5,7 @@
 import { Job } from '../job.ts';
 import { MODELS } from '../config.ts';
 import { HOSTS, llm, mapsSearch, parseJson, webPlaces, type Place } from '../tools.ts';
+import { MAIL_BUDGET_USD, MAIL_HOST } from '../mail.ts';
 
 type Spec = { category: string; location: string; want: number; filter: 'none' | 'no_website' | 'has_website' | 'has_phone'; queries: string[] };
 
@@ -30,7 +31,7 @@ export const localBusinessFinder = {
   id: 'local-business-finder',
   name: 'Local Business Finder',
   priceUsd: 3,
-  policy: { budgetUsd: 0.25, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.exa] },
+  policy: { budgetUsd: 0.25 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.exa, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
   async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);

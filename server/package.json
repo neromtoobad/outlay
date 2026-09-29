@@ -17,6 +17,7 @@
     "@circle-fin/x402-batching": "^3.5.0",
     "@hono/node-server": "^2.1.1",
     "hono": "^4.13.10",
+    "marked": "^18.0.14",
     "viem": "^2.56.9"
   }
 }

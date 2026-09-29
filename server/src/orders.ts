@@ -15,6 +15,7 @@ import { publish } from './bus.ts';
 import { quote, type Quote } from './cfo/quote.ts';
 import { CATALOG, SERVICES } from './services/index.ts';
 import * as chain from './escrow.ts';
+import { emailDelivery } from './mail.ts';
 
 export type OrderStatus = 'quoted' | 'queued' | 'running' | 'delivered' | 'revision' | 'accepted' | 'rejected' | 'failed' | 'declined' | 'expired';
 export type Order = {
@@ -167,6 +168,7 @@ async function run(o: Order) {
   saveOrder(o);
   const brief = o.revisionNote ? `${o.brief}\n\nRevision requested by the customer: ${o.revisionNote}` : o.brief;
   const job = await svc.run(brief, { orderId: o.id });
+  await emailDelivery(job, o); // the Messenger emails the delivery (never fails the job)
   const fresh = getOrder(o.id)!;
   fresh.runs.push(job.id);
   if (job.status === 'delivered') {

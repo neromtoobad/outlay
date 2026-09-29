@@ -5,12 +5,13 @@
 import { Job } from '../job.ts';
 import { MODELS } from '../config.ts';
 import { HOSTS, llm, neuralSearch, parseJson, readPages, webSearch, type Page, type SearchHit } from '../tools.ts';
+import { MAIL_BUDGET_USD, MAIL_HOST } from '../mail.ts';
 
 export const researchBrief = {
   id: 'research-brief',
   name: 'Research Brief',
   priceUsd: 3,
-  policy: { budgetUsd: 0.6, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.exa] },
+  policy: { budgetUsd: 0.6 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.exa, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
   async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);

@@ -6,6 +6,7 @@
 import { Job } from '../job.ts';
 import { MODELS } from '../config.ts';
 import { HOSTS, domainEmails, emailsIn, llm, mapsSearch, webPlaces, parseJson, verifyEmails, webRead, type Place } from '../tools.ts';
+import { MAIL_BUDGET_USD, MAIL_HOST } from '../mail.ts';
 
 type Spec = { target: string; location: string; want: number; offer: string; queries: string[] };
 type Lead = Place & { domain: string; email?: string; emailSource?: 'website' | 'tomba'; verdict?: string; opener?: string };
@@ -22,7 +23,7 @@ export const leadList = {
   id: 'lead-list',
   name: 'Lead List',
   priceUsd: 5,
-  policy: { budgetUsd: 0.6, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.apex, HOSTS.exa] },
+  policy: { budgetUsd: 0.6 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.apex, HOSTS.exa, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
   async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);

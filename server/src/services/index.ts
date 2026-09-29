@@ -14,24 +14,24 @@ export const SERVICES: Record<string, Runnable> = {
 /** The public menu. `live: false` services are shown as coming soon and can't be ordered yet. */
 export const CATALOG = [
   {
-    id: 'research-brief', name: 'Research Brief', dept: 'Research', live: true, priceUsd: 3, listedCostUsd: 0.2, etaMin: 6,
+    id: 'research-brief', name: 'Research Brief', dept: 'Research', live: true, priceUsd: 3, listedCostUsd: 0.3, etaMin: 6,
     tagline: 'Competitors, market and pricing, with every claim cited.',
-    youGet: ['A 600–900 word brief with a 3-point summary', 'Every factual claim cited to a source you can open', 'Concrete recommendations', 'Checked by an independent auditor on a different AI model'],
-    team: ['researcher', 'scout', 'reader', 'auditor', 'writer'],
+    youGet: ['A 600–900 word brief with a 3-point summary', 'Every factual claim cited to a source you can open', 'Concrete recommendations', 'Checked by an independent auditor on a different AI model', 'Emailed to you when it is done'],
+    team: ['researcher', 'scout', 'reader', 'auditor', 'writer', 'messenger'],
     example: 'Competitors and pricing for a small bakery in Lekki, Lagos that wants to add cake delivery',
   },
   {
-    id: 'local-business-finder', name: 'Local Business Finder', dept: 'Sales & Growth', live: true, priceUsd: 3, listedCostUsd: 0.1, etaMin: 3,
+    id: 'local-business-finder', name: 'Local Business Finder', dept: 'Sales & Growth', live: true, priceUsd: 3, listedCostUsd: 0.2, etaMin: 3,
     tagline: 'Every business of a type in an area, with phone, website and rating.',
-    youGet: ['A clean spreadsheet (CSV) of up to 60 businesses', 'Phone numbers normalised to +234', 'Filters like "no website" or "has a phone"', 'Checked by rules: no duplicates, every row complete, filter holds'],
-    team: ['researcher', 'scout', 'verifier', 'analyst', 'auditor'],
+    youGet: ['A clean spreadsheet (CSV) of up to 60 businesses', 'Phone numbers normalised to +234', 'Filters like "no website" or "has a phone"', 'Checked by rules: no duplicates, every row complete, filter holds', 'Emailed to you with the spreadsheet attached'],
+    team: ['researcher', 'scout', 'verifier', 'analyst', 'auditor', 'messenger'],
     example: 'Every café and coffee shop in Lekki Phase 1 that has no website',
   },
   {
-    id: 'lead-list', name: 'Lead List', dept: 'Sales & Growth', live: true, priceUsd: 5, listedCostUsd: 0.4, etaMin: 8,
+    id: 'lead-list', name: 'Lead List', dept: 'Sales & Growth', live: true, priceUsd: 5, listedCostUsd: 0.5, etaMin: 8,
     tagline: '25 verified business emails, each with a personalised first line.',
-    youGet: ['Up to 25 leads with emails that passed a live deliverability check', 'Where each email came from (their own site or a finder)', 'One opening line per lead, written from real data', 'You send; we never cold-email for you'],
-    team: ['researcher', 'scout', 'reader', 'verifier', 'writer', 'auditor'],
+    youGet: ['Up to 25 leads with emails that passed a live deliverability check', 'Where each email came from (their own site or a finder)', 'One opening line per lead, written from real data', 'You send; we never cold-email for you', 'Emailed to you with the spreadsheet attached'],
+    team: ['researcher', 'scout', 'reader', 'verifier', 'writer', 'auditor', 'messenger'],
     example: '25 boutique hotels in Victoria Island, Lagos, for my bakery\'s weekly pastry delivery',
   },
   {
