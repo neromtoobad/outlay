@@ -13,7 +13,9 @@ Each job gets a fixed price upfront. You pay only if you accept the work, and if
 
 Built for the [Tameion Agents Hackathon](https://tameion.thecanteenapp.com) (Canteen × Circle), Sep 27 – Oct 10, 2026.
 
-> **Status: day 1 of 14.** Only the office scene and the cast exist so far. The events in `proto/` are simulated in the browser. Contracts, the job engine and the real on-chain wiring are being built now; see the commit history.
+**Live:** [synclyhq.up.railway.app](https://synclyhq.up.railway.app) · [the books](https://synclyhq.up.railway.app/books) · [the office](https://synclyhq.up.railway.app/live) · [traction](TRACTION.md)
+
+> **Status:** live on Arc mainnet since Sep 28. The agents pay for their tools with x402 nanopayments through Circle Gateway, and every payment links to its settlement on Arc. The escrow and vault contracts are written and tested but not deployed yet. This README is being rewritten; the sections below describe the day-1 prototype.
 
 ## What's here
 
