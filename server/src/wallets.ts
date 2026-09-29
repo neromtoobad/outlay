@@ -38,6 +38,9 @@ export function mnemonic(): string {
   throw new Error(`No mnemonic: set OUTLAY_MNEMONIC or run scripts/wallet.ts init (writes ${SEED_FILE})`);
 }
 
+/** Whether the agents' keys are available (without reading them). */
+export const hasSeed = () => !!process.env.OUTLAY_MNEMONIC?.trim() || existsSync(SEED_FILE);
+
 export function initSeed(): { created: boolean } {
   if (process.env.OUTLAY_MNEMONIC || existsSync(SEED_FILE)) return { created: false };
   writeFileSync(SEED_FILE, generateMnemonic(english) + '\n', { mode: 0o600 });

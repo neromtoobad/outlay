@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/.next*
+server/data
+assets/style-tests
+assets/scene-tests
+contracts/out
+contracts/cache
+contracts/lib
+PLAN.md
+.env
+.env.*

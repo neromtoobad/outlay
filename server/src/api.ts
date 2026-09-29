@@ -3,9 +3,11 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { DATA_DIR, DRY } from './config.ts';
+import { hasSeed } from './wallets.ts';
 import { bus, type SynclyEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
 import { autoAcceptDue, createQuote, decide, getOrder, readJob, replay, retry, start } from './orders.ts';
@@ -13,9 +15,27 @@ import { books, beancount, team } from './books.ts';
 import { resolveSettlements } from './settle.ts';
 
 process.env.OUTLAY_QUIET ??= '1';
+
+// First boot on a fresh volume (Railway): restore the live books from OUTLAY_BOOTSTRAP, a base64 gzip
+// of { "orders/<id>.json" | "jobs/<job>/<file>": contents }. Skipped once any order exists.
+function bootstrap() {
+  const b64 = process.env.OUTLAY_BOOTSTRAP?.trim();
+  if (!b64 || existsSync(join(DATA_DIR, 'orders'))) return;
+  const files: Record<string, string> = JSON.parse(gunzipSync(Buffer.from(b64, 'base64')).toString('utf8'));
+  let n = 0;
+  for (const [rel, body] of Object.entries(files)) {
+    if (!/^(orders|jobs\/job_\w+)\/[\w-]+\.(json|md|csv)$/.test(rel)) continue;
+    mkdirSync(dirname(join(DATA_DIR, rel)), { recursive: true });
+    writeFileSync(join(DATA_DIR, rel), body);
+    n++;
+  }
+  console.log(`restored ${n} files into ${DATA_DIR}`);
+}
+bootstrap();
+
 const app = new Hono();
 
-app.get('/api/health', (c) => c.json({ ok: true, mode: DRY ? 'demo' : 'live' }));
+app.get('/api/health', (c) => c.json({ ok: true, mode: DRY ? 'demo' : 'live', keys: DRY || hasSeed() }));
 app.get('/api/services', (c) => c.json({ mode: DRY ? 'demo' : 'live', services: CATALOG }));
 
 app.post('/api/quote', async (c) => {
@@ -40,6 +60,7 @@ function view(id: string) {
 app.post('/api/orders/:id/start', async (c) => {
   const o = getOrder(c.req.param('id'));
   if (!o) return c.json({ error: 'not found' }, 404);
+  if (!DRY && !hasSeed()) return c.json({ error: 'The team is still clocking in. Try again in a few minutes.' }, 503);
   const { mode } = await c.req.json().catch(() => ({ mode: 'promo' }));
   try {
     await start(o, mode === 'simulated' ? 'simulated' : 'promo');
