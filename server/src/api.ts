@@ -14,6 +14,7 @@ import { autoAcceptDue, createQuote, decide, escrowPending, getOrder, noteForRev
 import { escrowConfig, refreshBondFree } from './escrow.ts';
 import { MODE as CFO_MODE, POLICY as CFO_POLICY, freshSnapshot, startTreasury } from './cfo/treasury.ts';
 import { decisions as cfoDecisions, verifyLog } from './cfo/log.ts';
+import { tractionReport } from './traction.ts';
 import { books, beancount, team } from './books.ts';
 import { resolveSettlements } from './settle.ts';
 
@@ -172,6 +173,12 @@ app.get('/api/cfo', async (c) => {
 });
 app.get('/api/team', (c) => c.json(team()));
 app.get('/api/replay', (c) => c.json({ mode: DRY ? 'demo' : 'live', orders: replay(Number(c.req.query('limit') ?? 6), c.req.query('order') || undefined) }));
+app.get('/api/traction.md', (c) => {
+  if (DRY) return c.text('Traction is only reported from live books.', 404);
+  c.header('content-type', 'text/markdown; charset=utf-8');
+  return c.body(tractionReport().md);
+});
+app.get('/api/traction', (c) => c.json(DRY ? null : tractionReport().summary));
 app.get('/api/books.beancount', (c) => {
   c.header('content-type', 'text/plain; charset=utf-8');
   return c.body(beancount());
