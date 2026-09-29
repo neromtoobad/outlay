@@ -28,7 +28,13 @@ const Escrow = art('JobEscrow');
 const LOCAL_RPC = process.env.LOCAL_RPC ?? 'http://127.0.0.1:8545';
 const local: Chain = { id: 31337, name: 'anvil', nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }, rpcUrls: { default: { http: [LOCAL_RPC] } } };
 const chain: Chain = network === 'arc' ? CHAIN_CONFIGS.arc.chain : network === 'arc-testnet' ? CHAIN_CONFIGS.arcTestnet.chain : local;
-const rpc = network === 'arc' ? ARC.rpc : network === 'arc-testnet' ? 'https://rpc.testnet.arc.io' : LOCAL_RPC;
+// Testnet goes through the builder's own Canteen RPC key ($RPC from `arc-canteen rpc-url --export`).
+// Canteen hosts testnet only, so mainnet uses ARC_RPC (config.ts).
+if (network === 'arc-testnet' && !process.env.RPC) {
+  console.error('arc-testnet needs your Canteen RPC key: eval "$(arc-canteen rpc-url --export)" first');
+  process.exit(1);
+}
+const rpc = network === 'arc' ? ARC.rpc : network === 'arc-testnet' ? process.env.RPC! : LOCAL_RPC;
 const usdc = (network === 'local' ? '0x' + '36'.padEnd(40, '0') : CHAIN_CONFIGS[network === 'arc' ? 'arc' : 'arcTestnet'].usdc) as Address;
 const gatewayWallet = (network === 'local' ? '0x' + '77'.padEnd(40, '7') : CHAIN_CONFIGS[network === 'arc' ? 'arc' : 'arcTestnet'].gatewayWallet) as Address;
 

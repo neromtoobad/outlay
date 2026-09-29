@@ -3,6 +3,7 @@
 export const ARC = {
   name: 'arc',
   chainId: 5042,
+  // Canteen's per-builder RPC key (arc-canteen) covers Arc testnet only; mainnet uses ARC_RPC.
   rpc: process.env.ARC_RPC ?? 'https://rpc.mainnet.arc.io',
   usdc: '0x3600000000000000000000000000000000000000',
   gatewayWallet: '0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE',

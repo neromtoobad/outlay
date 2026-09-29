@@ -10,4 +10,4 @@ optimizer_runs = 500
 
 [rpc_endpoints]
 arc = "https://rpc.mainnet.arc.io"
-arc_testnet = "https://rpc.testnet.arc.io"
+arc_testnet = "${RPC}" # your Canteen RPC key: eval "$(arc-canteen rpc-url --export)"
