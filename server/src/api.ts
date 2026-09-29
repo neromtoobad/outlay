@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { DATA_DIR, DRY } from './config.ts';
-import { hasSeed } from './wallets.ts';
+import { account, hasSeed } from './wallets.ts';
 import { bus, type SynclyEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
 import { autoAcceptDue, createQuote, decide, getOrder, readJob, replay, retry, start } from './orders.ts';
@@ -35,7 +35,11 @@ bootstrap();
 
 const app = new Hono();
 
-app.get('/api/health', (c) => c.json({ ok: true, mode: DRY ? 'demo' : 'live', keys: DRY || hasSeed() }));
+/** The treasury's public address proves which seed is loaded without revealing it. */
+function treasury() {
+  try { return hasSeed() ? account('treasury').address : null; } catch { return 'invalid seed'; }
+}
+app.get('/api/health', (c) => c.json({ ok: true, mode: DRY ? 'demo' : 'live', keys: DRY || hasSeed(), treasury: treasury() }));
 app.get('/api/services', (c) => c.json({ mode: DRY ? 'demo' : 'live', services: CATALOG }));
 
 app.post('/api/quote', async (c) => {
