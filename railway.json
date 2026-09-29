@@ -3,7 +3,16 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "Dockerfile",
-    "watchPatterns": ["server/**", "web/**", "assets/scene/**", "assets/sprites/**", "Dockerfile", "start.sh", "railway.json"]
+    "watchPatterns": [
+      "server/**",
+      "deployments/**",
+      "web/**",
+      "assets/scene/**",
+      "assets/sprites/**",
+      "Dockerfile",
+      "start.sh",
+      "railway.json"
+    ]
   },
   "deploy": {
     "healthcheckPath": "/api/health",
