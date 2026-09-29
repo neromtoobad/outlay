@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useApi, usd, timeAgo, SERVICE_NAME, Avatar } from '@/lib.tsx';
 import { CountUp, Reveal } from '@/components/motion.tsx';
+import CfoDesk from './CfoDesk.tsx';
 
 type Entry = { date: string; narration: string; postings: { account: string; amount: number }[]; meta: { doc?: string; tx?: string; agent?: string; reason?: string; kind: string; settled?: boolean } };
 type Books = {
@@ -147,6 +148,8 @@ export default function Books() {
           {vendors.length ? <Bars rows={vendors} gold /> : <p className="muted">No purchases yet.</p>}
         </section>
       </div>
+
+      <CfoDesk />
 
       <section className="card pad" style={{ marginTop: 20 }}>
         <h3 className="t">Unit economics <small>per service, measured, not estimated</small></h3>

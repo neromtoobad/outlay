@@ -5,14 +5,14 @@
 // Escrow is on when deployments/<net>.json exists. net = OUTLAY_ESCROW_NET, which defaults to 'arc' in
 // live mode and to nothing in demo mode ('local' runs it against anvil; see scripts/escrow-local.ts).
 import { existsSync, readFileSync } from 'node:fs';
-import { createPublicClient, createWalletClient, http, keccak256, toBytes, parseAbi, parseGwei, type Address, type Chain, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, http, keccak256, toBytes, parseAbi, parseGwei, type Abi, type Address, type Chain, type Hex } from 'viem';
 import { CHAIN_CONFIGS } from '@circle-fin/x402-batching/client';
 import { ARC, DRY } from './config.ts';
 import { account } from './wallets.ts';
 
 const NET = process.env.OUTLAY_ESCROW_NET ?? (DRY ? '' : 'arc');
 
-type Deployment = { network: string; chainId: number; rpc?: string; escrow: Address; vault: Address; usdc: Address };
+type Deployment = { network: string; chainId: number; rpc?: string; escrow: Address; vault: Address; usdc: Address; gatewayWallet: Address; boss: Address };
 function load(): Deployment | null {
   if (!NET) return null;
   const f = new URL(`../../deployments/${NET}.json`, import.meta.url).pathname;
@@ -60,15 +60,15 @@ export const jobKey = (orderId: string): Hex => keccak256(toBytes(orderId));
 export const hashText = (s: string): Hex => keccak256(toBytes(s));
 const units = (usd: number) => BigInt(Math.round(usd * 1e6));
 
-const pub = createPublicClient({ chain, transport: http(RPC) });
+export const pub = createPublicClient({ chain, transport: http(RPC) });
 let cfoWallet: ReturnType<typeof createWalletClient> | undefined;
 const wallet = () => (cfoWallet ??= createWalletClient({ chain, transport: http(RPC), account: account('cfo') }));
 
-// The CFO sends one transaction at a time, so nonces never collide.
+// Every transaction the CFO key sends (escrow and vault) goes through one queue, so nonces never collide.
 let queue: Promise<unknown> = Promise.resolve();
-function send(functionName: 'open' | 'submit' | 'autoRelease' | 'refundLate' | 'cancelUnfunded', args: readonly unknown[]) {
+export function cfoWrite(address: Address, abi: Abi, functionName: string, args: readonly unknown[]) {
   const p = queue.then(async () => {
-    const hash = await wallet().writeContract({ address: DEP!.escrow, abi: ESCROW_ABI, functionName, args, chain, account: wallet().account!, ...FEES } as any);
+    const hash = await wallet().writeContract({ address, abi, functionName, args, chain, account: wallet().account!, ...FEES } as any);
     const r = await pub.waitForTransactionReceipt({ hash });
     if (r.status !== 'success') throw new Error(`${functionName} reverted (${hash})`);
     return { hash, block: r.blockNumber };
@@ -76,6 +76,8 @@ function send(functionName: 'open' | 'submit' | 'autoRelease' | 'refundLate' | '
   queue = p.catch(() => {});
   return p;
 }
+const send = (functionName: 'open' | 'submit' | 'autoRelease' | 'refundLate' | 'cancelUnfunded', args: readonly unknown[]) => cfoWrite(DEP!.escrow, ESCROW_ABI, functionName, args);
+export const cfoAddress = () => wallet().account!.address;
 
 export const openJob = (id: Hex, customer: Address, priceUsd: number, bondUsd: number, specHash: Hex, fundBy: number, deliverBy: number) =>
   send('open', [id, customer, units(priceUsd), units(bondUsd), specHash, BigInt(fundBy), BigInt(deliverBy)]);

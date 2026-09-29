@@ -12,6 +12,8 @@ import { bus, type SynclyEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
 import { autoAcceptDue, createQuote, decide, escrowPending, getOrder, noteForRevision, openEscrow, readJob, replay, retry, start, syncEscrow } from './orders.ts';
 import { escrowConfig, refreshBondFree } from './escrow.ts';
+import { MODE as CFO_MODE, POLICY as CFO_POLICY, freshSnapshot, startTreasury } from './cfo/treasury.ts';
+import { decisions as cfoDecisions, verifyLog } from './cfo/log.ts';
 import { books, beancount, team } from './books.ts';
 import { resolveSettlements } from './settle.ts';
 
@@ -152,6 +154,22 @@ app.get('/api/orders/:id/files/:name', (c) => {
 });
 
 app.get('/api/books', async (c) => c.json(await books()));
+
+// The CFO in public: what it sees, the rules it follows, and every decision it made (signed, hash-chained).
+let verified: { at: number; v: Awaited<ReturnType<typeof verifyLog>> } | null = null;
+app.get('/api/cfo', async (c) => {
+  if (!verified || Date.now() - verified.at > 60_000) verified = { at: Date.now(), v: await verifyLog() };
+  const log = cfoDecisions(150);
+  const count = (st: string) => log.filter((d) => d.status === st).length;
+  const s = await freshSnapshot();
+  const planFile = join(DATA_DIR, 'cfo', 'epoch.json');
+  return c.json({
+    enabled: escrowConfig().enabled, mode: CFO_MODE, policy: CFO_POLICY, snapshot: s, verify: verified.v,
+    plan: existsSync(planFile) ? JSON.parse(readFileSync(planFile, 'utf8')) : null,
+    metrics: { done: count('done'), escalated: count('escalated'), refused: count('refused'), wouldDo: count('would-do'), proposed: s?.proposals.total ?? 0, cosigned: s?.proposals.cosigned ?? 0 },
+    decisions: log,
+  });
+});
 app.get('/api/team', (c) => c.json(team()));
 app.get('/api/replay', (c) => c.json({ mode: DRY ? 'demo' : 'live', orders: replay(Number(c.req.query('limit') ?? 6), c.req.query('order') || undefined) }));
 app.get('/api/books.beancount', (c) => {
@@ -197,6 +215,7 @@ async function escrowTick() {
   }
 }
 setTimeout(escrowTick, 2000);
+startTreasury();
 setInterval(escrowTick, 15_000);
 // link each live receipt to its on-chain settlement once Circle Gateway has batched it
 const settle = () => void resolveSettlements().then((n) => n && console.log(`settled ${n} receipts on Arc`)).catch(() => {});

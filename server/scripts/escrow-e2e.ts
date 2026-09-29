@@ -1,5 +1,5 @@
 // Scripted customer for the local escrow rig: reject, expiry, auto-release, and failed-job refund.
-// usage: node scripts/escrow-e2e.ts <apiBase> reject|expire|auto|fail   (after scripts/escrow-local.ts; "fail" needs an API started with OUTLAY_DRY_FAIL=BlockRun)
+// usage: node scripts/escrow-e2e.ts <apiBase> reject|accept|expire|auto|fail   (after scripts/escrow-local.ts; "fail" needs an API started with OUTLAY_DRY_FAIL=BlockRun)
 import { createPublicClient, createWalletClient, http, parseAbi, type Hex, type Address } from 'viem';
 
 const [API = 'http://localhost:8790', scenario = 'reject'] = process.argv.slice(2);
@@ -58,6 +58,12 @@ if (scenario === 'reject') {
   const after = await bal(cfg);
   console.log(`reject → status ${o.status}, escrow ${o.escrow.state}, refund tx matches ${o.refund?.tx === tx}, customer net ${(after - before).toFixed(2)} (expect +${q.quote.bondUsd})`);
   process.exit(o.status === 'rejected' && Math.abs(after - before - q.quote.bondUsd) < 1e-6 ? 0 : 1);
+}
+if (scenario === 'accept') {
+  const tx = await send(cfg.escrow, ESC, 'accept', [e.id]);
+  const o = await post(`/api/orders/${q.id}/sync`, { tx });
+  console.log(`accept → status ${o.status}, escrow ${o.escrow.state}, release tx ${o.escrow.closeTx?.slice(0, 10)}`);
+  process.exit(o.status === 'accepted' ? 0 : 1);
 }
 if (scenario === 'auto') {
   await warp(49 * 3600);

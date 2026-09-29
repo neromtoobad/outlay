@@ -558,3 +558,27 @@ footer.site p { margin-top: 12px; max-width: 360px; }
 .txlinks { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13.5px; padding: 6px 0 2px; }
 .txlinks:empty { display: none; }
 pre.spec { white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; background: var(--paper-2); border-radius: 10px; padding: 10px 12px; margin: 0; max-height: 220px; overflow: auto; }
+
+/* ---------- the CFO's desk (/books) ---------- */
+.cfohead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.subh { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.subh small { font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
+.tbl.compact td, .tbl.compact th { padding: 7px 8px; font-size: 13.5px; }
+.tbl td.warn { color: var(--bad); font-weight: 600; }
+.bossbox { display: grid; gap: 10px; background: var(--brass-soft); border: 1px solid #ecd9ae; border-radius: 14px; padding: 14px 16px; margin-top: 16px; }
+.bossrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14.5px; }
+.declog { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.declog > li { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); min-width: 0; }
+.declog > li.escalated, .declog > li.refused { border-color: #ecd9ae; background: #fffaf0; }
+.declog > li.failed { border-color: #f1cfc7; background: #fff7f5; }
+.declog .dl-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; }
+.declog .kind { font-weight: 600; color: var(--green); }
+.declog .st { border-radius: 999px; padding: 1px 8px; background: var(--paper-2); color: var(--ink-2); }
+.declog .st.done { background: var(--good-soft); color: var(--good); }
+.declog .st.escalated, .declog .st.refused { background: var(--brass-soft); color: #7d5410; }
+.declog .st.failed { background: var(--bad-soft); color: var(--bad); }
+.declog .when { color: var(--muted); margin-left: auto; }
+.declog .sum { font-size: 14px; margin-top: 4px; color: var(--ink); overflow-wrap: anywhere; }
+.declog details { margin-top: 6px; font-size: 13px; }
+.declog summary { cursor: pointer; color: var(--muted); }
+.declog details > * + * { margin-top: 6px; }

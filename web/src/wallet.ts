@@ -105,3 +105,14 @@ export async function decideOnChain(c: EscrowCfg, who: Address, id: Hex, action:
 
 export const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 export const txUrl = (c: { explorer: string | null } | null | undefined, hash?: string) => (c?.explorer && hash ? `${c.explorer}/tx/${hash}` : undefined);
+
+const VAULT = parseAbi(['function coSign(uint256 id)']);
+/** The Boss approves a CFO proposal from the vault owner's wallet. */
+export async function coSignOnChain(c: EscrowCfg, who: Address, id: number): Promise<Hex> {
+  await ensureChain(c);
+  const { pub, wallet } = clients(c, who);
+  const hash = await wallet.writeContract({ address: c.vault, abi: VAULT, functionName: 'coSign', args: [BigInt(id)], ...fees(c) });
+  const r = await pub.waitForTransactionReceipt({ hash });
+  if (r.status !== 'success') throw new Error('The co-sign failed on-chain.');
+  return hash;
+}

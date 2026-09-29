@@ -18,6 +18,11 @@ const rpcCall = (method: string, params: unknown[]) => pub.request({ method: met
 execFileSync(join(process.env.HOME!, '.foundry/bin/forge'), ['build', '--silent'], { cwd: join(root, 'contracts'), stdio: 'inherit' });
 const mock = JSON.parse(readFileSync(join(root, 'contracts/out/Syncly.t.sol/MockUSDC.json'), 'utf8'));
 await rpcCall('anvil_setCode', [USDC, mock.deployedBytecode.object]);
+// Circle's GatewayWallet stand-in at the local gateway address (the vault's top-ups call depositFor on it).
+const GATEWAY = ('0x' + '77'.padEnd(40, '7')) as Hex;
+const mockGateway = JSON.parse(readFileSync(join(root, 'contracts/out/Syncly.t.sol/MockGateway.json'), 'utf8'));
+await rpcCall('anvil_setCode', [GATEWAY, mockGateway.deployedBytecode.object]);
+await rpcCall('anvil_setStorageAt', [GATEWAY, '0x0', '0x' + USDC.slice(2).padStart(64, '0')]); // slot 0: its usdc
 for (const r of ['treasury', 'cfo'] as const) await rpcCall('anvil_setBalance', [account(r).address, '0x56BC75E2D63100000']);
 
 execFileSync(process.execPath, ['scripts/deploy.ts', 'local'], { cwd: join(root, 'server'), stdio: 'inherit' });
