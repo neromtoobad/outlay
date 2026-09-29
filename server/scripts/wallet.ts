@@ -14,7 +14,7 @@ if (cmd === 'init') {
 }
 
 if (cmd === 'status') {
-  const roles = (rest.length ? rest : ['treasury', 'cfo', 'scout', 'reader', 'researcher', 'writer', 'auditor']) as Role[];
+  const roles = (rest.length ? rest : ['treasury', 'cfo', 'scout', 'reader', 'researcher', 'writer', 'verifier', 'auditor']) as Role[];
   for (const role of roles) {
     const addr = account(role).address;
     try {
