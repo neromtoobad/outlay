@@ -69,8 +69,10 @@ export async function books() {
     mode: DRY ? 'demo' : 'live',
     asOf: new Date().toISOString(),
     counters: {
-      orders: orders.length,
-      customers: new Set(orders.map((o) => o.email)).size,
+      // an order counts once work was started (free or paid); quotes nobody took up don't
+      orders: orders.filter((o) => o.payment).length,
+      customers: new Set(orders.filter((o) => o.payment).map((o) => o.email)).size,
+      quotes: orders.length,
       delivered: delivered.length,
       accepted: accepted.length,
       rejected: orders.filter((o) => o.decision?.kind === 'rejected').length,

@@ -8,7 +8,9 @@ import { resolveSettlements } from '../src/settle.ts';
 if (process.env.OUTLAY_DRY === '1') { console.error('TRACTION.md is built from live data only; unset OUTLAY_DRY'); process.exit(1); }
 await resolveSettlements(200);
 
-const orders = listOrders().filter((o) => !o.demo).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+const quotes = listOrders().filter((o) => !o.demo);
+// an order counts once work was started (free or paid); quotes nobody took up are counted separately
+const orders = quotes.filter((o) => o.payment).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 const NAME: Record<string, string> = { 'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List' };
 const rows: string[] = [];
 let payments = 0, spent = 0, settled = 0;
@@ -35,7 +37,7 @@ Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC from Sy
 
 | | |
 |---|---|
-| Orders | ${orders.length} (${((n) => `${n} customer${n === 1 ? '' : 's'}`)(new Set(orders.map((o) => o.email)).size)}) |
+| Orders | ${orders.length} (${((n) => `${n} customer${n === 1 ? '' : 's'}`)(new Set(orders.map((o) => o.email)).size)}; ${quotes.length} quotes given) |
 | Delivered | ${delivered.length} |
 | Accepted by the customer | ${accepted.length} |
 | Paid jobs accepted (revenue) | ${paidAccepted.length} · ${revenue.toFixed(2)} USDC |

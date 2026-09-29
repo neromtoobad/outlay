@@ -170,7 +170,7 @@ function Team({ agents, books }: { agents: Record<string, AgentStats>; books: Bo
             <div className="role">{ROLES.cfo.title}</div>
             <p className="blurb">{ROLES.cfo.blurb}</p>
             <div className="nums">
-              <div><b>{books?.counters.orders ?? '—'}</b><span>jobs priced</span></div>
+              <div><b>{books?.counters.quotes ?? '—'}</b><span>jobs priced</span></div>
               <div><b>{books?.counters.acceptanceRate == null ? '—' : `${Math.round(books.counters.acceptanceRate * 100)}%`}</b><span>accepted</span></div>
               <div><b>{books ? usd(books.pnl.bondsPaid) : '—'}</b><span>bonds paid</span></div>
             </div>

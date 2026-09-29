@@ -7,7 +7,7 @@ import { CountUp, Reveal } from '@/components/motion.tsx';
 type Entry = { date: string; narration: string; postings: { account: string; amount: number }[]; meta: { doc?: string; tx?: string; agent?: string; reason?: string; kind: string; settled?: boolean } };
 type Books = {
   mode: 'demo' | 'live'; asOf: string;
-  counters: { orders: number; customers: number; delivered: number; accepted: number; rejected: number; acceptanceRate: number | null; freeJobs: number; toolCalls: number };
+  counters: { orders: number; quotes: number; customers: number; delivered: number; accepted: number; rejected: number; acceptanceRate: number | null; freeJobs: number; toolCalls: number };
   pnl: { revenue: number; tools: number; experts: number; guarantee: number; grossMargin: number; byVendor: Record<string, number>; byService: Record<string, number>; bondsPaid: number; refunds: number };
   perService: Record<string, { jobs: number; avgCost: number; price: number; accepted: number; decided: number; free: number }>;
   daily: { date: string; revenue: number; costs: number }[];

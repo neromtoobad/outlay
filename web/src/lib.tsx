@@ -116,7 +116,7 @@ export type Escrow = {
 export type AgentStats = { jobs: number; steps: number; calls: number; usd: number; vendors: string[]; last?: { at: string; step: string; orderId: string } };
 export type BooksSummary = {
   mode: "demo" | "live"; asOf: string;
-  counters: { orders: number; customers: number; delivered: number; accepted: number; rejected: number; acceptanceRate: number | null; freeJobs: number; toolCalls: number };
+  counters: { orders: number; quotes: number; customers: number; delivered: number; accepted: number; rejected: number; acceptanceRate: number | null; freeJobs: number; toolCalls: number };
   pnl: { revenue: number; tools: number; experts: number; guarantee: number; grossMargin: number; byVendor: Record<string, number>; bondsPaid: number; refunds: number };
 };
 export const SERVICE_NAME: Record<string, string> = { "research-brief": "Research Brief", "local-business-finder": "Local Business Finder", "lead-list": "Lead List" };
