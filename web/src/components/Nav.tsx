@@ -1,47 +1,42 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion } from 'motion/react';
-import { Seal, useApi } from '@/lib.tsx';
+import { useApi } from '@/lib.tsx';
+import Logo from '@/components/Logo.tsx';
 
-const LINKS: [string, string][] = [['/#services', 'Services'], ['/#team', 'The team'], ['/office', 'The office'], ['/books', 'Open books']];
-
-function Links({ onClick }: { onClick?: () => void }) {
-  const path = usePathname();
-  return (
-    <>
-      {LINKS.map(([href, label]) => {
-        const active = !href.includes('#') && path.startsWith(href);
-        return (
-          <Link key={href} href={href} className={active ? 'active' : ''} onClick={onClick}>
-            {active && <motion.span layoutId="navpill" className="navpill" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
-            <span style={{ position: 'relative' }}>{label}</span>
-          </Link>
-        );
-      })}
-    </>
-  );
-}
+const LINKS: [string, string][] = [['/#team', 'The team'], ['/#cfo', 'The CFO'], ['/#services', 'Services'], ['/office', 'The office'], ['/books', 'Open books']];
 
 export default function Nav() {
   const { data } = useApi<{ mode: string }>('/api/health');
+  const path = usePathname();
   const [menu, setMenu] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 8);
+    on();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => window.removeEventListener('scroll', on);
+  }, []);
+  useEffect(() => setMenu(false), [path]);
   return (
-    <div className="navshell">
-      <header className="nav">
-        <Link href="/" className="brand" aria-label="Syncly home"><Seal size={30} /><span className="wordmark">SYNCLY</span></Link>
-        <nav className="navlinks"><Links /></nav>
-        <span className="spacer" />
-        {data && (data.mode === 'demo'
-          ? <span className="chip demo" title="No real money moves in demo mode. Receipts are simulated and marked as such."><span className="dot" />Demo mode</span>
-          : <span className="chip live"><span className="dot" />Live on Arc</span>)}
-        <Link href="/hire/local-business-finder" className="btn primary sm">Hire the team</Link>
-        <button className="menubtn" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">{menu ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}</svg>
+    <header className={`nav${scrolled ? ' scrolled' : ''}${menu ? ' open' : ''}`}>
+      <div className="nav__bar">
+        <Link href="/" className="nav__logo" aria-label="Syncly home"><Logo size={28} /></Link>
+        <nav className="nav__links">
+          {LINKS.map(([href, label]) => <Link key={href} href={href} className={!href.includes('#') && path.startsWith(href) ? 'active' : ''}>{label}</Link>)}
+        </nav>
+        <span className="nav__sp" />
+        {data && <span className={`nav__status ${data.mode}`}><span className="dot" />{data.mode === 'demo' ? 'Demo mode' : 'Live on Arc'}</span>}
+        <Link href="/hire/local-business-finder" className="pill dark nav__cta">Hire the team <span className="pill__ic">→</span></Link>
+        <button className="pill dark nav__menu" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
+          Menu <span className="pill__ic">{menu ? '×' : '='}</span>
         </button>
-      </header>
-      <nav className={`mobilemenu${menu ? ' open' : ''}`}><Links onClick={() => setMenu(false)} /></nav>
-    </div>
+      </div>
+      <nav className="nav__sheet" aria-hidden={!menu}>
+        {LINKS.map(([href, label], i) => <Link key={href} href={href} style={{ transitionDelay: `${menu ? 0.04 * i : 0}s` }}><span className="mono">0{i + 1}</span>{label}</Link>)}
+        <Link href="/hire/local-business-finder" className="pill dark" style={{ justifySelf: 'start', marginTop: 12 }}>Hire the team <span className="pill__ic">→</span></Link>
+      </nav>
+    </header>
   );
 }
