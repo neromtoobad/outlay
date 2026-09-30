@@ -1,6 +1,6 @@
 // The Syncly mark: an S built from three ledger rows, the middle one in green (the books, balanced).
 export function Mark({ size = 28, light = false }: { size?: number; light?: boolean }) {
-  const ink = light ? '#FFFFFF' : '#0B1220', row = light ? '#3DDC97' : '#12B76A';
+  const ink = light ? '#FFFFFF' : '#13271C', row = light ? '#A3E36A' : '#7CC243';
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden="true">
       <rect x="7" y="10.5" width="9" height="14" fill={ink} />

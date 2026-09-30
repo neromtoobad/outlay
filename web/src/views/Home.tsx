@@ -109,7 +109,8 @@ function Team({ agents }: { agents: Record<string, AgentStats> }) {
 
 // ---------------------------------------------------------------- 02 · the CFO, on a blueprint
 
-const BUCKETS: [string, string, string][] = [['operating', 'OPERATING', '#E7EBF2'], ['tools', 'TOOLS', '#3DDC97'], ['bond', 'BOND', '#F5B83D'], ['reserve', 'RESERVE', '#7CC4FF'], ['promo', 'PROMO', '#B9A7FF']];
+// Categorical colours for the five buckets, validated on the forest surface (CVD-separated, labelled too).
+const BUCKETS: [string, string, string][] = [['operating', 'OPERATING', '#4B8DCF'], ['tools', 'TOOLS', '#59A53B'], ['bond', 'BOND', '#8F5FC0'], ['reserve', 'RESERVE', '#C38300'], ['promo', 'PROMO', '#04A19B']];
 
 function Cfo({ cfo, books }: { cfo: Cfo | null; books: Books | null }) {
   const [ref, seen] = useInView<HTMLDivElement>();

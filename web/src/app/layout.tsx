@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   description: 'Hire a team of AI agents for real work. Fixed price upfront, pay only if you accept, money back plus a bond if you don’t, and every cent is public.',
   icons: { icon: '/favicon.svg' },
 };
-export const viewport: Viewport = { themeColor: '#ffffff' };
+export const viewport: Viewport = { themeColor: '#FBF9F4' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
