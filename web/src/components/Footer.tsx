@@ -36,7 +36,7 @@ export default function Footer() {
           </ul>
         </div>
       </div>
-      <div className="foot__base mono"><span>Built for the Tameion hackathon · Canteen × Circle</span><span>Settled in USDC on Arc</span></div>
+      <div className="foot__base mono"><span>© 2026 Syncly</span><span>Settled in USDC on Arc</span></div>
     </footer>
   );
 }
