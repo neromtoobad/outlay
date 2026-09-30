@@ -22,6 +22,7 @@ export default function Footer() {
         <div>
           <h5 className="mono">Proof</h5>
           <ul>
+            <li><Link href="/docs">Docs</Link></li>
             <li><Link href="/books">Open books</Link></li>
             <li><a href="/api/cfo">The CFO's signed log</a></li>
             <li><a href="/api/books.beancount">Ledger (beancount)</a></li>
