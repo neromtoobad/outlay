@@ -70,6 +70,45 @@ function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
   );
 }
 
+const isVideo = (f: string) => /\.(mp4|webm)$/i.test(f);
+const isImage = (f: string) => /\.(png|jpe?g|webp)$/i.test(f);
+const isMedia = (f: string) => isVideo(f) || isImage(f) || /\.zip$/i.test(f);
+
+/** What the growth team made: the live site in a phone frame, videos that play, images at full size. */
+function Media({ id, files, deliverable }: { id: string; files: string[]; deliverable: string }) {
+  const url = (f: string) => `/api/orders/${id}/files/${f}`;
+  const site = deliverable.match(/\]\((?:https?:\/\/[^)\s]+)?(\/s\/[a-z0-9-]+)\)/)?.[1];
+  const videos = files.filter(isVideo);
+  const poster = files.find((f) => /^poster\./.test(f));
+  const shots = files.filter((f) => /^(phone|laptop)\.jpg$/.test(f));
+  const images = files.filter((f) => isImage(f) && !shots.includes(f) && f !== poster);
+  if (!site && !videos.length && !images.length) return null;
+  return (
+    <div className="media">
+      {site && (
+        <div className="media__site">
+          <div className="phone"><iframe src={site} title="Your new site" loading="lazy" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" /></div>
+          <div className="media__cap"><b>Live now</b><a href={site} target="_blank" rel="noreferrer">{`synclyhq.up.railway.app${site}`} ↗</a>{shots.length > 0 && <span className="muted">Laptop view below</span>}</div>
+          {shots.filter((f) => f.startsWith('laptop')).map((f) => <img key={f} className="media__shot" src={url(f)} alt="The site on a laptop" loading="lazy" />)}
+        </div>
+      )}
+      {videos.map((f) => (
+        <figure key={f} className={`media__video ${/1x1/.test(f) ? 'sq' : ''}`}>
+          <video src={url(f)} poster={poster ? url(poster) : undefined} controls playsInline loop preload="metadata" />
+          <figcaption><span className="mono">{f}</span><a href={`${url(f)}?download`}>Download ↓</a></figcaption>
+        </figure>
+      ))}
+      {images.length > 0 && (
+        <div className="media__grid">
+          {images.map((f) => (
+            <figure key={f}><a href={url(f)} target="_blank" rel="noreferrer"><img src={url(f)} alt={f} loading="lazy" /></a><figcaption><span className="mono">{f}</span><a href={`${url(f)}?download`}>↓</a></figcaption></figure>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
 const Tx = ({ cfg, hash, children }: { cfg: EscrowCfg | null; hash?: string; children: ReactNode }) => {
   const href = txUrl(cfg, hash);
@@ -215,10 +254,11 @@ export default function Job({ id }: { id: string }) {
               <div className="dochead">
                 <h3>Your deliverable</h3>
                 <div className="btns">
-                  {last!.files.map((f) => <a key={f} className="btn secondary sm" href={`/api/orders/${o.id}/files/${f}`}>↓ {f}</a>)}
+                  {last!.files.filter((f) => !isImage(f) && !isVideo(f)).map((f) => <a key={f} className="btn secondary sm" href={`/api/orders/${o.id}/files/${f}${isMedia(f) ? '?download' : ''}`}>↓ {f}</a>)}
                   <a className="btn secondary sm" href={`/api/orders/${o.id}/files/deliverable.md`}>↓ .md</a>
                 </div>
               </div>
+              <Media id={o.id} files={last!.files} deliverable={last!.deliverable} />
               <div className="deliverable" dangerouslySetInnerHTML={{ __html: html }} />
               <details style={{ marginTop: 22, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
                 <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14.5 }}>How the team did it · {steps.length} steps</summary>

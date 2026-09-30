@@ -783,3 +783,25 @@ body:has(.home) .foot { margin-top: var(--gutter); }
 .prose .callout.honest-limit, .prose .callout.heads-up { background: var(--brass-soft); border-color: #EBD9B0; }
 .prose .callout strong:first-child { display: block; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 4px; }
 .prose .callout.honest-limit strong:first-child, .prose .callout.heads-up strong:first-child { color: var(--brass-ink); }
+
+/* ---------- order page: what the growth team made ---------- */
+.media { display: grid; gap: 18px; margin: 4px 0 26px; }
+.media__site { display: grid; grid-template-columns: auto 1fr; gap: 14px 22px; align-items: start; }
+.media__site .phone { width: 300px; height: 600px; border-radius: 34px; padding: 10px; background: var(--ink); box-shadow: var(--shadow-lg); }
+.media__site .phone iframe { width: 100%; height: 100%; border: 0; border-radius: 26px; background: #fff; }
+.media__cap { display: grid; gap: 6px; align-content: start; padding-top: 6px; }
+.media__cap b { font-size: 15px; }
+.media__cap a { font-family: var(--mono); font-size: 13px; color: var(--accent-ink); word-break: break-all; }
+.media__shot { grid-column: 1 / -1; width: 100%; border-radius: var(--r-sm); border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
+.media__video { margin: 0; display: grid; gap: 8px; justify-items: start; }
+.media__video video { display: block; max-width: 100%; max-height: min(640px, 80vh); width: auto; height: auto; border-radius: 18px; background: var(--deep); box-shadow: var(--shadow); }
+.media__video figcaption, .media__grid figcaption { display: flex; gap: 12px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.media__video figcaption a, .media__grid figcaption a { color: var(--accent-ink); font-weight: 600; }
+.media__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.media__grid figure { margin: 0; display: grid; gap: 6px; }
+.media__grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--line); }
+@media (max-width: 640px) {
+  .media__site { grid-template-columns: 1fr; justify-items: center; }
+  .media__site .phone { width: min(100%, 300px); height: 560px; }
+  .media__cap { justify-items: center; text-align: center; }
+}

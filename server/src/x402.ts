@@ -1,7 +1,13 @@
 // buy(): the only way an Syncly agent spends money. It pays an x402 endpoint from the agent's
 // Circle Gateway balance on Arc, enforces a per-call price cap and a host allowlist BEFORE
 // signing, and appends a receipt line to the job. No receipt, no spend.
-import { GatewayClient } from '@circle-fin/x402-batching/client';
+// A few sellers only take a direct USDC transfer from the agent's own wallet (EIP-3009), and async
+// ones (video) need the same payment shown again while polling; those go through payManual().
+import { CHAIN_CONFIGS, GatewayClient, registerBatchScheme } from '@circle-fin/x402-batching/client';
+import { x402Client, x402HTTPClient } from '@x402/core/client';
+import { ExactEvmScheme } from '@x402/evm/exact/client';
+import { privateKeyToAccount } from 'viem/accounts';
+import { createPublicClient, http as rpc, parseAbi, type Address } from 'viem';
 import { ARC, DRY } from './config.ts';
 import { privateKey, type Role } from './wallets.ts';
 import type { Job } from './job.ts';
@@ -78,6 +84,8 @@ export async function buy<T>(
     maxUsd: number; // hard cap for this single call
     expectUsd: number; // listed price, used for budgeting and dry runs
     dryData: () => T;
+    direct?: boolean; // the seller only takes a USDC transfer from the agent's own wallet
+    poll?: (first: any) => string | undefined; // async seller: where to poll for the finished result
   },
 ): Promise<T> {
   const host = new URL(opts.url).host;
@@ -100,6 +108,8 @@ export async function buy<T>(
     });
     return data;
   }
+
+  if (opts.direct || opts.poll) return payManual(job, opts);
 
   const s = slot(opts.agent);
   const run = async () => {
@@ -134,5 +144,110 @@ export async function buy<T>(
   };
   const p = s.tail.then(run, run);
   s.tail = p.catch(() => undefined);
+  return p;
+}
+
+// ---------------------------------------------------------------- the manual path
+
+/** The agent's own wallet can't cover a direct payment. Callers may fall back to a Gateway seller. */
+export class NoWalletFunds extends SpendRefused {}
+
+const ARC_NET = `eip155:${ARC.chainId}`;
+const arcRead = createPublicClient({ chain: CHAIN_CONFIGS.arc.chain, transport: rpc(ARC.rpc) });
+const ERC20 = parseAbi(['function balanceOf(address) view returns (uint256)']);
+export const walletUsdc = async (role: Role) =>
+  Number(await arcRead.readContract({ address: ARC.usdc as Address, abi: ERC20, functionName: 'balanceOf', args: [privateKeyToAccount(privateKey(role)).address] })) / 1e6;
+
+type ManualSlot = { http: x402HTTPClient; address: Address; capAtomic: bigint; refused?: string; broke?: boolean; signed: boolean; call?: { url: string; agent: string; vendor: string }; tail: Promise<unknown> };
+const manuals = new Map<Role, ManualSlot>();
+
+function manualSlot(role: Role): ManualSlot {
+  let m = manuals.get(role);
+  if (m) return m;
+  const account = privateKeyToAccount(privateKey(role));
+  const client = new x402Client();
+  // Gateway-batched requirements sign against the Gateway wallet; plain "exact" ones move USDC directly.
+  registerBatchScheme(client, { signer: account, fallbackScheme: new ExactEvmScheme(account), networks: [ARC_NET] });
+  client.registerPolicy((_v, reqs) => reqs.filter((r) => r.network === ARC_NET));
+  client.setSpendControls(false); // the cap below is ours, per call
+  const created: ManualSlot = { http: new x402HTTPClient(client), address: account.address, capAtomic: 0n, signed: false, tail: Promise.resolve() };
+  client.onBeforePaymentCreation(async (ctx) => {
+    const req = ctx.selectedRequirements;
+    const amt = BigInt(req.amount);
+    if (amt > created.capAtomic) return { abort: true, reason: (created.refused = `price ${Number(amt) / 1e6} USDC > cap ${Number(created.capAtomic) / 1e6}`) };
+    const refusal = await checkPayee(created.call!.url, String(req.payTo), created.call!);
+    if (refusal) return { abort: true, reason: (created.refused = refusal) };
+    if ((req.extra as any)?.name !== 'GatewayWalletBatched') {
+      const have = BigInt(await arcRead.readContract({ address: req.asset as Address, abi: ERC20, functionName: 'balanceOf', args: [account.address] }));
+      if (have < amt) { created.broke = true; return { abort: true, reason: (created.refused = `wallet holds ${Number(have) / 1e6} USDC, the call costs ${Number(amt) / 1e6}`) }; }
+    }
+    created.signed = true;
+  });
+  manuals.set(role, created);
+  return created;
+}
+
+async function payManual<T>(job: Job, opts: Parameters<typeof buy<T>>[1]): Promise<T> {
+  const m = manualSlot(opts.agent);
+  const run = async (): Promise<T> => {
+    m.capAtomic = BigInt(Math.round(opts.maxUsd * 1e6));
+    m.refused = undefined;
+    m.broke = false;
+    m.signed = false;
+    m.call = { url: opts.url, agent: opts.agent, vendor: opts.vendor };
+    const init: RequestInit = { method: opts.method ?? 'POST', headers: { 'content-type': 'application/json' }, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) };
+    try {
+      // 1. The free request: the seller answers 402 with its terms. Safe to retry.
+      let first: Response | undefined;
+      for (let attempt = 1; ; attempt++) {
+        try { first = await fetch(opts.url, init); if (first.status !== 429 && first.status < 500) break; }
+        catch (e: any) { if (attempt >= 3) throw e; }
+        if (attempt >= 3) break;
+        await sleep(attempt * 2500);
+      }
+      if (first!.status !== 402) throw new Error(`${opts.vendor}: expected payment terms (402), got ${first!.status}`);
+      const terms = m.http.getPaymentRequiredResponse((h) => first!.headers.get(h), await first!.json().catch(() => undefined));
+      // 2. Sign (the hook above checks cap, payee and wallet funds first), then send once.
+      const payment = await m.http.createPaymentPayload(terms);
+      const headers = { ...(init.headers as Record<string, string>), ...m.http.encodePaymentSignatureHeader(payment) };
+      let res = await fetch(opts.url, { ...init, headers });
+      let data: any = await res.json().catch(() => undefined);
+      if (!res.ok) throw new Error(`${opts.vendor}: ${res.status} ${String(data?.error ?? data?.message ?? '').slice(0, 120)}`);
+      // 3. Async sellers: show the same payment while polling; they settle only on the finished result.
+      const pollUrl = opts.poll?.(data);
+      if (pollUrl) {
+        const url = new URL(pollUrl, opts.url).toString();
+        const until = Date.now() + 10 * 60_000;
+        job.log(opts.agent, 'wait', `${opts.vendor}: rendering; checking back every 6 s`);
+        for (;;) {
+          await sleep(6000);
+          res = await fetch(url, { headers });
+          data = await res.json().catch(() => undefined);
+          const st = String(data?.status ?? data?.state ?? '').toLowerCase();
+          if (/complet|succe|done|ready/.test(st)) break;
+          if (/fail|error|cancel/.test(st) || (!res.ok && res.status !== 202)) throw new Error(`${opts.vendor}: ${st || res.status} ${String(data?.error ?? '').slice(0, 100)} (not charged)`);
+          if (Date.now() > until) throw new Error(`${opts.vendor}: still not finished after 10 minutes (not charged unless it completes)`);
+        }
+      }
+      let settled: { transaction?: string } = {};
+      try { settled = m.http.getPaymentSettleResponse((h) => res.headers.get(h)); } catch { /* some sellers don't echo it */ }
+      const direct = (payment.accepted.extra as any)?.name !== 'GatewayWalletBatched';
+      const tx = String(settled.transaction ?? '');
+      job.addReceipt({
+        at: new Date().toISOString(), agent: opts.agent, vendor: opts.vendor, url: opts.url,
+        amount: String(payment.accepted.amount), usd: Number(payment.accepted.amount) / 1e6, transaction: tx || 'direct',
+        reason: opts.reason, status: res.status, dry: false,
+        ...(direct && /^0x[0-9a-f]{64}$/i.test(tx) ? { settledTx: tx, settledAt: new Date().toISOString() } : {}),
+      });
+      return data as T;
+    } catch (e: any) {
+      if (m.broke) throw new NoWalletFunds(`${opts.agent} can't pay ${opts.vendor} directly: ${m.refused}`);
+      if (m.refused) throw new SpendRefused(`${opts.agent} refused ${opts.vendor}: ${m.refused}`);
+      if (m.signed) throw new Error(`${String(e?.message ?? e).slice(0, 160)}. Not retried after signing, so it can't be paid twice.`);
+      throw e;
+    }
+  };
+  const p = m.tail.then(run, run);
+  m.tail = p.catch(() => undefined);
   return p;
 }

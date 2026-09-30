@@ -2,8 +2,13 @@
 // node scripts/wallet.ts status    → addresses + wallet/Gateway USDC balances on Arc mainnet
 // node scripts/wallet.ts deposit <role> <usdc>   → move USDC from the role's wallet into its Gateway balance
 // node scripts/wallet.ts fund <usdc> <role...>     → the treasury tops up each role's Gateway balance (depositFor)
+// node scripts/wallet.ts send <usdc> <role...>     → the treasury sends USDC to each role's own wallet, for sellers
+//                                                    that take a direct transfer (Opus 5 on BlockRun's Arc endpoint)
+import { createWalletClient, http, parseAbi, type Address } from 'viem';
+import { CHAIN_CONFIGS } from '@circle-fin/x402-batching/client';
 import { initSeed, account, ROLES, SEED_FILE, type Role } from '../src/wallets.ts';
 import { gateway } from '../src/x402.ts';
+import { ARC } from '../src/config.ts';
 
 const [cmd = 'status', ...rest] = process.argv.slice(2);
 
@@ -14,7 +19,7 @@ if (cmd === 'init') {
 }
 
 if (cmd === 'status') {
-  const roles = (rest.length ? rest : ['treasury', 'cfo', 'scout', 'reader', 'researcher', 'writer', 'verifier', 'auditor']) as Role[];
+  const roles = (rest.length ? rest : ['treasury', 'cfo', 'scout', 'reader', 'researcher', 'writer', 'verifier', 'auditor', 'analyst', 'investigator', 'illustrator', 'producer', 'messenger']) as Role[];
   for (const role of roles) {
     const addr = account(role).address;
     try {
@@ -50,4 +55,19 @@ if (cmd === 'fund') {
   process.exit(0);
 }
 
-console.log('commands: init | status [roles...] | deposit <role> <usdc> | fund <usdc-each> <role...>');
+if (cmd === 'send') {
+  const [amount, ...roles] = rest as [string, ...Role[]];
+  if (!amount || !roles.length || !(Number(amount) > 0)) throw new Error('usage: send <usdc-each> <role> [role...]   e.g. send 1 illustrator producer');
+  const t = gateway('treasury');
+  const have = Number((await t.getBalances()).wallet.formatted);
+  const need = Number(amount) * roles.length;
+  if (need > have - 0.05) throw new Error(`treasury has ${have} USDC; sending ${roles.length} × ${amount} needs ${need} plus a little gas`);
+  const w = createWalletClient({ account: account('treasury'), chain: CHAIN_CONFIGS.arc.chain, transport: http(ARC.rpc) });
+  for (const role of roles) {
+    const hash = await w.writeContract({ address: ARC.usdc as Address, abi: parseAbi(['function transfer(address,uint256) returns (bool)']), functionName: 'transfer', args: [account(role).address, BigInt(Math.round(Number(amount) * 1e6))] });
+    console.log(`sent ${amount} USDC to ${role.padEnd(11)} wallet  tx ${hash}  (https://arcscan.app/tx/${hash})`);
+  }
+  process.exit(0);
+}
+
+console.log('commands: init | status [roles...] | deposit <role> <usdc> | fund <usdc-each> <role...> | send <usdc-each> <role...>');

@@ -21,4 +21,8 @@ export const MODELS = {
   maker: process.env.MODEL_MAKER ?? 'anthropic/claude-sonnet-4.6',
   fast: process.env.MODEL_FAST ?? 'anthropic/claude-haiku-4.5',
   auditor: process.env.MODEL_AUDITOR ?? 'openai/gpt-5.4-mini',
+  // Design work (sites, motion): Opus 5 from BlockRun's Arc endpoint, else Opus 4.8 through Gateway.
+  designer: process.env.MODEL_DESIGNER ?? 'anthropic/claude-opus-5',
+  designerFallback: process.env.MODEL_DESIGNER_FALLBACK ?? 'anthropic/claude-opus-4.8',
+  vision: process.env.MODEL_VISION ?? 'anthropic/claude-sonnet-4.6',
 } as const;

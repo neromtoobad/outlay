@@ -12,11 +12,20 @@ A business describes a job in a sentence: *"every restaurant in Lugbe, Abuja tha
 
 | Service | Price | What you get |
 |---|---|---|
+| AI Answer Audit | 15 USDC | What ChatGPT, Gemini, Claude and Perplexity tell customers about the business, every wrong fact quoted, who they recommend instead, and a fix list |
+| Content Pack | 8 USDC | The content styles working in the niche this week (backed by real posts and their numbers), then 7 posts and 3 images |
+| Website | 15 USDC | A designed one-page site from the Google listing and Instagram, hosted at a link the same day, plus the files |
+| Motion Ad | 12 USDC | A 12–24 s motion video with an original soundtrack, rendered on our own server |
+| Video Ad | 15 USDC | An 8 s ad from the customer's product photo (9:16 and 1:1), with ad copy |
+| Best Price Finder | 3 USDC | Where to buy for the lowest total price, each offer re-checked on the seller's page |
+| Check Before You Pay | 4 USDC | A rule-based red/amber/green risk verdict on a supplier before paying them, every signal cited |
 | Local Business Finder | 3 USDC | Every business of a type in an area, with phone, website and rating, as a spreadsheet |
 | Lead List | 5 USDC | Up to 25 verified business emails, each with a personalised first line |
 | Research Brief | 3 USDC | Competitors, market and pricing, with every claim cited |
 
-- **The first job is free.** After that, the customer pays into escrow on Arc from their own wallet.
+The menu comes from research into what small businesses already pay freelancers and software for, and what a search or a chatbot can't do: jobs that need fresh data from many paid sources at once, checking against the truth, or real production.
+
+- **The first job is free** when its tools cost under 0.50 USDC. After that, the customer pays into escrow on Arc from their own wallet.
 - **Nothing is paid unless the customer accepts.** Only the paying wallet can accept, ask for one free revision, or reject. A rejection refunds the price plus a bond the CFO put up.
 - **The agents buy their own tools.** Each has its own wallet and pays per call (x402 nanopayments through Circle Gateway) for AI models, search, page reading and email checks. Every call is on the job's public receipt, linked to the Arc transaction that settled it.
 - **The CFO runs the money.** It plans each agent's weekly budget, puts revenue to work, and tops up agents that run low. Anything above its limits goes to a human to co-sign on-chain.
@@ -113,13 +122,15 @@ Canteen's [essay](https://thecanteenapp.com/analysis/2026/09/12/agents-and-ledge
 - **Circle Gateway (x402 batching):** every agent pays sellers per call from its own Gateway balance, via [`@circle-fin/x402-batching`](https://www.npmjs.com/package/@circle-fin/x402-batching). The vault funds agents by calling `GatewayWallet.depositFor`, and settlement transactions are read back with `getTransferById`.
 - **USDC on Arc:** customer payments, escrow, bonds, the vault, and gas (Arc pays gas in USDC).
 - **Smart contracts on Arc:** SynclyVault and JobEscrow, written in Foundry with 16 tests.
-- **x402 discovery:** sellers were chosen from Circle's x402 discovery API for Arc (hundreds of paid services), and `scripts/preflight.ts` checks each one's payment terms without paying.
+- **x402 discovery:** sellers were chosen from Circle's x402 discovery API for Arc (2,133 paid endpoints on 30 Sep 2026), and `scripts/preflight.ts` checks each one's payment terms without paying.
+- **Two ways to pay a seller:** Gateway-batched payments from an agent's Gateway balance, and direct EIP-3009 USDC transfers from the agent's own wallet for sellers that only take those (Claude Opus 5 on BlockRun's Arc endpoint), through `@x402/core` with the batch scheme and an exact-scheme fallback. Async sellers (video) are polled with the same signed payment and settle only when the result is ready. `scripts/pay-safety.ts` tests both paths against a fake seller.
 
 ## Repo map
 
 | Path | What |
 |---|---|
 | [`server/`](server) | The company: API (Hono, Node 24 running TypeScript directly), services, x402 payments, the CFO, escrow, the ledger |
+| [`server/assets/reel/`](server/assets/reel) | The motion engine behind Motion Ad: one-shape morph reels with springs, a cursor and a synthesised score, rendered frame by frame in headless Chrome |
 | [`web/`](web) | The site (Next.js 16): hire, job pages, books, the CFO's desk, the office (PixiJS) with a marimba soundtrack |
 | [`contracts/`](contracts) | SynclyVault and JobEscrow, with tests (Foundry) |
 | [`deployments/`](deployments) | Mainnet addresses and deploy transactions |

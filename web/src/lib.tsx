@@ -7,7 +7,7 @@ export const usd = (x: number, d = 2) => `${x.toFixed(d)}`;
 export const ngn = (x: number) => `≈ ₦${Math.round(x * NGN_PER_USD).toLocaleString('en-NG')}`;
 
 export const ROLE_NAME: Record<string, string> = {
-  cfo: "The CFO", scout: "Scout", researcher: "Researcher", writer: "Writer", illustrator: "Illustrator",
+  cfo: "The CFO", scout: "Scout", researcher: "Researcher", writer: "Writer", illustrator: "Designer",
   verifier: "Verifier", mailer: "Mailer", reader: "Reader", analyst: "Analyst", messenger: "Messenger", auditor: "Auditor",
   producer: "Producer", bookkeeper: "Bookkeeper", linguist: "Linguist", investigator: "Investigator",
 };
@@ -45,7 +45,7 @@ export function Check({ size = 16 }: { size?: number }) {
 }
 
 /** Soft backdrop per department, for service cards. */
-export const DEPT_TINT: Record<string, string> = { "Research": "#f4e2e5", "Sales & Growth": "#fbefcc", "Content & Creative": "#eee8f8", "Web & Tech": "#e2edf9", "Finance & Ops": "#e1ece5" };
+export const DEPT_TINT: Record<string, string> = { "Research": "#f4e2e5", "Sales & Growth": "#fbefcc", "Growth Studio": "#eee8f8", "Buying & Suppliers": "#e2edf9", "Content & Creative": "#eee8f8", "Web & Tech": "#e2edf9", "Finance & Ops": "#e1ece5" };
 
 export function Seal({ size = 32 }: { size?: number }) {
   return (
@@ -119,4 +119,8 @@ export type BooksSummary = {
   counters: { orders: number; quotes: number; customers: number; delivered: number; accepted: number; rejected: number; acceptanceRate: number | null; freeJobs: number; toolCalls: number };
   pnl: { revenue: number; tools: number; experts: number; guarantee: number; grossMargin: number; byVendor: Record<string, number>; bondsPaid: number; refunds: number };
 };
-export const SERVICE_NAME: Record<string, string> = { "research-brief": "Research Brief", "local-business-finder": "Local Business Finder", "lead-list": "Lead List" };
+export const SERVICE_NAME: Record<string, string> = {
+  "research-brief": "Research Brief", "local-business-finder": "Local Business Finder", "lead-list": "Lead List",
+  "content-pack": "Content Pack", website: "Website", "motion-ad": "Motion Ad", "video-ad": "Video Ad",
+  "best-price": "Best Price Finder", "ai-answer-audit": "AI Answer Audit", "vendor-check": "Check Before You Pay",
+};

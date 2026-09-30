@@ -286,9 +286,10 @@ function Services({ services }: { services: Service[] }) {
 // ---------------------------------------------------------------- close
 
 const ASK: [string, string, string][] = [
-  ['local-business-finder', 'Local businesses', 'Every café in Lekki Phase 1 without a website'],
-  ['lead-list', 'Lead list', '25 fitness studios in Ikoyi for my smoothie delivery business'],
-  ['research-brief', 'Research brief', 'Competitors and pricing for a bakery adding cake delivery'],
+  ['ai-answer-audit', 'AI answer audit', 'What do ChatGPT and Gemini say about my restaurant in Yaba?'],
+  ['website', 'Website', 'A site for my small chops business, WhatsApp 0803 555 0142'],
+  ['vendor-check', 'Check a supplier', 'I’m about to pay ₦850,000 upfront to a phone vendor on Instagram'],
+  ['best-price', 'Best price', 'Where to buy 20 bags of Dangote cement cheapest in Ikeja'],
 ];
 
 function Close() {

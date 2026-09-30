@@ -22,7 +22,7 @@ export class Job {
   receipt: ReceiptLine[] = [];
   steps: StepLog[] = [];
   deliverable = '';
-  files: { name: string; content: string }[] = []; // extra deliverables (CSV, etc.)
+  files: { name: string; content: string | Buffer }[] = []; // extra deliverables: CSV, images, video, a site
   qa?: { verdict: 'pass' | 'revise'; notes: string; model: string };
   status: 'running' | 'delivered' | 'failed' = 'running';
   error?: string;

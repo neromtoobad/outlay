@@ -7,5 +7,18 @@
   "api.exa.ai/search": "0xB98eF29eb2be19Ae646A8FC0248255B90A332dbC",
   "api.exa.ai/contents": "0xB98eF29eb2be19Ae646A8FC0248255B90A332dbC",
   "apexfaucet.xyz/api": "0xd334ab5151c624cada654854e2879903dc4217ed",
-  "api.aisa.one/apis": "0xBd7b9f3e0CD3E1f6e698D0eeBb99F96E093BdeE3"
+  "api.aisa.one/apis": "0xBd7b9f3e0CD3E1f6e698D0eeBb99F96E093BdeE3",
+  "arc.blockrun.ai/api": "0x634D274e67DafaF76C54153aa113906a606e1E0B",
+  "np.orthogonal.com/voygr": "0x7D2D55Da17Aa98130e90054e4011B6727416aD83",
+  "np.orthogonal.com/openmart": "0x1B1cCaaB3D71b8BA017103AE8d511FA9ad3d3a5E",
+  "np.orthogonal.com/didit": "0x92cEc8dd87ebcB21cFFbc2D0AD134c2D6Eb895E0",
+  "np.orthogonal.com/predictleads": "0xcA37dE138574432B96F92B0Cd9826DaDFd1cf443",
+  "np.orthogonal.com/olostep": "0x67cD43fcfce8ab2d6477a1f6bf8dFf67aA5E86e1",
+  "np.orthogonal.com/scrapegraphai": "0x8Ee7C76fcb175dD0F9e7FC240F6828ecB226e90C",
+  "np.orthogonal.com/tavily": "0x7f1E8AdA9F03B292865dDF4D9737319aF6963a86",
+  "np.orthogonal.com/brand-dev": "0x9f7556c65392E5cBCB342010618C2b407E64A8EA",
+  "np.orthogonal.com/context-dev": "0x9f7556c65392E5cBCB342010618C2b407E64A8EA",
+  "np.orthogonal.com/serper-scrape": "0x1563CdE0042d17F53b23d91Fd9B73ACE9Da26a09",
+  "np.orthogonal.com/linkup": "0x1A93eD3B59ead051de453Aec3bF16957F4A2266f",
+  "np.orthogonal.com/scrapecreators": "0x9EdC06E69FBf71B191510CA9446Fe09caa95668d"
 }

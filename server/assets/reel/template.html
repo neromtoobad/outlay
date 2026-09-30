@@ -1,0 +1,211 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Motion reel</title>
+<!-- One clean UI font (+ optional serif accent). Swap for the product's own typography. -->
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@1&display=block" rel="stylesheet" />
+<style>
+  /* ---- Palette: set these from the product's site. The shape fills in PALETTE (script) must match. ---- */
+  :root {
+    --canvas: #e8eaf9;   /* backdrop */
+    --dot: #c3c5ef;      /* canvas dot grid */
+    --ink: #0a0212;      /* dark state + primary text */
+    --paper: #ffffff;    /* light state */
+    --accent: #6569d2;   /* brand colour state */
+    --accent-soft: #b7baf5;
+    --success: #5ecba1;  /* success state */
+    --gain: #2fae80;     /* positive numbers */
+    --muted: #6e6c8a;
+    --hair: rgba(101, 105, 210, 0.16);
+    --hair-d: rgba(255, 255, 255, 0.13);
+    --track: #ecedfb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--canvas); }
+  body { font-family: Geist, system-ui, sans-serif; -webkit-font-smoothing: antialiased; color: var(--ink); letter-spacing: -0.01em; }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+  .serif { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  #stage { position: absolute; inset: 0; overflow: hidden; }
+  #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #grid { position: absolute; left: -8000px; top: -8000px; width: 16000px; height: 16000px; background-size: 32px 32px; }
+  #shape { position: absolute; overflow: hidden; transform-origin: 50% 50%; }
+  .content { position: absolute; left: 50%; top: 50%; transform-origin: 50% 50%; display: none; }
+  .on-dark { color: #fff; }
+  #cursor { position: absolute; left: 0; top: 0; width: 40px; height: 40px; transform-origin: 7px 5px; pointer-events: none; z-index: 10; }
+  svg.i { display: block; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: 14px; font-weight: 500; transform-origin: 50% 50%; }
+  .btn.dark { background: var(--ink); color: #fff; }
+  .btn.light { background: #fff; color: var(--ink); }
+  .chip { display: inline-flex; align-items: center; gap: 7px; border-radius: 999px; font-weight: 600; }
+  .row { display: flex; align-items: center; justify-content: space-between; }
+  .label { font-size: 15px; color: var(--muted); }
+  .tog { width: 50px; height: 30px; border-radius: 15px; background: #e2e3f5; position: relative; }
+  .tog i { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(20, 16, 60, 0.2); }
+  .round-btn { position: absolute; right: 40px; bottom: 34px; width: 54px; height: 54px; border-radius: 27px; display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <div id="grid"></div>
+    <div id="shape">
+      <!-- Each state's content lives in one .content box sized to that state (data-w/h in world px).
+           id="c-<state id>". Give any element the cursor touches or you animate an id. -->
+
+      <!-- 1. start pill (ink) -->
+      <div class="content on-dark" id="c-start" data-w="320" data-h="84">
+        <div style="height:100%;display:flex;align-items:center;justify-content:center;gap:14px;font-size:26px;font-weight:500">
+          <span data-icon="sparkle" data-size="28" style="color:var(--success)"></span><span>Get started</span>
+        </div>
+      </div>
+
+      <!-- 2. list card (paper) -->
+      <div class="content" id="c-list" data-w="640" data-h="480">
+        <div style="padding:40px 42px 0">
+          <div class="label">This week</div>
+          <div style="font-size:36px;font-weight:600;letter-spacing:-.03em;margin-top:4px">Your <span class="serif" style="font-size:1.14em;color:var(--accent)">tasks</span></div>
+          <div id="ls-rows" style="margin-top:22px;border-top:1px solid var(--hair)"></div>
+        </div>
+        <div id="ls-btn" class="btn dark" style="position:absolute;left:42px;right:42px;bottom:34px;height:56px;font-size:17px">Review 3 tasks <span data-icon="arrow" data-size="20"></span></div>
+      </div>
+
+      <!-- 3. settings card (paper): drag, toggle, odometer -->
+      <div class="content" id="c-settings" data-w="580" data-h="520">
+        <div style="padding:40px 42px 0">
+          <div style="font-size:34px;font-weight:600;letter-spacing:-.03em">Tune it</div>
+          <div class="label" style="margin-top:6px">Drag to set how much gets done automatically.</div>
+          <div class="row" style="margin-top:30px;align-items:flex-end">
+            <div style="font-size:17px;font-weight:500">Automation</div>
+            <div id="st-val" class="tnum" style="font-size:46px;font-weight:600;letter-spacing:-.03em;line-height:46px;height:46px;color:var(--gain)"></div>
+          </div>
+          <div id="st-track" style="position:relative;margin-top:18px;height:6px;border-radius:3px;background:var(--track)">
+            <div id="st-fill" style="position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)"></div>
+            <div id="st-knob" style="position:absolute;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:15px;background:#fff;border:1px solid #d9daf1;box-shadow:0 3px 8px rgba(56,52,140,.2)"></div>
+          </div>
+          <div class="row" style="margin-top:28px;height:58px;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)">
+            <span style="font-size:17px">Notify me when done</span><div class="tog" id="st-tog"><i></i></div>
+          </div>
+        </div>
+        <div id="st-btn" class="btn dark" style="position:absolute;left:42px;right:42px;bottom:34px;height:58px;font-size:18px;border-radius:16px">Ship it <span data-icon="arrow" data-size="20"></span></div>
+      </div>
+
+      <!-- 4. hold-to-confirm (accent) -->
+      <div class="content on-dark" id="c-hold" data-w="176" data-h="176">
+        <svg id="hd-ring" width="176" height="176" viewBox="0 0 176 176" style="position:absolute;inset:0">
+          <circle cx="88" cy="88" r="60" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="4" />
+          <circle id="hd-arc" cx="88" cy="88" r="60" fill="none" style="stroke:var(--success)" stroke-width="4" stroke-linecap="round" pathLength="1" stroke-dasharray="1 1" transform="rotate(-90 88 88)" />
+        </svg>
+        <div id="hd-label" class="mono" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.85)">hold</div>
+        <div id="hd-check" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--success)"><span data-icon="check" data-size="46" data-stroke="2.2"></span></div>
+      </div>
+
+      <!-- 5. success pill (success) -->
+      <div class="content" id="c-done" data-w="700" data-h="104">
+        <div style="height:100%;display:flex;align-items:center;gap:16px;padding:0 38px 0 30px">
+          <div style="width:44px;height:44px;border-radius:22px;background:var(--ink);color:var(--success);display:flex;align-items:center;justify-content:center;flex:none"><span data-icon="check" data-size="24" data-stroke="2.2"></span></div>
+          <div style="font-size:25px;font-weight:600;letter-spacing:-.02em;white-space:nowrap">Shipped <span class="serif" style="font-size:1.15em">3 tasks</span></div>
+          <div style="flex:1"></div>
+          <div id="dn-meta" class="mono" style="font-size:16px;color:rgba(10,2,18,.62);white-space:nowrap"></div>
+        </div>
+      </div>
+
+      <!-- 6. summary / brand card (accent) -->
+      <div class="content on-dark" id="c-summary" data-w="1000" data-h="500">
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <div class="label" style="color:rgba(255,255,255,.72)">Time saved this week</div>
+          <div id="sm-num" class="tnum" style="margin-top:10px;font-size:120px;font-weight:600;letter-spacing:-.05em;line-height:120px;height:120px"></div>
+          <div id="sm-tag" style="margin-top:16px;font-size:30px;color:rgba(255,255,255,.85)">Your product, <span class="serif" style="font-size:1.16em;color:var(--success)">in one line.</span></div>
+          <div id="sm-cta" class="btn light" style="margin-top:34px;height:62px;padding:0 30px;border-radius:31px;font-size:21px;gap:12px">
+            <span data-icon="sparkle" data-size="24" style="color:var(--accent)"></span>Get started
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <svg id="cursor" viewBox="0 0 34 34"><path d="M7 4.5 L7 26 L12.4 20.9 L16.3 29.2 L20.3 27.4 L16.5 19.4 L23.8 19.4 Z" fill="#0a0212" stroke="#fff" stroke-width="1.6" stroke-linejoin="round" /></svg>
+</div>
+
+<script src="reel.js"></script>
+<script src="score.js"></script>
+<script>
+const { sp, ease, clamp, mix, rgb } = Reel;
+const PALETTE = { canvas: '#e8eaf9', dot: '#c3c5ef', ink: '#0a0212', paper: '#ffffff', accent: '#6569d2', success: '#5ecba1' };
+// grid dots follow the palette
+document.getElementById('grid').style.backgroundImage = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><circle cx='16' cy='16' r='1.15' fill='${PALETTE.dot}'/></svg>`)}")`;
+
+/* ---- static content ---- */
+const ROWS = [['Draft the launch post', 'Today'], ['Reply to 12 customers', 'Today'], ['Reconcile invoices', 'Fri']];
+document.getElementById('ls-rows').innerHTML = ROWS.map(([a, b], i) => `
+  <div id="ls-r${i}" class="row" style="position:relative;height:62px;border-bottom:1px solid var(--hair)">
+    <div data-hover-bg style="position:absolute;inset:6px -14px;border-radius:12px;background:rgba(101,105,210,.08);opacity:0"></div>
+    <span style="position:relative;display:flex;align-items:center;gap:12px;font-size:18px"><span style="width:10px;height:10px;border-radius:5px;background:var(--accent)"></span>${a}</span>
+    <span class="mono" style="position:relative;font-size:14px;color:var(--muted)">${b}</span>
+  </div>`).join('');
+Reel.hydrateIcons();
+Reel.odo(document.getElementById('st-val'), '00%');
+Reel.odo(document.getElementById('sm-num'), '00.0h');
+
+/* ---- the film: 24 s at 120 BPM = 12 bars; every state change lands on a beat ---- */
+const reel = Reel.define({
+  fps: 60, duration: 24, bpm: 120,
+  fills: { ink: PALETTE.ink, paper: PALETTE.paper, accent: PALETTE.accent, success: PALETTE.success },
+  cursorHome: [230, 120],
+  shadow: '0 0 0 1px rgba(101,105,210,.08), 0 2px 4px rgba(40,36,120,.06), 0 24px 56px -18px rgba(40,36,120,.30)',
+  states: [
+    { id: 'start', w: 320, h: 84, r: 42, fill: 'ink', zoom: 2.6, dur: 1.0, cursor: [['move', 0.02, [50, 10]]] },
+    { id: 'list', w: 640, h: 480, r: 30, fill: 'paper', zoom: 1.6, dur: 4.0,
+      cursor: [['move', 0.5, { sel: '#ls-r0', dx: -120 }], ['move', 1.1, { sel: '#ls-r1', dx: -60 }], ['move', 1.7, { sel: '#ls-r2', dx: 20 }], ['move', 2.5, { sel: '#ls-btn', dx: 40, dy: 4 }]] },
+    { id: 'settings', w: 580, h: 520, r: 32, fill: 'paper', zoom: 1.55, dur: 5.0,
+      cursor: [['move', 0.3, { along: '#st-track', f: 0.3 }], ['drag', 0.9, 2.3, { along: '#st-track', f: 0.3 }, { along: '#st-track', f: 0.85 }],
+               ['move', 2.6, { sel: '#st-tog', dx: 3, dy: 2 }], ['click', 3.1], ['move', 3.5, { sel: '#st-btn', dx: 30, dy: 4 }]] },
+    { id: 'hold', w: 176, h: 176, r: 88, fill: 'accent', zoom: 3.0, dur: 2.0, advance: 'hold', cursor: [['move', 0.02, [6, 8]], ['hold', 0.35, 1.9]] },
+    { id: 'done', w: 700, h: 104, r: 52, fill: 'success', zoom: 2.1, dur: 3.0, cursor: [['move', 0.4, [240, 12]], ['move', 1.6, [280, 6]]] },
+    { id: 'summary', w: 1000, h: 500, r: 44, fill: 'accent', zoom: 1.5, dur: 7.0, cursor: [['move', 0.6, [360, 190]], ['move', 4.6, { sel: '#sm-cta', dx: 30, dy: 6 }]] },
+    { id: 'end', content: 'start', w: 320, h: 84, r: 42, fill: 'ink', zoom: 2.6, dur: null, cursor: [['move', 0.3, [230, 120]]] },
+  ],
+  hover: ['#ls-r0', '#ls-r1', '#ls-r2', '#ls-btn', '#st-btn', '#sm-cta'],
+  press: ['#st-tog'],
+  channels: {
+    slider: { init: 0.3, w: 120, target: (a) => (a.dragging('settings') ? a.dragFrac('#st-track') : null) },
+    notify: { init: 0, w: 20, z: 0.9, target: (a) => (a.clicked('#st-tog') ? 1 : null) },
+    hold: { init: 0, w: 9, target: (a) => (a.state === 'hold' ? a.holdProgress('hold') : null) },
+  },
+  update: {
+    list(lt, S, h) {
+      for (let i = 0; i < ROWS.length; i++) { const k = sp(lt - 0.3 - i * 0.14, 15, 0.9), r = h.el('ls-r' + i); r.style.opacity = k; r.style.transform = `translateY(${(1 - k) * 10}px)`; }
+      const kb = sp(lt - 0.9, 15, 0.86), b = h.el('ls-btn'); b.style.opacity = kb; b.style.translate = `0 ${(1 - kb) * 14}px`;
+    },
+    settings(lt, S, h) {
+      const tr = reel.M['#st-track'];
+      h.el('st-knob').style.left = S.slider * tr.w + 'px'; h.el('st-fill').style.width = S.slider * tr.w + 'px';
+      h.setOdo(h.el('st-val'), Math.round(S.slider * 100), 0, 46);
+      const tg = h.el('st-tog'); tg.style.background = rgb(mix([226, 227, 245], h.fill('accent'), S.notify)); tg.querySelector('i').style.left = 3 + 20 * S.notify + 'px';
+    },
+    hold(lt, S, h) {
+      h.el('hd-arc').style.strokeDashoffset = 1 - S.hold;
+      const kc = sp(lt - 1.9, 18, 0.84); h.el('hd-check').style.opacity = kc; h.el('hd-check').style.transform = `scale(${0.7 + 0.3 * kc})`;
+      h.el('hd-label').style.opacity = 1 - clamp(S.hold * 3);
+    },
+    done(lt, S, h) { const s = '3 of 3 · 0.4s'; h.el('dn-meta').textContent = s.slice(0, Math.floor(clamp((lt - 0.35) / 0.8) * s.length)); },
+    summary(lt, S, h) {
+      h.setOdo(h.el('sm-num'), 12.5 * ease(clamp((lt - 0.4) / 1.4)), 1, 120);
+      const kt = sp(lt - 1.2, 15, 1); h.el('sm-tag').style.opacity = kt; h.el('sm-tag').style.transform = `translateY(${(1 - kt) * 10}px)`;
+      const kc = sp(lt - 2.2, 15, 0.86), c = h.el('sm-cta'); c.style.opacity = kc; c.style.translate = `0 ${(1 - kc) * 14}px`;
+    },
+  },
+  // Score: bar 0-1 intro, groove, riser under the hold (automatic), lift after it, 2-bar outro that matches the intro.
+  score: {
+    prog: ['F', 'G', 'Em', 'Am', 'F', 'G', 'C', 'C', 'F', 'G', 'Em', 'G'],
+    hits: [{ state: 'done', boom: 0.55, motif: [72, 76, 79] }, { state: 'summary', boom: 0.4, motif: [72, 76, 79, 84] }],
+  },
+  sfx(au, r) {
+    au.detents('slider', 'settings', 0.05, 3000, 0.05);
+    au.counter(r.at('summary') + 0.4, r.at('summary') + 1.8, 14);
+    au.tick(r.at('settings') + 3.15, 3800, 0.06, 0.03); // toggle second click
+  },
+});
+</script>
+</body>
+</html>

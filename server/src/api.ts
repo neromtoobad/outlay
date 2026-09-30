@@ -12,7 +12,7 @@ import { bus, type SynclyEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
 import { autoAcceptDue, createQuote, decide, escrowPending, getOrder, noteForRevision, openEscrow, readJob, replay, retry, start, syncEscrow } from './orders.ts';
 import { escrowConfig, refreshBondFree } from './escrow.ts';
-import { MODE as CFO_MODE, POLICY as CFO_POLICY, freshSnapshot, startTreasury } from './cfo/treasury.ts';
+import { MODE as CFO_MODE, POLICY as CFO_POLICY, freshSnapshot, startTreasury, teamShortfall } from './cfo/treasury.ts';
 import { decisions as cfoDecisions, verifyLog } from './cfo/log.ts';
 import { tractionReport } from './traction.ts';
 import { books, beancount, team } from './books.ts';
@@ -53,6 +53,8 @@ app.post('/api/quote', async (c) => {
   if (brief.trim().length < 12) return c.json({ error: 'Tell us a bit more: at least a sentence.' }, 400);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return c.json({ error: 'A valid email is needed so we can deliver.' }, 400);
   try {
+    const unfunded = await teamShortfall(service);
+    if (unfunded) return c.json({ error: unfunded }, 409);
     return c.json(createQuote({ service, brief, email }));
   } catch (e: any) {
     return c.json({ error: e.message }, 400);
@@ -142,6 +144,7 @@ app.get('/api/orders/:id', (c) => {
   return c.json(view(o.id));
 });
 
+const MEDIA: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', svg: 'image/svg+xml', zip: 'application/zip', html: 'text/plain; charset=utf-8' };
 app.get('/api/orders/:id/files/:name', (c) => {
   const o = getOrder(c.req.param('id'));
   const name = c.req.param('name');
@@ -149,10 +152,36 @@ app.get('/api/orders/:id/files/:name', (c) => {
   const last = o.runs[o.runs.length - 1];
   const f = last && join(DATA_DIR, 'jobs', last, name);
   if (!f || !existsSync(f)) return c.text('not found', 404);
-  c.header('content-type', name.endsWith('.csv') ? 'text/csv' : 'text/markdown');
-  c.header('content-disposition', `attachment; filename="${o.id}-${name}"`);
+  const ext = name.split('.').pop()!.toLowerCase();
+  const media = MEDIA[ext];
+  c.header('content-type', media ?? (ext === 'csv' ? 'text/csv' : 'text/markdown'));
+  // Pictures and video open in the browser; data files download.
+  c.header('content-disposition', `${media && c.req.query('download') === undefined ? 'inline' : 'attachment'}; filename="${o.id}-${name}"`);
+  if (media) c.header('cache-control', 'public, max-age=86400');
+  // Generated files never run as our site: no scripts, no same-origin access.
+  c.header('content-security-policy', "sandbox; default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'");
+  c.header('x-content-type-options', 'nosniff');
   return c.body(readFileSync(f));
 });
+
+// Customer sites built by the web designer: static files, isolated from our own origin by a CSP sandbox.
+const SITE_MIME: Record<string, string> = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon', txt: 'text/plain', xml: 'application/xml' };
+const site = (c: any) => {
+  const slug = c.req.param('slug'), file = c.req.param('file') || 'index.html';
+  if (!/^[a-z0-9-]{3,60}$/.test(slug) || !/^[a-z0-9._-]{1,80}$/i.test(file)) return c.text('not found', 404);
+  const f = join(DATA_DIR, 'sites', slug, file);
+  if (!existsSync(f)) return c.text('not found', 404);
+  c.header('content-type', SITE_MIME[file.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream');
+  c.header('content-security-policy', "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox; default-src * data: blob: 'unsafe-inline'");
+  c.header('x-content-type-options', 'nosniff');
+  c.header('cache-control', 'public, max-age=300');
+  // Relative asset paths must resolve under the site whether or not the URL has a trailing slash.
+  if (f.endsWith('.html')) return c.body(readFileSync(f, 'utf8').replace(/<head([^>]*)>/i, `<head$1><base href="/s/${slug}/">`));
+  return c.body(readFileSync(f));
+};
+app.get('/s/:slug', site);
+app.get('/s/:slug/', site);
+app.get('/s/:slug/:file', site);
 
 app.get('/api/books', async (c) => c.json(await books()));
 

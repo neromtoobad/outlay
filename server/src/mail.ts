@@ -22,8 +22,12 @@ export const MAIL_HOST = MAIL ? new URL(MAIL.base).host : '';
 /** Mail costs each service's budget must leave room for: the per-email price plus the one-off mailbox. */
 export const MAIL_BUDGET_USD = MAIL ? MAIL.sendUsd + Math.min(MAIL.inboxUsd, 0.1) : 0;
 
-const PUBLIC_URL = process.env.OUTLAY_PUBLIC_URL ?? 'https://synclyhq.up.railway.app';
-const SERVICE: Record<string, string> = { 'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List' };
+export const PUBLIC_URL = process.env.OUTLAY_PUBLIC_URL ?? 'https://synclyhq.up.railway.app';
+const SERVICE: Record<string, string> = {
+  'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List',
+  'content-pack': 'Content Pack', website: 'Website', 'motion-ad': 'Motion Ad', 'video-ad': 'Video Ad',
+  'ai-answer-audit': 'AI Answer Audit', 'best-price': 'Best Price Finder', 'vendor-check': 'Check Before You Pay',
+};
 export const maskEmail = (e: string) => e.replace(/^(.).*(@.*)$/, '$1•••$2');
 
 // The mailbox is opened once (paid by the first job that needs it) and remembered on the data volume.
@@ -78,7 +82,9 @@ export function compose(job: Pick<Job, 'deliverable' | 'files'>, o: Order) {
 <p style="font-size:13.5px;color:#4b4841;background:#f3eee4;border-radius:12px;padding:12px 14px;margin:18px 0 0">${esc(decide)}</p>
 <p style="font-size:12px;color:#847d70;margin:18px 0 0">Every tool we paid for this job is on its <a href="${link}" style="color:#17473b">public receipt</a>. This email was sent, and paid for, by our Messenger agent in USDC on Arc.</p>
 </div></div>`;
-  const attachments = job.files.map((f) => ({ filename: f.name, content_type: f.name.endsWith('.csv') ? 'text/csv' : 'text/plain', content: Buffer.from(f.content).toString('base64') }));
+  // Text files ride along; images, video and sites are linked from the order page instead (mail size).
+  const attachments = job.files.filter((f) => typeof f.content === 'string' && f.content.length < 2_000_000)
+    .map((f) => ({ filename: f.name, content_type: f.name.endsWith('.csv') ? 'text/csv' : 'text/plain', content: Buffer.from(f.content).toString('base64') }));
   return { subject, text, html, attachments };
 }
 

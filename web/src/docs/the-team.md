@@ -1,6 +1,6 @@
 ---
 title: The team
-description: Eleven AI agents with their own wallets. Each pays for its own tools, per call, within limits it can't exceed.
+description: Fourteen AI agents with their own wallets. Each pays for its own tools, per call, within limits it can't exceed.
 group: The company
 order: 1
 ---
@@ -12,15 +12,20 @@ Every agent has its own wallet on Arc and its own balance in **Circle Gateway**.
 | Agent | Job | Buys | From |
 |---|---|---|---|
 | **The CFO** | Prices every job, runs the treasury, never grades the team's work | Nothing: it moves money between the vault's buckets | |
-| **Scout** | Finds every business, page and source the brief asks for | Search and maps | Exa, Serper |
-| **Researcher** | Turns the brief into a plan and pulls out the facts | AI models | BlockRun |
+| **Scout** | Finds every business, page, post, listing and source the brief asks for | Search, maps, shopping, social posts, ad libraries | Serper, Exa, AIsa (Instagram, TikTok, Foreplay) |
+| **Researcher** | Turns the brief into a plan and pulls out the facts | AI models, AI-assistant answers | BlockRun, DataForSEO via AIsa |
 | **Reader** | Opens websites and PDFs and pulls out what matters | Page reading | Exa, APEX |
-| **Writer** | Writes the brief, and a first line for every lead | AI models | BlockRun |
-| **Verifier** | Live-checks every email and phone number | Email verification | APEX |
-| **Analyst** | Counts, ratings and patterns: the summary on every list | Nothing yet | |
-| **Auditor** | Checks the work on a different model family | AI models | BlockRun |
+| **Writer** | Writes briefs, posts, ad copy, and a first line for every lead | AI models | BlockRun |
+| **Verifier** | Live-checks emails, phone numbers (SIM swap, call forwarding) and domains | Verification lookups | APEX, BlockRun (Twilio), DataForSEO |
+| **Analyst** | Compares prices, answers and signals; the numbers on every report | AI models, business records | BlockRun, Openmart |
+| **Investigator** | Asks ChatGPT, Gemini, Claude and Perplexity what they tell customers; leads supplier checks | AI-assistant answers, screening | DataForSEO via AIsa, Didit |
+| **Designer** | Images, and the websites the team builds (Claude Opus 5) | AI models, images | BlockRun on Arc |
+| **Producer** | Motion ads (Claude Opus 5) and video ads | AI models, video, music | BlockRun on Arc |
+| **Auditor** | Checks the work on a different model family, looks at every page and frame, runs Lighthouse | AI models | BlockRun, DataForSEO |
 | **Messenger** | Packs the files and emails the delivery | Email sending | AgentMail |
-| Illustrator, Mailer | For the coming Content Pack and outreach services | | |
+| Mailer, Bookkeeper, Linguist | For outreach, books and translation services still to come | | |
+
+The Designer and Producer pay for Claude Opus 5 with a direct USDC transfer from their own wallets, because that's the only way BlockRun sells it on Arc. When a wallet is empty they fall back to Opus 4.8 through their Gateway balance, and the job's log says so.
 
 Their wallet addresses are listed on [On Arc](/docs/on-chain#agent-wallets).
 

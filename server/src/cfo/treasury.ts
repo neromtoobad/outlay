@@ -33,8 +33,8 @@ export const POLICY = {
   dust: 0.01, // ignore amounts smaller than this
 };
 // Spend per job before there is history: model calls and searches are about a cent or two.
-const PAYING: Role[] = ['researcher', 'scout', 'reader', 'writer', 'verifier', 'auditor', 'messenger'];
-const DEFAULT_PER_JOB: Partial<Record<Role, number>> = { researcher: 0.02, scout: 0.03, reader: 0.01, writer: 0.02, verifier: 0.02, auditor: 0.01, messenger: MAIL?.sendUsd ?? 0 };
+const PAYING: Role[] = ['researcher', 'scout', 'reader', 'writer', 'verifier', 'auditor', 'analyst', 'investigator', 'illustrator', 'producer', 'messenger'];
+const DEFAULT_PER_JOB: Partial<Record<Role, number>> = { researcher: 0.02, scout: 0.03, reader: 0.01, writer: 0.02, verifier: 0.02, auditor: 0.01, analyst: 0.02, investigator: 0.4, illustrator: 0.4, producer: 1.2, messenger: MAIL?.sendUsd ?? 0 };
 
 const BUCKETS = ['operating', 'tools', 'bond', 'reserve', 'promo'] as const;
 type Bucket = (typeof BUCKETS)[number];
@@ -181,6 +181,69 @@ async function act(p: Plan, opts: { escalated?: boolean; proposal?: () => Promis
 async function escalate(key: string, summary: string, rule: string, inputs: Record<string, unknown>) {
   if (loggedWithin(key, 24 * 3600_000)) return;
   await record({ kind: 'escalate', summary, rule, inputs, key, status: 'escalated' });
+}
+
+// ---------------------------------------------------------------- can the team afford this job?
+
+const balances = new Map<Role, { usd: number; at: number }>();
+async function cachedBalance(role: Role): Promise<number> {
+  const hit = balances.get(role);
+  if (hit && Date.now() - hit.at < 60_000) return hit.usd;
+  const bal = await agentBalance(role).catch(() => NaN);
+  balances.set(role, { usd: bal, at: Date.now() });
+  return bal;
+}
+
+/** What each agent spends on one job of a service, measured on demo runs. Live history replaces it. */
+const SPEND: Record<string, Partial<Record<Role, number>>> = {
+  'local-business-finder': { researcher: 0.02, scout: 0.02 },
+  'lead-list': { researcher: 0.02, scout: 0.015, reader: 0.006, verifier: 0.01, writer: 0.03 },
+  'research-brief': { researcher: 0.02, scout: 0.015, reader: 0.003, auditor: 0.01 },
+  'content-pack': { researcher: 0.01, reader: 0.003, scout: 0.6, analyst: 0.02, writer: 0.05, illustrator: 0.3, auditor: 0.01 },
+  website: { researcher: 0.01, scout: 0.01, reader: 0.1, illustrator: 0.6, auditor: 0.15 },
+  'motion-ad': { researcher: 0.01, reader: 0.003, producer: 0.6, auditor: 0.05 },
+  'video-ad': { researcher: 0.01, scout: 0.1, illustrator: 0.2, producer: 1.4, writer: 0.01, auditor: 0.03 },
+  'ai-answer-audit': { researcher: 1.21, scout: 0.21, reader: 0.03, investigator: 1.2, analyst: 0.18, auditor: 0.03, writer: 0.01 },
+  'best-price': { researcher: 0.02, scout: 0.02, reader: 0.02, auditor: 0.01 },
+  'vendor-check': { investigator: 0.01, verifier: 0.42, analyst: 0.32, scout: 0.015, reader: 0.003, writer: 0.02, auditor: 0.01 },
+};
+
+/** Per-agent spend on this service's past live jobs (median of the last 10), or the demo measurement. */
+function spendFor(service: string): Partial<Record<Role, number>> {
+  const runs: Partial<Record<Role, number>>[] = [];
+  for (const o of listOrders().filter((x) => x.service === service && x.demo === DRY && x.payment)) {
+    for (const r of o.runs) {
+      const j = readJob(r);
+      if (j?.status !== 'delivered') continue;
+      const by: Partial<Record<Role, number>> = {};
+      for (const line of j.receipt ?? []) if (line.agent !== 'messenger') by[line.agent as Role] = (by[line.agent as Role] ?? 0) + line.usd;
+      runs.push(by);
+    }
+  }
+  if (!runs.length) return SPEND[service] ?? {};
+  const last = runs.slice(-10), roles = new Set(last.flatMap((b) => Object.keys(b) as Role[]));
+  return Object.fromEntries([...roles].map((r) => [r, median(last.map((b) => b[r] ?? 0))]));
+}
+
+/**
+ * Before quoting, the CFO checks the team can pay for the job's tools: every agent that spends on this
+ * service holds at least one job's worth in Gateway. An empty agent means a declined quote and a signed
+ * request to the Boss, not a job that starts, fails at its first purchase and has to be refunded.
+ * (The Designer and Producer pay for Opus 5 from their own wallets when they can, but fall back to
+ * Gateway, so Gateway is what has to be covered.)
+ */
+export async function teamShortfall(service: string): Promise<string | undefined> {
+  if (DRY || !DEP || !hasSeed()) return undefined;
+  const item = CATALOG.find((c) => c.id === service);
+  if (!item) return undefined;
+  const need = Object.entries(spendFor(service)).filter(([, v]) => (v ?? 0) > 0.0005) as [Role, number][];
+  const rows = await Promise.all(need.map(async ([role, perJob]) => ({ role, need: r6(perJob), have: await cachedBalance(role) })));
+  const short = rows.filter((r) => Number.isFinite(r.have) && r.have < r.need);
+  if (!short.length) return undefined;
+  const who = short.map((r) => `${r.role} (${usd(r.have)} of ${usd(r.need)})`).join(', ');
+  await escalate(`unfunded:${service}`, `Declined a ${item.name} quote: ${who} can't cover their part of a job. Asking the Boss to fund them.`,
+    'never start a job the team can’t pay its tools for', { service, rows: rows.map((r) => ({ ...r, have: Number.isFinite(r.have) ? r6(r.have) : null })) });
+  return `The ${item.name} team isn't funded for this job yet, so the CFO won't take it (it would fail halfway). It has asked the owner to fund them; please try again later.`;
 }
 
 const write = (fn: string, args: unknown[]) => () => cfoWrite(DEP!.vault, VAULT, fn, args);

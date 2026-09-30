@@ -1,12 +1,13 @@
 // Paid tools on Arc mainnet (x402 via Circle Gateway). Prices are the listed amounts from
 // Circle's discovery API on 2026-09-22/27; each call is capped a little above list.
-import { buy } from './x402.ts';
+import { buy, NoWalletFunds } from './x402.ts';
 import { MODELS } from './config.ts';
 import type { Job } from './job.ts';
 import type { Role } from './wallets.ts';
 
 export const HOSTS = {
   blockrun: 'nano.blockrun.ai',
+  blockrunArc: 'arc.blockrun.ai', // newest models; paid by direct USDC transfer from the agent's wallet
   orthogonal: 'np.orthogonal.com',
   exa: 'api.exa.ai',
   apex: 'apexfaucet.xyz',
@@ -14,6 +15,9 @@ export const HOSTS = {
 } as const;
 
 const qs = (o: Record<string, string>) => new URLSearchParams(o).toString();
+/** APEX wraps its answer as { ok, paid, data: { results | pages | … } }; older replies were flat. */
+const apex = (d: any) => (d?.data && typeof d.data === 'object' && !Array.isArray(d.data) ? d.data : d);
+const list = (...xs: unknown[]): any[] => (xs.find(Array.isArray) as any[]) ?? [];
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 
 // ---------- APEX (GET, query params)
@@ -28,8 +32,8 @@ export async function webRead(job: Job, agent: Role, urls: string[], reason: str
       reason, expectUsd: 0.003, maxUsd: 0.006,
       dryData: () => ({ pages: batch.map((u, k) => ({ url: u, title: `Site ${u}`, text: k % 2 ? `Contact us: hello@${new URL(u).host}` : 'No email here.' })) }),
     });
-    const arr = data?.pages ?? data?.results ?? data?.data ?? [];
-    for (const p of arr) out.push({ url: p.finalUrl ?? p.url, title: p.title ?? p.url, text: String(p.text ?? p.body ?? p.content ?? '').slice(0, 8000) });
+    const d = apex(data);
+    for (const p of list(d?.pages, d?.results, d?.data)) if (p?.ok !== false) out.push({ url: p.finalUrl ?? p.url, title: p.title ?? p.url, text: String(p.text ?? p.body ?? p.content ?? p.markdown ?? '').slice(0, 8000) });
   }
   return out;
 }
@@ -52,8 +56,8 @@ export async function verifyEmails(job: Job, agent: Role, emails: string[], reas
       reason, expectUsd: 0.009, maxUsd: 0.015,
       dryData: () => ({ results: batch.map((e, k) => ({ email: e, verdict: k % 4 === 3 ? 'undeliverable' : 'deliverable' })) }),
     });
-    const arr = data?.results ?? data?.emails ?? data?.data ?? [];
-    for (const r of arr) {
+    const d = apex(data);
+    for (const r of list(d?.results, d?.emails, d?.data)) {
       const v = String(r.verdict ?? r.status ?? r.result ?? (r.deliverable ? 'deliverable' : 'unknown')).toLowerCase();
       out.push({ email: String(r.email ?? r.address).toLowerCase(), ok: /deliverable|valid|ok|safe/.test(v) && !/un(deliverable)|invalid|disposable/.test(v), verdict: v });
     }
@@ -68,8 +72,9 @@ export async function pdfText(job: Job, agent: Role, url: string, reason: string
     reason, expectUsd: 0.003, maxUsd: 0.006,
     dryData: () => ({ pages: [{ page: 1, text: 'INVOICE #1042\nAcme Supplies Ltd\nDate: 2026-09-20\nFlour 25kg x2  ₦48,000\nSugar 10kg x1  ₦14,500\nTotal ₦62,500' }] }),
   });
-  const pages = data?.pages ?? [];
-  return pages.length ? pages.map((p: any) => `--- page ${p.page ?? ''}\n${p.text ?? ''}`).join('\n') : String(data?.text ?? '');
+  const d = apex(data);
+  const pages = list(d?.pages, d?.results);
+  return pages.length ? pages.map((p: any) => `--- page ${p.page ?? ''}\n${p.text ?? ''}`).join('\n') : String(d?.text ?? '');
 }
 
 // ---------- Tomba (Orthogonal, GET)
@@ -179,17 +184,34 @@ export async function webPlaces(job: Job, spec: { category: string; location: st
 
 // ---------- LLM (BlockRun, OpenAI-compatible)
 
-export type Msg = { role: 'system' | 'user' | 'assistant'; content: string };
+export type Part = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
+export type Msg = { role: 'system' | 'user' | 'assistant'; content: string | Part[] };
 
-export async function llm(job: Job, agent: Role, messages: Msg[], reason: string, opts: { model?: string; maxTokens?: number; json?: boolean; dry?: () => string } = {}): Promise<string> {
+/** Models only BlockRun's Arc endpoint sells; it takes a direct USDC transfer, not a Gateway balance. */
+const ARC_ONLY = /claude-opus-5|claude-sonnet-5|claude-fable/;
+
+export async function llm(
+  job: Job, agent: Role, messages: Msg[], reason: string,
+  opts: { model?: string; fallback?: string; maxTokens?: number; maxUsd?: number; json?: boolean; dry?: () => string } = {},
+): Promise<string> {
   const model = opts.model ?? MODELS.maker;
-  const data = await buy<any>(job, {
-    agent, vendor: `BlockRun ${model.split('/')[1]}`, url: `https://${HOSTS.blockrun}/api/v1/chat/completions`,
-    body: { model, messages, max_tokens: opts.maxTokens ?? 1800, ...(opts.json ? { response_format: { type: 'json_object' } } : {}) },
-    reason, expectUsd: 0.01, maxUsd: 0.08,
-    dryData: () => ({ choices: [{ message: { content: opts.dry ? opts.dry() : `(dry) ${reason}` } }] }),
-  });
-  return String(data?.choices?.[0]?.message?.content ?? '');
+  const direct = ARC_ONLY.test(model);
+  const maxTokens = opts.maxTokens ?? 1800;
+  try {
+    const data = await buy<any>(job, {
+      agent, vendor: `BlockRun ${model.split('/')[1]}`, url: `https://${direct ? HOSTS.blockrunArc : HOSTS.blockrun}/api/v1/chat/completions`,
+      body: { model, messages, max_tokens: maxTokens, ...(opts.json ? { response_format: { type: 'json_object' } } : {}) },
+      reason, expectUsd: Math.max(0.01, (maxTokens * 12) / 1e6), maxUsd: opts.maxUsd ?? 0.08, direct,
+      dryData: () => ({ choices: [{ message: { content: opts.dry ? opts.dry() : `(dry) ${reason}` } }] }),
+    });
+    return String(data?.choices?.[0]?.message?.content ?? '');
+  } catch (e) {
+    // The newest models need USDC in the agent's own wallet. When it's empty the job doesn't stall:
+    // the same work goes to the fallback model through Gateway, and the step log says so.
+    if (!(e instanceof NoWalletFunds) || !opts.fallback) throw e;
+    job.log(agent, 'fallback', `${model.split('/')[1]} is paid from the ${agent}'s own wallet, which is empty; using ${opts.fallback.split('/')[1]} through Gateway`);
+    return llm(job, agent, messages, reason, { ...opts, model: opts.fallback, fallback: undefined });
+  }
 }
 
 export function parseJson<T>(s: string, fallback: T): T {

@@ -19,6 +19,8 @@ const DESK_X = [947, 1149, 1350, 1551, 1758, 1970, 2171, 2374, 2573, 2778];
 const DESK_EDGE: [number, number][] = [[850, 1044], [1056, 1242], [1258, 1442], [1461, 1642], [1666, 1850], [1880, 2060], [2079, 2264], [2282, 2467], [2479, 2667], [2677, 2879]];
 const LAPTOP_X = [955, 1154, 1354, 1554, 1761, 1968, 2169, 2372, 2571, 2770];
 const SEATS = ['scout', 'researcher', 'reader', 'writer', 'verifier', 'analyst', 'auditor', 'illustrator', 'mailer', 'messenger'];
+// Agents hired after the office was drawn work from a colleague's desk until they get their own.
+const SHARES: Record<string, string> = { producer: 'illustrator', investigator: 'verifier', bookkeeper: 'analyst', linguist: 'writer' };
 const ROW_END = 2935; // walk behind the desks to here, then step forward onto the lane
 const CFO_SPOT = { x: 2518, y: 885 };
 const CFO_DESK = { x0: 2302, x1: 2798, top: 762, bottom: 909 };
@@ -47,7 +49,7 @@ const CYCLE_STEPS: Record<string, number> = { 'messenger-carry': 4 }; // steps d
 const WF = { idle: 0, walkA: 1, walkB: 2, type: 3, cheer: 4, sad: 5, box: 6, coin: 7 };
 const CF = { idle: 0, walkA: 1, walkB: 2, talk: 3, stamp: 4, stern: 5, thumbs: 6, deny: 7 };
 const SERVICE: Record<string, string> = { 'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List' };
-const NAME: Record<string, string> = { cfo: 'The CFO', scout: 'Scout', researcher: 'Researcher', writer: 'Writer', illustrator: 'Illustrator', verifier: 'Verifier', mailer: 'Mailer', reader: 'Reader', analyst: 'Analyst', messenger: 'Messenger', auditor: 'Auditor' };
+const NAME: Record<string, string> = { cfo: 'The CFO', scout: 'Scout', researcher: 'Researcher', writer: 'Writer', illustrator: 'Designer', verifier: 'Verifier', mailer: 'Mailer', reader: 'Reader', analyst: 'Analyst', messenger: 'Messenger', auditor: 'Auditor', producer: 'Producer', investigator: 'Investigator' };
 const COLOR: Record<string, number> = { cfo: 0x17473b, scout: 0xd9a21b, researcher: 0x7a2335, writer: 0xe1705c, illustrator: 0x8f79c9, verifier: 0x5f97d1, mailer: 0xec7418, reader: 0x556b2f, analyst: 0x2848b8, messenger: 0xcf2a2a, auditor: 0x5a2d5f };
 
 // Camera shots: centre + visible width in world units (height follows the 16:9 canvas).
@@ -692,15 +694,18 @@ export class OfficeScene {
     this.sfx.bump(e.type === 'order' ? 1 : 0.85);
     const d = e.data ?? {};
     const cfo = this.actors.get('cfo')!;
+    const guest = SHARES[d.agent] && !this.actors.has(d.agent) ? d.agent : undefined;
+    const seat = guest ? SHARES[guest] : d.agent;
+    const tag = guest ? `${NAME[guest] ?? guest}: ` : '';
     if (e.type === 'step') {
-      const a = this.actors.get(d.agent); if (!a) return;
+      const a = this.actors.get(seat); if (!a) return;
       a.busyUntil = performance.now() + 7000;
       if (d.agent === 'auditor' && (d.step === 'check' || d.step === 'audit') && !/fail|missing|revise/i.test(String(d.note ?? ''))) { this.signOff(`${d.step} · ${d.note ?? 'pass'}`); return; }
-      if (a.mode === 'seat' || a.id === 'cfo') this.say(d.agent, `${d.step}${d.note ? ` · ${d.note}` : ''}`);
-      else a.last = `${d.step}${d.note ? ` · ${d.note}` : ''}`;
+      if (a.mode === 'seat' || a.id === 'cfo') this.say(seat, `${tag}${d.step}${d.note ? ` · ${d.note}` : ''}`);
+      else a.last = `${tag}${d.step}${d.note ? ` · ${d.note}` : ''}`;
       this.want('work', 2600);
     } else if (e.type === 'purchase') {
-      const a = this.actors.get(d.agent); if (!a) return;
+      const a = this.actors.get(seat); if (!a) return;
       a.busyUntil = performance.now() + 7000;
       const from = a.home ? { x: a.home.laptop, y: DESK.top - 70 } : { x: a.pos.x, y: a.pos.y - 200 };
       const to = { x: 2320 + (Math.random() - 0.5) * 300, y: COUNTER.top - 30 };

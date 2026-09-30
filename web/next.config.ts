@@ -9,7 +9,12 @@ const config: NextConfig = {
   compress: false, // keep Server-Sent Events from being buffered through the proxy
   images: { unoptimized: true },
   async rewrites() {
-    return [{ source: '/api/:path*', destination: `${API}/api/:path*` }];
+    return [
+      { source: '/api/:path*', destination: `${API}/api/:path*` },
+      // Sites the team builds for customers, served by the API from the books volume.
+      { source: '/s/:slug', destination: `${API}/s/:slug/` },
+      { source: '/s/:slug/:file*', destination: `${API}/s/:slug/:file*` },
+    ];
   },
 };
 export default config;

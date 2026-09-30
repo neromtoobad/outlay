@@ -13,6 +13,13 @@ const EXAMPLES: Record<string, string[]> = {
   'local-business-finder': ['Every café and coffee shop in Lekki Phase 1 that has no website', 'Pharmacies in Yaba, Lagos with a phone number', 'Hair salons in Wuse 2, Abuja rated 4 stars or more'],
   'lead-list': ['25 fitness studios and gyms in Lekki and Ikoyi for my smoothie delivery business', 'Boutique hotels in Victoria Island for our laundry service', 'Private schools in Ikeja for our school-bus app'],
   'research-brief': ['Competitors and pricing for a small bakery in Lekki that wants to add cake delivery', 'Is there demand for solar inverter rentals in Ibadan?', 'How do Lagos co-working spaces price day passes?'],
+  'content-pack': ['Content for Tolu’s Small Chops in Lagos. Instagram @tolussmallchops, competitor @chopsbyada', 'A week of TikTok and Instagram posts for my skincare brand in Abuja, @glowbyada', 'Posts for my barbershop in Yaba that bring in weekday customers'],
+  website: ['A website for Tolu’s Small Chops in Surulere, Lagos. WhatsApp 0803 555 0142, Instagram @tolussmallchops', 'A site for my law practice in Ikeja: property and company law, call 0809 000 0000', 'Replace my old Wix site mybakery.com with something modern and mobile-first'],
+  'motion-ad': ['A 16 second vertical ad for my small chops trays: ₦25,000 for 20 guests, order on WhatsApp 0803 555 0142', 'A square motion ad for my laundry pickup app: book in 30 seconds, pickup in 2 hours', 'A landscape launch video for my school-fees savings plan, calm and trustworthy'],
+  'ai-answer-audit': ['Mama Put Kitchen, a restaurant in Yaba, Lagos. Website mamaputkitchen.ng', 'Glow Skin Clinic in Wuse 2, Abuja: what do ChatGPT and Gemini say about us?', 'Our dental practice, SmileCare Lekki. Are we recommended when people ask for a dentist in Lekki?'],
+  'best-price': ['Two Samsung Galaxy A16 phones, new, delivered to Lekki, Lagos. Budget ₦400k', '20 bags of Dangote cement delivered to Ikeja', 'A 5kVA inverter and two 220Ah batteries, new, delivered to Wuse, Abuja'],
+  'vendor-check': ['I’m about to pay ₦850,000 upfront to Gadget Plug NG for 5 iPhones. Instagram @gadgetplug_ng, phone 0803 123 4567', 'Our flour supplier says their bank account changed. New account name: Adeyemi Foods Ltd, phone 0812 000 0000', 'Is this cargo agent legit before I send $1,200? China2Lagos Shipping, china2lagos.com, WhatsApp +86 138 0000 0000'],
+  'video-ad': ['An ad for my shea butter body cream, ₦8,500, order on WhatsApp 0812 000 0000. Photo: https://…', 'Video ad for our weekend brunch at Café Nuru, Lekki, book on Instagram @cafenuru', 'An ad for my Ankara tote bags from @toteswithtolu, DM to order'],
 };
 
 function QuoteDoc({ s, order }: { s: Service; order: QuotedOrder }) {
