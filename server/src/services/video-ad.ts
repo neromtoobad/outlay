@@ -13,6 +13,9 @@ import { AISA, aisa } from '../sellers.ts';
 import { download, editImage, ffmpeg, image, music, video } from '../media.ts';
 import { htmlToPng } from '../browser.ts';
 import { MAIL_BUDGET_USD, MAIL_HOST, PUBLIC_URL } from '../mail.ts';
+import type { BusinessDetails } from '../details.ts';
+import { readUpload } from '../uploads.ts';
+import { palette } from '../site/color.ts';
 
 type Spec = { business: string; product: string; offer: string; price?: string; cta: string; photo?: string; instagram?: string; palette: string; mood: string; scene: string };
 type Copy = { overlay: string; endTitle: string; endLine: string; hooks: string[]; primary: string[]; headline: string[] };
@@ -26,7 +29,7 @@ export const videoAd = {
   priceUsd: 15,
   policy: { budgetUsd: 2.6 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, AISA, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
-  async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
+  async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);
     try {
       job.log('researcher', 'parse', 'the product, the offer and the call to action');
@@ -39,9 +42,22 @@ export const videoAd = {
         { business: brief.slice(0, 40), product: brief, offer: '', cta: 'Order now', palette: '', mood: 'warm', scene: 'a clean studio set' },
       );
 
-      // 1. Their real product photo, when there is one
-      let photo: Buffer | undefined;
-      if (spec.photo) {
+      // The order form's values are exact: they override what was read from the brief.
+      const d = opts.details;
+      if (d) {
+        spec.business = d.name;
+        if (d.promote) spec.product = d.promote;
+        if (d.price) spec.price = d.price;
+        if (d.instagram) spec.instagram = d.instagram;
+        if (d.tone) spec.mood = d.tone;
+        const n = d.whatsapp ?? d.phone;
+        spec.cta = d.cta === 'call' && n ? `Call ${n}` : d.cta === 'visit' && d.address ? `Visit us: ${d.address}` : d.cta === 'website' && d.website ? `Order at ${d.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}` : d.cta === 'dm' && d.instagram ? `DM @${d.instagram}` : n ? `Order on WhatsApp ${n}` : spec.cta;
+      }
+
+      // 1. Their real product photo: one they uploaded, a link they gave, or their latest Instagram post
+      let photo: Buffer | undefined = d?.photos?.length ? readUpload(d.photos[0]) : undefined;
+      if (photo) job.log('scout', 'photo', 'using the product photo they uploaded');
+      if (!photo && spec.photo) {
         try { photo = await download(spec.photo, 12); job.log('scout', 'photo', 'using the product photo they sent'); }
         catch (e: any) { job.log('scout', 'skip', `couldn't fetch their photo (${String(e?.message ?? e).slice(0, 50)})`); }
       }
@@ -80,11 +96,14 @@ export const videoAd = {
       ], 'write the ad copy', { maxTokens: 700, json: true, dry: () => JSON.stringify({ overlay: 'Party sorted.', endTitle: 'Tolu’s Small Chops', endLine: 'Trays for 20 guests · ₦25,000', hooks: ['Your guests will ask who catered.', 'Small chops that arrive hot.', 'The tray that ends the party debate.'], primary: ['Puff-puff, samosa and spring rolls, delivered hot for your next party. Order on WhatsApp 0803 555 0142.', 'Hosting this weekend? Trays for 20 guests at ₦25,000. Order on WhatsApp 0803 555 0142.'], headline: ['Party trays from ₦25,000', 'Small chops, delivered hot'] }) }), { overlay: spec.offer, endTitle: spec.business, endLine: spec.offer, hooks: [], primary: [], headline: [] });
 
       // 5. Typeset and cut (headless Chrome + ffmpeg on our server)
-      const accent = /red/i.test(spec.palette) ? '#B3261E' : /green/i.test(spec.palette) ? '#1F7A3A' : /blue/i.test(spec.palette) ? '#1D4ED8' : /gold|yellow/i.test(spec.palette) ? '#B7791F' : '#13271C';
+      const brand = d?.colour ? palette(d.colour) : undefined;
+      const accent = brand?.brand ?? (/red/i.test(spec.palette) ? '#B3261E' : /green/i.test(spec.palette) ? '#1F7A3A' : /blue/i.test(spec.palette) ? '#1D4ED8' : /gold|yellow/i.test(spec.palette) ? '#B7791F' : '#13271C');
+      const onAccent = brand?.onBrand ?? '#ffffff';
+      const logo = d?.logo ? readUpload(d.logo) : undefined;
       job.log('producer', 'edit', 'headline overlay, end card and music');
       const overlay = await htmlToPng(card(`<div class="t">${esc(copy.overlay)}</div>`, `.t{position:absolute;left:72px;right:72px;top:210px;font:800 112px/0.98 'Bricolage Grotesque';color:#fff;letter-spacing:-0.03em;text-shadow:0 4px 40px rgba(0,0,0,.45)}`), 1080, 1920);
-      const end = await htmlToPng(card(`<div class="c"><div class="n">${esc(copy.endTitle)}</div><div class="l">${esc(copy.endLine)}</div><div class="b">${esc(spec.cta)}</div></div>`,
-        `body{background:${accent}}.c{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:96px;color:#fff}.n{font:800 118px/0.95 'Bricolage Grotesque';letter-spacing:-0.035em}.l{font:600 50px/1.2 Geist;margin-top:36px;opacity:.9}.b{margin-top:80px;align-self:flex-start;background:#fff;color:${accent};font:600 44px/1 Geist;padding:34px 44px;border-radius:999px}`), 1080, 1920);
+      const end = await htmlToPng(card(`<div class="c">${logo ? `<img class="logo" src="data:image/jpeg;base64,${logo.toString('base64')}" alt="">` : ''}<div class="n">${esc(copy.endTitle)}</div><div class="l">${esc(copy.endLine)}</div><div class="b">${esc(spec.cta)}</div></div>`,
+        `body{background:${accent}}.c{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:96px;color:${onAccent}}.logo{width:180px;height:180px;border-radius:50%;object-fit:cover;background:#fff;margin-bottom:56px}.n{font:800 118px/0.95 'Bricolage Grotesque';letter-spacing:-0.035em}.l{font:600 50px/1.2 Geist;margin-top:36px;opacity:.9}.b{margin-top:80px;align-self:flex-start;background:${onAccent};color:${accent};font:600 44px/1 Geist;padding:34px 44px;border-radius:999px}`), 1080, 1920);
       let track: Buffer | undefined;
       try { track = await music(job, 'producer', { prompt: `Short upbeat instrumental for a ${spec.mood} social ad, modern Afrobeats-influenced groove, clean mix, strong start, ends on a button`, seconds: 10, reason: 'music for the ad' }); }
       catch (e: any) { job.log('producer', 'skip', `music unavailable (${String(e?.message ?? e).slice(0, 50)}); the ad will be silent`); }

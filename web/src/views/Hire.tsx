@@ -3,13 +3,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, Reveal, Stagger, StaggerItem } from '@/components/motion.tsx';
-import { api, useApi, usd, ngn, Avatar, Sprite, Seal, ROLE_NAME, DEPT_TINT, useStored, type Service, type Quote } from '@/lib.tsx';
+import { api, useApi, usd, ngn, Avatar, Sprite, Seal, ROLE_NAME, DEPT_TINT, HAS_ART, useStored, type Service, type Quote } from '@/lib.tsx';
 import { connect, fundEscrow, hasWallet, short, txUrl, usdcBalance, walletError, type EscrowCfg } from '@/wallet.ts';
 import type { Address, Hex } from 'viem';
 import BusinessForm, { type Details } from './BusinessForm.tsx';
 
 // Services that take the structured business form instead of a one-line brief.
-const FORM_SERVICES = new Set(['website']);
+const FORM_SERVICES = new Set(['website', 'content-pack', 'motion-ad', 'video-ad', 'ai-answer-audit']);
 
 type QuotedOrder = { id: string; status: string; quote: Quote; demo: boolean; brief?: string };
 
@@ -177,7 +177,7 @@ export default function Hire({ service }: { service: string }) {
           <p style={{ fontSize: 19, color: 'var(--ink-2)', marginTop: 12 }}>{s.tagline}</p>
 
           <Stagger className="teamphoto" style={{ ['--t' as any]: DEPT_TINT[s.dept] }}>
-            {s.team.map((r) => <StaggerItem key={r} style={{ display: 'contents' }} variants={{ hidden: {}, show: {} }}><motion.img className="sprite" src={`/sprites/${r}/${r}-0.png`} alt={r} variants={{ hidden: { opacity: 0, y: 40 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 18 } } }} /></StaggerItem>)}
+            {s.team.filter((r) => HAS_ART.has(r)).map((r) => <StaggerItem key={r} style={{ display: 'contents' }} variants={{ hidden: {}, show: {} }}><motion.img className="sprite" src={`/sprites/${r}/${r}-0.png`} alt={r} variants={{ hidden: { opacity: 0, y: 40 }, show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 18 } } }} /></StaggerItem>)}
           </Stagger>
           <div className="names">{s.team.map((r) => <span key={r} className="chip"><Avatar role={r} />{ROLE_NAME[r] ?? r}</span>)}</div>
 
@@ -196,8 +196,8 @@ export default function Hire({ service }: { service: string }) {
             structured ? (
             <div className="card pad formcard">
               <h3>Tell us about your business</h3>
-              <p className="muted">Four short steps. We build from exactly this, your Google listing and your Instagram. You'll see the price before anything starts.</p>
-              <BusinessForm onSubmit={(d) => getQuote(d)} busy={busy} email={email} setEmail={setEmail} cta="Get my quote" />
+              <p className="muted">{service === 'website' ? 'Four short steps. We build from exactly this, your Google listing and your Instagram.' : 'A few short steps. The team works from exactly this, so the result is yours, not generic.'} You'll see the price before anything starts.</p>
+              <BusinessForm service={service} onSubmit={(d) => getQuote(d)} busy={busy} email={email} setEmail={setEmail} cta="Get my quote" />
               {err && <div className="error" style={{ marginTop: 14 }}>{err}</div>}
               {order?.status === 'declined' && <div className="error" style={{ marginTop: 14 }}>The CFO declined this job: {order.quote.reasons.at(-1)}</div>}
             </div>

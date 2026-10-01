@@ -55,7 +55,7 @@ app.post('/api/quote', async (c) => {
   let brief = String(b.brief ?? '');
   let details: BusinessDetails | undefined;
   if (b.details) {
-    try { details = cleanDetails(b.details); } catch (e: any) { return c.json({ error: e.message }, 400); }
+    try { details = cleanDetails(b.details, service); } catch (e: any) { return c.json({ error: e.message }, 400); }
     brief = `${detailsBrief(details, service)}${brief.trim() ? `\n\n${brief.trim()}` : ''}`;
   }
   if (brief.trim().length < 12) return c.json({ error: 'Tell us a bit more: at least a sentence.' }, 400);

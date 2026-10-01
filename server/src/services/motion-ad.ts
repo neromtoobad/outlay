@@ -15,6 +15,10 @@ import { HOSTS, llm, parseJson, webRead, type Msg } from '../tools.ts';
 import { ffmpeg } from '../media.ts';
 import { reelAudio, reelStills, renderReel } from '../browser.ts';
 import { MAIL_BUDGET_USD, MAIL_HOST } from '../mail.ts';
+import type { BusinessDetails } from '../details.ts';
+import { readUpload } from '../uploads.ts';
+import { prepPhoto } from '../site/photos.ts';
+import { parseMenu } from '../site/facts.ts';
 
 const KIT = new URL('../../assets/reel/', import.meta.url).pathname;
 const kit = (f: string) => readFileSync(join(KIT, f), 'utf8');
@@ -28,7 +32,7 @@ export const motionAd = {
   priceUsd: 12,
   policy: { budgetUsd: 2.4 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.blockrunArc, HOSTS.apex, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
-  async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
+  async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);
     const work = mkdtempSync(join(tmpdir(), 'syncly-reel-'));
     try {
@@ -41,6 +45,21 @@ export const motionAd = {
           dry: () => JSON.stringify({ business: 'Tolu’s Small Chops', offer: 'Small chops trays for parties and offices in Lagos', points: ['Puff-puff, samosa, spring rolls, gizzard', 'Delivered hot, on time', 'Trays for 20 to 200 guests'], prices: ['₦25,000 for 20 guests'], cta: 'Order on WhatsApp 0803 555 0142', palette: 'warm red, gold and cream', format: 'landscape', seconds: 24, website: null, mood: 'warm and playful' }) }),
         { business: brief.slice(0, 40), offer: brief, points: [], prices: [], cta: '', palette: '', format: 'vertical', seconds: 16, mood: 'warm' },
       );
+      // The order form's values are exact: they override what was read from the brief.
+      const d = opts.details;
+      if (d) {
+        spec.business = d.name;
+        spec.offer = d.promote ? `${d.promote} (${d.offer})` : d.offer;
+        if (d.format) spec.format = d.format;
+        if (d.length) spec.seconds = d.length;
+        if (d.colour) spec.palette = `${d.colour} as the brand colour${spec.palette ? `; ${spec.palette}` : ''}`;
+        if (d.tone) spec.mood = d.tone;
+        if (d.website) spec.website = d.website;
+        const menu = parseMenu(d.menu).filter((m) => m.price).slice(0, 4).map((m) => `${m.name}: ${m.price}`);
+        spec.prices = [...(d.price ? [`${d.promote ?? d.offer}: ${d.price}`] : []), ...menu];
+        const n = d.whatsapp ?? d.phone;
+        spec.cta = d.cta === 'call' && n ? `Call ${n}` : d.cta === 'visit' && d.address ? `Visit us at ${d.address}` : d.cta === 'website' && d.website ? `Order at ${d.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}` : d.cta === 'dm' && d.instagram ? `DM @${d.instagram} on Instagram` : n ? `Order on WhatsApp ${n}` : spec.cta;
+      }
       const format: Format = spec.format in FORMATS ? spec.format : 'vertical';
       const [W, H] = FORMATS[format];
       const seconds = Math.max(12, Math.min(24, Math.round((spec.seconds || 16) / 2) * 2));
@@ -54,6 +73,11 @@ export const motionAd = {
         } catch (e: any) { job.log('reader', 'skip', `site unreadable (${String(e?.message ?? e).slice(0, 50)})`); }
       }
 
+      // The owner's logo and product photos, if they uploaded any, go into the scene folder.
+      const images: { name: string; about: string; buf: Buffer }[] = [];
+      if (d?.logo) { const b = readUpload(d.logo); if (b) images.push({ name: 'logo.jpg', about: 'their logo', buf: (await prepPhoto(b, 480, 3)).buf }); }
+      for (const [i, id] of (d?.photos ?? []).slice(0, 3).entries()) { const b = readUpload(id); if (b) images.push({ name: `photo-${i + 1}.jpg`, about: `their own product photo ${i + 1}`, buf: (await prepPhoto(b, 1200, 4)).buf }); }
+
       // 1. Storyboard + scene, written against the engine's real API and craft rules
       const zoomHint = format === 'vertical' ? 'about min(900 / w, 1500 / h)' : format === 'square' ? 'about min(880 / w, 880 / h)' : 'about min(1500 / w, 870 / h)';
       const system = `You are a motion designer. You make product motion videos with a small engine: one HTML scene, one shape that morphs through states, a cursor that causes every change, springs everywhere, and an original score synthesised from the same timeline. Read the engine API, the craft rules and the score guide below, then write ONE complete scene file (index.html) for a ${seconds}-second ${format} ad (${W}x${H}) for a small business.
@@ -64,7 +88,7 @@ Hard requirements:
 - The story sells the business: open on a hook, show the offer and its best points as UI moments (a menu or product card, choosing an option, a price rolling up on an odometer, a hold-to-order button, a WhatsApp/booking confirmation), end on a brand lockup with the call to action. Every state has one idea readable in 2-3 seconds; type big enough to read on a phone.
 - Use ONLY facts given (business, points, prices, CTA, site text). Never invent prices, ratings, awards, stats or testimonials. If no price is given, don't show one.
 - Palette: ${spec.palette || 'derive a warm, confident palette that suits the business'}; 4-5 fills. Mood: ${spec.mood}. Use the template's fonts or one Google Font pair.
-- Score: set score.prog and 2 hits on the key moments; keep the mix gentle. No external images (use shapes, type and the engine icons).
+- Score: set score.prog and 2 hits on the key moments; keep the mix gentle. Images: ${images.length ? `you may use these files from the scene folder by exact name: ${images.map((i) => `${i.name} (${i.about})`).join(', ')}. Put the logo in the final brand lockup; show product photos inside a card or tile with the theme radius, never stretched` : 'none; use shapes, type and the engine icons'}.
 - Keep it robust: every id unique, every cursor target exists, no console errors.
 
 === ENGINE API ===
@@ -86,6 +110,7 @@ ${kit('template.html')}`;
       job.log('producer', 'storyboard', `${seconds} s ${format} scene with ${MODELS.designer.split('/')[1]}`);
       let scene = clean(await write([{ role: 'system', content: system }, { role: 'user', content: user }], 'storyboard and code the motion scene'));
       for (const f of ['reel.js', 'score.js']) copyFileSync(join(KIT, f), join(work, f));
+      for (const im of images) writeFileSync(join(work, im.name), im.buf);
       const file = join(work, 'index.html');
       const size: [number, number] = [W, H];
 

@@ -10,6 +10,8 @@ export type Details = {
   instagram: string; tiktok: string; facebook: string; website: string;
   menu: string; story: string; style: string; colour: string; sections: string[]; notes: string;
   logo?: string; photos: string[];
+  platforms: string[]; goal: string; competitors: string; tone: string;
+  promote: string; price: string; cta: string; format: string; length: number; questions: string;
 };
 
 const KINDS: [string, string][] = [['food', 'Food & drinks'], ['beauty', 'Beauty & wellness'], ['creative', 'Photography & creative'], ['events', 'Events & weddings'], ['retail', 'Shop & products'], ['health', 'Health & clinics'], ['professional', 'Professional services'], ['other', 'Something else']];
@@ -25,7 +27,19 @@ const THEMES: { id: string; name: string; mood: string; font: string; bg: string
 ];
 const SECTIONS: [string, string][] = [['offer', 'Menu / prices'], ['gallery', 'Photo gallery'], ['reviews', 'Google reviews'], ['about', 'About us'], ['steps', 'How to order or book'], ['location', 'Map & opening hours'], ['faq', 'Questions & answers']];
 const SWATCHES = ['#C0392B', '#D4380D', '#E67E22', '#D4A017', '#2E7D32', '#0F766E', '#1D4ED8', '#6D28D9', '#BE185D', '#111827'];
-const EMPTY: Details = { name: '', kind: 'food', offer: '', area: '', city: 'Lagos', whatsapp: '', phone: '', email: '', address: '', maps: '', instagram: '', tiktok: '', facebook: '', website: '', menu: '', story: '', style: 'auto', colour: '', sections: SECTIONS.map(([k]) => k), notes: '', photos: [] };
+const EMPTY: Details = { name: '', kind: 'food', offer: '', area: '', city: 'Lagos', whatsapp: '', phone: '', email: '', address: '', maps: '', instagram: '', tiktok: '', facebook: '', website: '', menu: '', story: '', style: 'auto', colour: '', sections: SECTIONS.map(([k]) => k), notes: '', photos: [], platforms: ['instagram', 'tiktok'], goal: '', competitors: '', tone: '', promote: '', price: '', cta: 'whatsapp', format: 'vertical', length: 16, questions: '' };
+const PLATFORMS: [string, string][] = [['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['whatsapp-status', 'WhatsApp Status'], ['facebook', 'Facebook'], ['x', 'X'], ['linkedin', 'LinkedIn']];
+const GOALS = ['More orders this month', 'More bookings', 'More followers who buy', 'Launch a new product', 'Fill quiet weekdays'];
+const TONES = ['Warm and friendly', 'Playful, Lagos street', 'Premium and calm', 'Bold and loud', 'Expert and trustworthy'];
+const CTAS: [string, string][] = [['whatsapp', 'Order on WhatsApp'], ['call', 'Call us'], ['dm', 'DM on Instagram'], ['website', 'Order on our website'], ['visit', 'Visit the shop']];
+type StepId = 'business' | 'contact' | 'links' | 'offer' | 'look' | 'content' | 'ad' | 'audit';
+const FLOWS: Record<string, { id: StepId; title: string }[]> = {
+  website: [{ id: 'business', title: 'Your business' }, { id: 'contact', title: 'Contact & links' }, { id: 'offer', title: 'What you sell' }, { id: 'look', title: 'The look' }],
+  'content-pack': [{ id: 'business', title: 'Your business' }, { id: 'links', title: 'Your accounts' }, { id: 'content', title: 'The content' }],
+  'motion-ad': [{ id: 'business', title: 'Your business' }, { id: 'ad', title: 'The ad' }],
+  'video-ad': [{ id: 'business', title: 'Your business' }, { id: 'ad', title: 'The ad' }],
+  'ai-answer-audit': [{ id: 'business', title: 'Your business' }, { id: 'audit', title: 'What to check' }],
+};
 const KEY = 'syncly:business';
 
 /** Shrink a photo to at most 2000 px and re-encode it as JPEG before upload. */
@@ -48,7 +62,7 @@ async function upload(files: File[]): Promise<string[]> {
   return j.uploads.map((u: { id: string }) => u.id);
 }
 
-export default function BusinessForm({ onSubmit, busy, email, setEmail, cta }: { onSubmit: (d: Details) => void; busy: boolean; email: string; setEmail: (v: string) => void; cta: string }) {
+export default function BusinessForm({ service, onSubmit, busy, email, setEmail, cta }: { service: string; onSubmit: (d: Details) => void; busy: boolean; email: string; setEmail: (v: string) => void; cta: string }) {
   const [d, setD] = useState<Details>(EMPTY);
   const [step, setStep] = useState(0);
   const [up, setUp] = useState<string | null>(null);
@@ -70,15 +84,62 @@ export default function BusinessForm({ onSubmit, busy, email, setEmail, cta }: {
     } catch (e: any) { setErr(e.message); } finally { setUp(null); }
   }
 
-  const ok = [d.name.trim() && d.offer.trim(), d.whatsapp.trim() || d.phone.trim() || d.email.trim(), true, email.includes('@')];
-  const STEPS = ['Your business', 'Contact & links', 'What you sell', 'The look'];
+  const flow = FLOWS[service] ?? FLOWS.website;
+  const cur = flow[Math.min(step, flow.length - 1)].id;
+  const last = step >= flow.length - 1;
+  const reach = !!(d.whatsapp.trim() || d.phone.trim() || d.email.trim());
+  const ctaReady = d.cta === 'whatsapp' || d.cta === 'call' ? !!(d.whatsapp.trim() || d.phone.trim()) : d.cta === 'dm' ? !!d.instagram.trim() : d.cta === 'website' ? !!d.website.trim() : d.cta === 'visit' ? !!d.address.trim() : true;
+  const valid: Record<StepId, boolean> = {
+    business: !!(d.name.trim() && d.offer.trim() && (service !== 'ai-answer-audit' || d.city.trim() || d.area.trim())),
+    contact: reach, links: true, offer: true, look: true, content: d.platforms.length > 0, ad: !!(d.promote.trim() && ctaReady), audit: true,
+  };
+  const why: Partial<Record<StepId, string>> = {
+    business: service === 'ai-answer-audit' ? 'Add the business name, what you sell, and the area or city.' : 'Add the business name and what you sell.',
+    contact: 'Add at least one way customers can reach you.', content: 'Pick at least one platform.',
+    ad: !d.promote.trim() ? 'Say what the ad is for.' : 'Add the contact detail for your call to action.',
+  };
+  const allValid = flow.every((f) => valid[f.id]) && email.includes('@');
+
+  const photosField = (hint: string, max = 10) => (
+    <div className="field">Your photos <span className="hint">{hint}</span>
+      <div className="uploads">
+        {d.photos.map((id) => <figure key={id}><img src={`/api/uploads/${id}`} alt="" /><button type="button" aria-label="Remove" onClick={() => set('photos', d.photos.filter((x) => x !== id))}>×</button></figure>)}
+        {d.photos.length < max && <label className="addph">{up === 'photos' ? 'Uploading…' : '+ Add photos'}<input type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} hidden /></label>}
+      </div>
+    </div>
+  );
+  const logoField = (hint: string) => (
+    <div className="field">Logo <span className="hint">{hint}</span>
+      <div className="uploads">
+        {d.logo && <figure className="logo"><img src={`/api/uploads/${d.logo}`} alt="" /><button type="button" aria-label="Remove" onClick={() => set('logo', undefined)}>×</button></figure>}
+        {!d.logo && <label className="addph">{up === 'logo' ? 'Uploading…' : '+ Add logo'}<input type="file" accept="image/*" onChange={(e) => addPhotos(e.target.files, true)} hidden /></label>}
+      </div>
+    </div>
+  );
+  const colourField = (autoLabel = 'From my photos') => (
+    <div className="field">Colour
+      <div className="swatches">
+        <button type="button" className={`sw auto${!d.colour ? ' on' : ''}`} onClick={() => set('colour', '')}>{autoLabel}</button>
+        {SWATCHES.map((c) => <button type="button" key={c} className={`sw${d.colour.toLowerCase() === c.toLowerCase() ? ' on' : ''}`} style={{ background: c }} aria-label={c} onClick={() => set('colour', c)} />)}
+        <label className="sw pick" title="Your exact brand colour"><input type="color" value={d.colour || '#2E7A38'} onChange={(e) => set('colour', e.target.value)} />Pick</label>
+      </div>
+    </div>
+  );
+  const chips = (k: 'platforms', options: [string, string][]) => (
+    <div className="checks">{options.map(([v, l]) => <label key={v} className={`chip click${d[k].includes(v) ? ' on' : ''}`}><input type="checkbox" hidden checked={d[k].includes(v)} onChange={(e) => set(k, e.target.checked ? [...d[k], v] : d[k].filter((x) => x !== v))} />{l}</label>)}</div>
+  );
+  const pick = (k: 'goal' | 'tone' | 'cta' | 'format', options: [string, string][]) => (
+    <div className="checks">{options.map(([v, l]) => <button type="button" key={v} className={`chip click${d[k] === v ? ' on' : ''}`} onClick={() => set(k, v)}>{l}</button>)}</div>
+  );
+  const notes = (hint: string) => <label className="field">Anything else <span className="hint">{hint}</span><textarea style={{ minHeight: 80 }} value={d.notes} onChange={(e) => set('notes', e.target.value)} /></label>;
+  const emailHint: Record<string, string> = { website: 'We send the finished site here.', 'content-pack': 'We send your content pack here.', 'motion-ad': 'We send your motion ad here.', 'video-ad': 'We send your video ad here.', 'ai-answer-audit': 'We send the audit here.' };
 
   return (
     <div className="bform">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,500&family=Archivo:wdth,wght@125,850&family=Cormorant+Garamond:ital,wght@1,500&family=Space+Grotesk:wght@500&family=Literata:wght@600&family=Unbounded:wght@700&display=swap" />
-      <ol className="bsteps">{STEPS.map((s, i) => <li key={s} className={i === step ? 'on' : i < step ? 'done' : ''}><button type="button" onClick={() => setStep(i)}><span>{i + 1}</span>{s}</button></li>)}</ol>
+      <ol className="bsteps" style={{ gridTemplateColumns: `repeat(${flow.length}, 1fr)` }}>{flow.map((f, i) => <li key={f.id} className={i === step ? 'on' : i < step ? 'done' : ''}><button type="button" onClick={() => setStep(i)}><span>{i + 1}</span>{f.title}</button></li>)}</ol>
 
-      {step === 0 && (
+      {cur === 'business' && (
         <div className="form">
           {text('name', 'Business name', 'Tolu’s Small Chops')}
           <label className="field">What kind of business
@@ -89,7 +150,7 @@ export default function BusinessForm({ onSubmit, busy, email, setEmail, cta }: {
         </div>
       )}
 
-      {step === 1 && (
+      {cur === 'contact' && (
         <div className="form">
           <div className="two-up">{text('whatsapp', 'WhatsApp number', '0803 555 0142', undefined, 'tel')}{text('phone', 'Phone (if different)', '', undefined, 'tel')}</div>
           {text('address', 'Address', '14 Adelabu Street, Surulere, Lagos', 'Leave it out if you don’t have a shop or office customers visit.')}
@@ -100,7 +161,17 @@ export default function BusinessForm({ onSubmit, busy, email, setEmail, cta }: {
         </div>
       )}
 
-      {step === 2 && (
+      {cur === 'links' && (
+        <div className="form">
+          <div className="two-up">{text('instagram', 'Instagram', '@yourbusiness', 'We study what your posts get.')}{text('tiktok', 'TikTok', '@yourbusiness')}</div>
+          <div className="two-up">{text('website', 'Website', 'yourbusiness.com')}{text('whatsapp', 'WhatsApp number', '0803 555 0142', 'For the calls to action.', 'tel')}</div>
+          <label className="field">Competitors to learn from <span className="hint">Optional: up to 3 Instagram handles of businesses you compete with.</span>
+            <input type="text" value={d.competitors} onChange={(e) => set('competitors', e.target.value)} placeholder="@chopsbyada @lagosbites" />
+          </label>
+        </div>
+      )}
+
+      {cur === 'offer' && (
         <div className="form">
           <label className="field">Menu or prices <span className="hint">One per line, like “Party tray (20 guests) – ₦25,000”. A line ending with “:” starts a group. Only what you write here, your posts and your listing will ever show as a price.</span>
             <textarea value={d.menu} onChange={(e) => set('menu', e.target.value)} placeholder={'Trays:\nParty tray (20 guests) – ₦25,000\nParty tray (50 guests) – ₦58,000\nBy the piece:\nPuff-puff (50 pieces) – ₦6,000'} />
@@ -108,22 +179,12 @@ export default function BusinessForm({ onSubmit, busy, email, setEmail, cta }: {
           <label className="field">Your story <span className="hint">Optional. A few lines in your own words: how you started, what you’re known for.</span>
             <textarea style={{ minHeight: 90 }} value={d.story} onChange={(e) => set('story', e.target.value)} />
           </label>
-          <div className="field">Your photos <span className="hint">Up to 10. Your real food, work, shop or team; we never use flyers as photos. If you skip this, we use your Instagram.</span>
-            <div className="uploads">
-              {d.photos.map((id) => <figure key={id}><img src={`/api/uploads/${id}`} alt="" /><button type="button" aria-label="Remove" onClick={() => set('photos', d.photos.filter((x) => x !== id))}>×</button></figure>)}
-              {d.photos.length < 10 && <label className="addph">{up === 'photos' ? 'Uploading…' : '+ Add photos'}<input type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} hidden /></label>}
-            </div>
-          </div>
-          <div className="field">Logo <span className="hint">Optional. It goes in the header and sets the colours.</span>
-            <div className="uploads">
-              {d.logo && <figure className="logo"><img src={`/api/uploads/${d.logo}`} alt="" /><button type="button" aria-label="Remove" onClick={() => set('logo', undefined)}>×</button></figure>}
-              {!d.logo && <label className="addph">{up === 'logo' ? 'Uploading…' : '+ Add logo'}<input type="file" accept="image/*" onChange={(e) => addPhotos(e.target.files, true)} hidden /></label>}
-            </div>
-          </div>
+          {photosField('Up to 10. Your real food, work, shop or team; we never use flyers as photos. If you skip this, we use your Instagram.')}
+          {logoField('Optional. It goes in the header and sets the colours.')}
         </div>
       )}
 
-      {step === 3 && (
+      {cur === 'look' && (
         <div className="form">
           <div className="field">Style
             <div className="themes">
@@ -136,33 +197,72 @@ export default function BusinessForm({ onSubmit, busy, email, setEmail, cta }: {
               ))}
             </div>
           </div>
-          <div className="field">Colour
-            <div className="swatches">
-              <button type="button" className={`sw auto${!d.colour ? ' on' : ''}`} onClick={() => set('colour', '')}>From my photos</button>
-              {SWATCHES.map((c) => <button type="button" key={c} className={`sw${d.colour.toLowerCase() === c.toLowerCase() ? ' on' : ''}`} style={{ background: c }} aria-label={c} onClick={() => set('colour', c)} />)}
-              <label className="sw pick" title="Your exact brand colour"><input type="color" value={d.colour || '#2E7A38'} onChange={(e) => set('colour', e.target.value)} />Pick</label>
-            </div>
-          </div>
+          {colourField()}
           <div className="field">Sections <span className="hint">We only add a section when we have real content for it.</span>
             <div className="checks">{SECTIONS.map(([k, l]) => <label key={k} className={`chip click${d.sections.includes(k) ? ' on' : ''}`}><input type="checkbox" hidden checked={d.sections.includes(k)} onChange={(e) => set('sections', e.target.checked ? [...d.sections, k] : d.sections.filter((x) => x !== k))} />{l}</label>)}</div>
           </div>
-          <label className="field">Anything else <span className="hint">Optional: colours to avoid, words to use, what to highlight.</span>
-            <textarea style={{ minHeight: 80 }} value={d.notes} onChange={(e) => set('notes', e.target.value)} />
+          {notes('Optional: colours to avoid, words to use, what to highlight.')}
+        </div>
+      )}
+
+      {cur === 'content' && (
+        <div className="form">
+          <div className="field">Where you post {chips('platforms', PLATFORMS)}</div>
+          <div className="field">What it should do for you {pick('goal', GOALS.map((g) => [g, g]))}
+            <input type="text" value={d.goal} onChange={(e) => set('goal', e.target.value)} placeholder="Or write your own goal" />
+          </div>
+          <div className="field">Your voice {pick('tone', TONES.map((t) => [t, t]))}</div>
+          {photosField('Optional, up to 3. We restage your real products for the post images instead of inventing them.', 3)}
+          {colourField('No preference')}
+          {notes('Optional: an offer to push this week, words you always use, topics to avoid.')}
+        </div>
+      )}
+
+      {cur === 'ad' && (
+        <div className="form">
+          {text('promote', 'What is the ad for?', 'Weekend suya platter for 4', 'One product, offer or service.')}
+          {text('price', 'Price to show', '₦12,000', 'Optional. Shown exactly as you write it.')}
+          <div className="field">What should people do? {pick('cta', CTAS)}</div>
+          {(d.cta === 'whatsapp' || d.cta === 'call') && text('whatsapp', d.cta === 'call' ? 'Phone number' : 'WhatsApp number', '0812 345 6789', undefined, 'tel')}
+          {d.cta === 'dm' && text('instagram', 'Instagram', '@yourbusiness')}
+          {d.cta === 'website' && text('website', 'Website', 'yourbusiness.com')}
+          {d.cta === 'visit' && text('address', 'Address', '5 Admiralty Way, Lekki Phase 1')}
+          {service === 'motion-ad' && <div className="field">Format {pick('format', [['vertical', 'Vertical · Reels, TikTok, Status'], ['square', 'Square · feed'], ['landscape', 'Landscape · X, YouTube, website']])}</div>}
+          {service === 'motion-ad' && <div className="field">Length <div className="checks">{[12, 16, 20, 24].map((n) => <button type="button" key={n} className={`chip click${d.length === n ? ' on' : ''}`} onClick={() => set('length', n)}>{n} s</button>)}</div></div>}
+          {photosField(service === 'video-ad' ? 'Your product photo: we animate the real thing. Add 1–3; the first is used.' : 'Optional, up to 3. They appear inside the motion design.', 3)}
+          {logoField(service === 'video-ad' ? 'Optional. It goes on the end card.' : 'Optional. It closes the ad.')}
+          {colourField(service === 'video-ad' ? 'Choose for me' : 'Choose for me')}
+          {notes('Optional: the mood, words to use, anything to avoid.')}
+        </div>
+      )}
+
+      {cur === 'audit' && (
+        <div className="form">
+          <div className="two-up">{text('website', 'Website', 'yourbusiness.com', 'We read it for your real hours and prices.')}{text('instagram', 'Instagram', '@yourbusiness')}</div>
+          {text('maps', 'Google Maps link', 'https://maps.app.goo.gl/…', 'Helps us find the right listing.', 'url')}
+          <label className="field">Your prices <span className="hint">Optional, one per line. We check what the AI assistants say about your prices against these.</span>
+            <textarea style={{ minHeight: 100 }} value={d.menu} onChange={(e) => set('menu', e.target.value)} placeholder={'Jollof rice & chicken – ₦3,500\nPounded yam & egusi – ₦4,000'} />
           </label>
-          <label className="field">Your email <span className="hint">We send the finished site here. It’s also your key to accept, revise or reject.</span>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" />
+          <label className="field">Questions your customers ask <span className="hint">Optional. We add them to what we ask the assistants.</span>
+            <textarea style={{ minHeight: 80 }} value={d.questions} onChange={(e) => set('questions', e.target.value)} placeholder="Do you deliver to Victoria Island?" />
           </label>
         </div>
+      )}
+
+      {last && (
+        <label className="field">Your email <span className="hint">{emailHint[service] ?? 'We send the work here.'} It’s also your key to accept, revise or reject.</span>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@business.com" />
+        </label>
       )}
 
       {err && <div className="error">{err}</div>}
       <div className="bnav">
         {step > 0 && <button type="button" className="btn ghost" onClick={() => setStep(step - 1)}>Back</button>}
-        {step < 3
-          ? <button type="button" className="btn primary" disabled={!ok[step]} onClick={() => setStep(step + 1)}>Next: {STEPS[step + 1]}</button>
-          : <button type="button" className="btn primary" disabled={busy || !ok[0] || !ok[1] || !ok[3] || !!up} onClick={() => onSubmit(d)}>{busy ? 'The CFO is pricing it…' : cta}</button>}
+        {!last
+          ? <button type="button" className="btn primary" disabled={!valid[cur]} onClick={() => setStep(step + 1)}>Next: {flow[step + 1].title}</button>
+          : <button type="button" className="btn primary" disabled={busy || !allValid || !!up} onClick={() => onSubmit(d)}>{busy ? 'The CFO is pricing it…' : cta}</button>}
       </div>
-      {!ok[step] && step < 2 && <p className="muted" style={{ fontSize: 13 }}>{step === 0 ? 'Add the business name and what you sell.' : 'Add at least one way customers can reach you.'}</p>}
+      {!valid[cur] && why[cur] && <p className="muted" style={{ fontSize: 13 }}>{why[cur]}</p>}
     </div>
   );
 }

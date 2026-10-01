@@ -5,6 +5,8 @@
 // → Analyst checks every statement against the record → deterministic QA: every quote and competitor must
 // appear word for word in the saved answer → Auditor (other model family) re-judges every statement blind;
 // a statement counts as wrong only when both agree → Writer summarises; the fix list is rules, not an LLM.
+import type { BusinessDetails } from '../details.ts';
+import { parseMenu } from '../site/facts.ts';
 import { Job } from '../job.ts';
 import { MODELS } from '../config.ts';
 import { HOSTS, llm, parseJson, readPages, type Page } from '../tools.ts';
@@ -15,7 +17,7 @@ import type { Role } from '../wallets.ts';
 import * as fx from './ai-answer-audit.fixtures.ts';
 
 type Spec = { name: string; website: string; area: string; city: string; country: string; countryIso: string; category: string; categoryPlural: string; service: string; priceItem: string };
-type Kind = 'hours' | 'status' | 'price' | 'best' | 'service' | 'recommend';
+type Kind = 'hours' | 'status' | 'price' | 'best' | 'service' | 'recommend' | 'custom';
 type Prompt = { kind: Kind; type: 'direct' | 'discovery'; text: string; expects: string[] };
 type Cite = { title: string; url: string };
 type Verdict = 'correct' | 'wrong' | 'made_up' | 'unverifiable';
@@ -291,7 +293,7 @@ async function ask(job: Job, e: Engine, agent: Role, p: Prompt, spec: Spec, st: 
     try {
       job.log(agent, 'ask', `${e.label}: "${p.text}"`);
       const [r] = await dataforseo<any>(job, `ai_optimization/${e.path}/llm_responses/live`, task, {
-        agent, vendor: `${e.label} (DataForSEO)`, reason: `ask ${e.label} a customer question (${p.kind})`, dry: () => fx.answer(e.id, p.kind),
+        agent, vendor: `${e.label} (DataForSEO)`, reason: `ask ${e.label} a customer question (${p.kind})`, dry: () => fx.answer(e.id, p.kind === 'custom' ? 'status' : p.kind),
       });
       st.ok = true;
       preferred[e.id] = st.model;
@@ -335,7 +337,7 @@ Reply JSON only: {"answers":[{"id","named","name_quote","facts":[...],"missing":
     out = parseJson(await llm(job, 'analyst', [
       { role: 'system', content: rules },
       { role: 'user', content: `${record}\n\nQUESTION the customer asked: "${p.text}"\n\n` + live.map((a) => `=== ANSWER id=${a.id} (${a.label})\n${a.text.slice(0, 4000)}`).join('\n\n') },
-    ], `check ${live.length} answers against the record`, { maxTokens: 2500, json: true, dry: () => JSON.stringify(fx.judge(p.kind)) }), {});
+    ], `check ${live.length} answers against the record`, { maxTokens: 2500, json: true, dry: () => JSON.stringify(fx.judge(p.kind === 'custom' ? 'status' : p.kind)) }), {});
   } catch (e) { job.log('analyst', 'skip', `compare failed (${errMsg(e).slice(0, 60)})`); }
 
   const drop = [...GENERIC, ...words(spec.area), ...words(spec.city)];
@@ -500,9 +502,9 @@ export const aiAnswerAudit = {
   priceUsd: 15,
   // 24 answers at 0.10 + Business Profile 0.10 + LLM Mentions 0.10 + Maps, site and ~10 LLM calls ≈ 2.75;
   // headroom covers a model fallback or two. Answers cap at 0.15 each (sellers.ts default).
-  policy: { budgetUsd: 3.5 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.blockrunArc, HOSTS.orthogonal, HOSTS.apex, HOSTS.exa, AISA, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
+  policy: { budgetUsd: 4 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.blockrunArc, HOSTS.orthogonal, HOSTS.apex, HOSTS.exa, AISA, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
-  async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
+  async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);
     try {
       job.log('researcher', 'parse', 'business, website, area, category, what customers look for');
@@ -523,7 +525,23 @@ export const aiAnswerAudit = {
       const where = place(spec);
 
       // 1. The truth
+      // The order form's details are exact: name, website and place override what was parsed.
+      const d = opts.details;
+      if (d) {
+        spec.name = d.name;
+        if (d.website) spec.website = d.website;
+        if (d.area) spec.area = d.area;
+        if (d.city) spec.city = d.city;
+      }
       const truth = await gatherTruth(job, spec);
+      // The owner's own prices and contact details join the record the answers are judged against.
+      if (d) {
+        const owner = 'the owner (order form)';
+        for (const m of parseMenu(d.menu).filter((x) => x.price)) truth.siteFacts.push({ field: 'price', value: `${m.name}: ${m.price}`, quote: m.source, url: owner });
+        if (d.whatsapp ?? d.phone) truth.siteFacts.push({ field: 'phone', value: (d.whatsapp ?? d.phone)!, quote: (d.whatsapp ?? d.phone)!, url: owner });
+        if (d.address) truth.siteFacts.push({ field: 'address', value: d.address, quote: d.address, url: owner });
+        if (d.menu) job.log('analyst', 'facts', `${parseMenu(d.menu).filter((x) => x.price).length} prices from the owner added to the record`);
+      }
       const record = recordText(spec, truth);
       const seen = await mentions(job, spec, truth);
 
@@ -535,6 +553,8 @@ export const aiAnswerAudit = {
         { kind: 'best', type: 'discovery', text: `What's the best ${spec.category} in ${where}?`, expects: [] },
         { kind: 'service', type: 'discovery', text: `Where can I get ${spec.service} near ${where}?`, expects: [] },
         { kind: 'recommend', type: 'discovery', text: `Can you recommend a few good ${spec.categoryPlural} in ${where}?`, expects: [] },
+        // the customer's own question from the order form, asked about the business by name
+        ...(d?.questions ? [{ kind: 'custom' as Kind, type: 'direct' as const, text: `About ${spec.name} in ${where}: ${d.questions.split('\n')[0].trim().slice(0, 160)}`, expects: ['other'] }] : []),
       ];
       job.log('researcher', 'plan', `${prompts.length} questions × ${ENGINES.length} assistants, web search on`);
 

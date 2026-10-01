@@ -28,11 +28,11 @@ These services exist because a Google search or a ChatGPT answer can't do them: 
 
 ### AI Answer Audit
 
-45% of consumers now ask an AI assistant for local recommendations. The team asks ChatGPT, Gemini, Claude and Perplexity six questions a customer would ask, three about you by name and three asking for a recommendation, with web search on. Every answer is checked against your Google listing and your website. A fact only counts as wrong when two AI models from different companies agree, and every quote is copied word for word from the saved answer. You get the score, the wrong facts, who was recommended instead, the pages the assistants cite, and what to fix first. AI answers vary between runs; the report is a dated snapshot.
+45% of consumers now ask an AI assistant for local recommendations. The team asks ChatGPT, Gemini, Claude and Perplexity six questions a customer would ask, three about you by name and three asking for a recommendation, with web search on. Every answer is checked against your Google listing and your website. A fact only counts as wrong when two AI models from different companies agree, and every quote is copied word for word from the saved answer. You get the score, the wrong facts, who was recommended instead, the pages the assistants cite, and what to fix first. AI answers vary between runs; the report is a dated snapshot. On the form you add your area, your website, Instagram and Google Maps links, your prices (so a wrong price gets caught), and a question your customers ask, which becomes a seventh question.
 
 ### Content Pack
 
-The Scout pulls this week's top reels and TikToks for your niche, your own recent posts, and the ads in your niche that have run for more than 30 days (an ad that keeps running is one that pays). The Analyst names the styles that are working, each backed by the real posts and their numbers. The Writer drafts seven posts in your voice, the Designer makes three images, and the Auditor checks that no post invents a price or a claim.
+The Scout pulls this week's top reels and TikToks for your niche, your own recent posts, and the ads in your niche that have run for more than 30 days (an ad that keeps running is one that pays). The Analyst names the styles that are working, each backed by the real posts and their numbers. The Writer drafts seven posts in your voice, the Designer makes three images, and the Auditor checks that no post invents a price or a claim. On the form you pick your platforms, your goal, your tone and up to three competitors to study; your own photos are staged into the images instead of stock scenes.
 
 ### Website
 
@@ -42,11 +42,11 @@ The site runs on a site engine. Our code owns the design: the themes (font pairi
 
 ### Motion Ad
 
-Built with a motion engine for designer-grade product videos: one shape that never cuts, morphing through your offer while a cursor drives every change, with springs throughout and a soundtrack composed from the video's own timeline. The Producer (Claude Opus 5) writes the scene against the engine's own rules; every state is rendered as a still and reviewed before our server renders every frame. The editable scene file comes with it.
+Built with a motion engine for designer-grade product videos: one shape that never cuts, morphing through your offer while a cursor drives every change, with springs throughout and a soundtrack composed from the video's own timeline. The Producer (Claude Opus 5) writes the scene against the engine's own rules; every state is rendered as a still and reviewed before our server renders every frame. The editable scene file comes with it. On the form you say what to promote, the price, how customers should respond (WhatsApp, call, visit, website or DM), the format and length, and a brand colour; your logo and photos go into the scene.
 
 ### Video Ad
 
-The Designer stages your own product photo as an ad scene, the Producer animates it into a 5-second clip (Seedance 2.0), and our server adds your hook, an end card with your call to action, and music. The Writer drafts hooks, primary text and headlines for Meta and TikTok, and the Auditor checks them against your brief.
+The Designer stages your own product photo as an ad scene, the Producer animates it into a 5-second clip (Seedance 2.0), and our server adds your hook, an end card with your call to action, and music. The Writer drafts hooks, primary text and headlines for Meta and TikTok, and the Auditor checks them against your brief. On the form you add the offer, the price and the call to action; your own photo is used before any generated one, and your logo and brand colour go on the end card.
 
 ## Buying and suppliers
 
@@ -78,7 +78,7 @@ The books show each service's measured tool cost next to its price; see the live
 
 | Service | Tool budget per job (plus email delivery) |
 |---|---|
-| AI Answer Audit | 3.50 USDC |
+| AI Answer Audit | 4.00 USDC |
 | Content Pack | 1.60 USDC |
 | Website | 2.20 USDC |
 | Motion Ad | 2.40 USDC |

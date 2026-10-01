@@ -29,7 +29,7 @@ export const SERVICES: Record<string, Runnable> = {
 /** The public menu. `live: false` services are shown as coming soon and can't be ordered yet. */
 export const CATALOG = [
   {
-    id: 'ai-answer-audit', name: 'AI Answer Audit', dept: 'Growth Studio', live: true, priceUsd: 15, listedCostUsd: 2.8, etaMin: 10,
+    id: 'ai-answer-audit', name: 'AI Answer Audit', dept: 'Growth Studio', live: true, priceUsd: 15, listedCostUsd: 3.0, etaMin: 10,
     tagline: 'What ChatGPT, Gemini, Claude and Perplexity tell your customers about you, and what they get wrong.',
     youGet: ['24 real answers: 6 customer questions put to ChatGPT, Gemini, Claude and Perplexity with web search on', 'Every wrong fact quoted word for word next to your real hours, prices and details', 'Who the AIs recommend instead of you, and the pages they cite', 'A prioritised fix list, checked by an independent auditor on a different AI model', 'Emailed to you with a spreadsheet of every answer'],
     team: ['researcher', 'scout', 'reader', 'investigator', 'analyst', 'auditor', 'writer', 'messenger'],

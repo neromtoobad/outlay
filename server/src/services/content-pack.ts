@@ -11,6 +11,9 @@ import { HOSTS, llm, parseJson, webRead, type Page } from '../tools.ts';
 import { AISA, aisa } from '../sellers.ts';
 import { image } from '../media.ts';
 import { MAIL_BUDGET_USD, MAIL_HOST } from '../mail.ts';
+import type { BusinessDetails } from '../details.ts';
+import { readUpload } from '../uploads.ts';
+import { editImage } from '../media.ts';
 
 type Spec = { business: string; niche: string; location: string; platforms: string[]; instagram?: string; tiktok?: string; website?: string; competitors: string[]; offer: string; audience: string; tone: string; keywords: string[] };
 export type Example = { n: number; platform: string; url: string; who: string; caption: string; views?: number; likes?: number; comments?: number; audio?: string; format?: string; posted?: string };
@@ -42,7 +45,7 @@ export const contentPack = {
   priceUsd: 8,
   policy: { budgetUsd: 1.6 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.blockrunArc, HOSTS.apex, AISA, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
-  async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
+  async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);
     try {
       job.log('researcher', 'parse', 'the business, its niche, where it sells and who it talks to');
@@ -54,6 +57,18 @@ export const contentPack = {
           dry: () => JSON.stringify({ business: 'Tolu’s Small Chops', niche: 'small chops and party catering', location: 'Lagos', platforms: ['instagram', 'tiktok'], instagram: '@tolussmallchops', tiktok: null, website: 'https://tolussmallchops.com', competitors: ['@chopsbyada'], offer: 'Small chops trays and party catering for events in Lagos', audience: 'Lagos party hosts, office admins, brides', tone: 'warm, playful, Lagos English', keywords: ['small chops lagos', 'party food lagos', 'small chops tray'] }) }),
         { business: brief.slice(0, 60), niche: brief.slice(0, 60), location: '', platforms: ['instagram', 'tiktok'], competitors: [], offer: brief, audience: '', tone: 'warm and direct', keywords: [brief.slice(0, 40)] },
       );
+      // The order form's values are exact: they override what was read from the brief.
+      const d = opts.details;
+      if (d) {
+        spec.business = d.name; spec.offer = d.offer;
+        spec.location = [d.area, d.city].filter(Boolean).join(', ') || spec.location;
+        if (d.instagram) spec.instagram = d.instagram;
+        if (d.tiktok) spec.tiktok = d.tiktok;
+        if (d.website) spec.website = d.website;
+        if (d.competitors?.length) spec.competitors = d.competitors;
+        if (d.tone) spec.tone = d.tone;
+        if (d.platforms?.length) spec.platforms = d.platforms.map((p) => ({ 'whatsapp-status': 'WhatsApp Status', x: 'X' } as Record<string, string>)[p] ?? p);
+      }
       const ig = handle(spec.instagram), tt = handle(spec.tiktok);
       const keywords = (spec.keywords?.length ? spec.keywords : [spec.niche]).slice(0, 3);
 
@@ -114,7 +129,7 @@ export const contentPack = {
       job.log('writer', 'write', '7 posts in their voice, each built on a style that is working');
       const plan = parseJson<{ posts: Post[] }>(
         await llm(job, 'writer', [
-          { role: 'system', content: `You write social posts for a small business, in its voice (${spec.tone}). Write 7 posts for the next 7 days across ${spec.platforms.join(' and ')}, each built on one of the working styles. Rules: never invent prices, discounts, awards or facts about the business that the site text or brief doesn't state (use a placeholder like [price] instead); the hook must work in the first second; the caption must end with a clear CTA (DM, WhatsApp, link in bio, order now); reels/TikToks get a shot list of 3–6 shots; carousels get slide text. Mark 3 of the posts as needing a designed image and give each an imagePrompt (describe the image only: subject, composition, light, colours; no text in the image). Reply JSON only: {"posts":[{"day":"Mon","platform":"Instagram","format":"reel|carousel|photo|story|tiktok","hook":"","caption":"","hashtags":["..."],"cta":"","shots":["..."],"inspiredBy":[example numbers],"imagePrompt":"" or null}]}` },
+          { role: 'system', content: `You write social posts for a small business, in its voice (${spec.tone}). Write 7 posts for the next 7 days across ${spec.platforms.join(' and ')}, each built on one of the working styles.${d?.goal ? ` The owner's goal: ${d.goal}; every post should push towards it.` : ''} Rules: never invent prices, discounts, awards or facts about the business that the site text or brief doesn't state (use a placeholder like [price] instead); the hook must work in the first second; the caption must end with a clear CTA (DM, WhatsApp, link in bio, order now); reels/TikToks get a shot list of 3–6 shots; carousels get slide text. Mark 3 of the posts as needing a designed image and give each an imagePrompt (describe the image only: subject, composition, light, colours; no text in the image). Reply JSON only: {"posts":[{"day":"Mon","platform":"Instagram","format":"reel|carousel|photo|story|tiktok","hook":"","caption":"","hashtags":["..."],"cta":"","shots":["..."],"inspiredBy":[example numbers],"imagePrompt":"" or null}]}` },
           { role: 'user', content: `Business: ${spec.business}\nOffer: ${spec.offer}\nAudience: ${spec.audience}\nLocation: ${spec.location}\nBrief: ${brief}\n\nTheir site says:\n${site?.text.slice(0, 3000) ?? '(no site)'}\n\nWhat's working now:\n${styles}` },
         ], 'write a week of posts', { maxTokens: 3500, json: true, dry: () => JSON.stringify({ posts: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => ({ day, platform: i % 2 ? 'TikTok' : 'Instagram', format: i % 3 === 0 ? 'reel' : i % 3 === 1 ? 'carousel' : 'photo', hook: ['POV: 50 guests and zero stress', 'Guess the price of this tray', 'What ₦[price] gets you', 'Frying at 6am so your party slaps', 'The tray that ended the argument', 'Behind every owambe', 'Your Sunday sorted'][i], caption: `Small chops that show up hot and on time. Puff-puff, samosa, spring rolls, peppered gizzard — packed for your guests. Order for your next event.`, hashtags: ['#smallchopslagos', '#lagosevents', '#partyfood'], cta: 'DM us or WhatsApp to book your tray', shots: ['Top-down tray reveal', 'Close-up puff-puff pull', 'Packing into the box', 'Delivery handover'], inspiredBy: [1 + (i % 4)], imagePrompt: i < 3 ? 'Top-down photo of a full small chops party tray on a warm wooden table, soft daylight, green and gold napkins, appetising, editorial food photography' : null })) }) }),
         { posts: [] },
@@ -129,7 +144,12 @@ export const contentPack = {
         job.log('illustrator', 'design', `image ${i + 1} of ${withImages.length}: ${p.day} ${p.format}`);
         try {
           const size = p.format === 'story' || /tiktok|reel/i.test(p.format) ? '1024x1792' : '1024x1024';
-          const { buf } = await image(job, 'illustrator', { prompt: `${p.imagePrompt}. For ${spec.business}, ${spec.offer}. Photographic, natural, no text, no logos, no watermark.`, size, reason: `image for ${p.day}'s post` });
+          // Their own photo, staged for the post, beats a generated one: the product stays real.
+          const own = d?.photos?.[i] ? readUpload(d.photos[i]) : undefined;
+          const tint = d?.colour ? ` Colour accents in ${d.colour}.` : '';
+          const { buf } = own
+            ? await editImage(job, 'illustrator', { prompt: `Keep the product or subject from this photo exactly as it is. Restage it for a social post: ${p.imagePrompt}.${tint} Photographic and natural, no text, no logos, no watermark.`, images: [own], size, reason: `stage their photo for ${p.day}'s post` })
+            : await image(job, 'illustrator', { prompt: `${p.imagePrompt}. For ${spec.business}, ${spec.offer}.${tint} Photographic, natural, no text, no logos, no watermark.`, size, reason: `image for ${p.day}'s post` });
           const name = `post-${i + 1}-${p.day.toLowerCase()}.png`;
           job.files.push({ name, content: buf });
           images.push({ post: p, name });
