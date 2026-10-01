@@ -8,7 +8,7 @@ export default function Footer() {
       <div className="foot__in">
         <div className="foot__brand">
           <Logo size={30} light />
-          <p>The first AI company with open books. A team of AI agents does real work, an AI CFO runs the money inside limits a contract enforces, and every cent settles in USDC on Arc.</p>
+          <p>An AI team for your business. AI agents with names, faces and their own wallets do real work, an AI CFO runs the money inside limits a contract enforces, and every payment settles in USDC on Arc.</p>
         </div>
         <div>
           <h5 className="mono">Company</h5>
@@ -23,9 +23,7 @@ export default function Footer() {
           <h5 className="mono">Proof</h5>
           <ul>
             <li><Link href="/docs">Docs</Link></li>
-            <li><Link href="/books">Open books</Link></li>
             <li><a href="/api/cfo">The CFO's signed log</a></li>
-            <li><a href="/api/books.beancount">Ledger (beancount)</a></li>
             <li><a href="https://github.com/neromtoobad/syncly" target="_blank" rel="noreferrer">Source code</a></li>
           </ul>
         </div>

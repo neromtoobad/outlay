@@ -35,7 +35,7 @@ export const SERVICES: Record<string, Runnable> = {
   [leadList.id]: leadList,
 };
 
-/** The menu: seven services, each one something a business would otherwise pay an agency or a freelancer for. */
+/** The menu: what a business would otherwise pay an agency or a freelancer for, plus research it can order in a sentence. */
 export const CATALOG = [
   {
     id: 'website', name: 'Website', dept: 'Growth Studio', live: true, freeFirst: true, priceUsd: 15, listedCostUsd: 0.7, etaMin: 6,
@@ -43,13 +43,15 @@ export const CATALOG = [
     youGet: ['A site in one of 7 designed themes, in a colour taken from your own photos, live at a link today', 'Your menu or prices, real Google reviews and your best photos (flyers are left out)', 'WhatsApp on every screen, live "open now" hours, map and directions', 'Every price and phone number checked against your sources; reviewed on a phone and a laptop', 'Search-ready, and the files to host anywhere with your own domain'],
     team: ['researcher', 'scout', 'reader', 'analyst', 'illustrator', 'auditor', 'messenger'],
     example: 'A website for Tolu’s Small Chops in Surulere, Lagos. WhatsApp 0803 555 0142, Instagram @tolussmallchops',
-  },  {
+  },
+  {
     id: 'content-pack', name: 'Content Pack', dept: 'Growth Studio', live: true, priceUsd: 8, listedCostUsd: 1.1, etaMin: 6,
     tagline: 'What is working in your niche this week, and 7 posts built on it.',
     youGet: ['The content styles pulling views in your niche right now, each backed by real posts and their numbers', 'What your own account shows: what worked and what didn’t', '7 posts in your voice: hook, caption, CTA, hashtags, shot list', '3 designed images, ready to post', 'Checked: every example is real, no invented claims'],
     team: ['researcher', 'reader', 'scout', 'analyst', 'writer', 'illustrator', 'auditor', 'messenger'],
     example: 'Content for Tolu’s Small Chops in Lagos, Instagram @tolussmallchops',
-  },  {
+  },
+  {
     id: 'ad-launch', name: 'Ad Launch', dept: 'Growth Studio', live: true, priceUsd: 20, listedCostUsd: 2.0, etaMin: 12,
     tagline: 'Ads that bring customers, not likes: creatives, a video, copy and a 7-day plan.',
     youGet: ['3 ad angles built on ads in your niche that have kept running for 30+ days', 'Feed and Story creatives for each, made from your own product photo', 'An 8 s video ad, and copy to paste for Instagram, Facebook and TikTok', 'Who to target, your budget split into a 7-day test, and step-by-step setup', 'Already boosting? Send a screenshot and we tell you what to change'],
@@ -84,6 +86,27 @@ export const CATALOG = [
     team: ['researcher', 'scout', 'reader', 'analyst', 'investigator', 'verifier', 'writer', 'auditor', 'messenger'],
     example: '2 chest freezers (300 L) and a double-basket deep fryer, new, delivered to Surulere, Lagos. Budget ₦900k. Also talking to @frostking_ng on Instagram',
   },
+  {
+    id: 'local-business-finder', name: 'Local Business Finder', dept: 'Research', live: true, priceUsd: 3, listedCostUsd: 0.2, etaMin: 3,
+    tagline: 'Every business of a type in an area, with phone, website and rating.',
+    youGet: ['A clean spreadsheet (CSV) of up to 60 businesses', 'Phone numbers normalised to +234', 'Filters like "no website" or "has a phone"', 'Checked by rules: no duplicates, every row complete, filter holds', 'Emailed to you with the spreadsheet attached'],
+    team: ['researcher', 'scout', 'verifier', 'analyst', 'auditor', 'messenger'],
+    example: 'Every café and coffee shop in Lekki Phase 1 that has no website',
+  },
+  {
+    id: 'lead-list', name: 'Lead List', dept: 'Research', live: true, priceUsd: 5, listedCostUsd: 0.5, etaMin: 8,
+    tagline: 'Up to 25 verified business emails, each with a personalised first line.',
+    youGet: ['Up to 25 leads with emails that passed a live deliverability check', 'Where each email came from (their own site or a finder)', 'One opening line per lead, written from real data', 'You send; we never cold-email for you', 'Emailed to you with the spreadsheet attached'],
+    team: ['researcher', 'scout', 'reader', 'verifier', 'writer', 'auditor', 'messenger'],
+    example: '25 boutique hotels in Victoria Island, Lagos, for my bakery\'s weekly pastry delivery',
+  },
+  {
+    id: 'research-brief', name: 'Research Brief', dept: 'Research', live: true, priceUsd: 3, listedCostUsd: 0.3, etaMin: 6,
+    tagline: 'Competitors, market and pricing, with every claim cited.',
+    youGet: ['A 600–900 word brief with a 3-point summary', 'Every factual claim cited to a source you can open', 'Concrete recommendations', 'Checked by an independent auditor on a different AI model', 'Emailed to you when it is done'],
+    team: ['researcher', 'scout', 'reader', 'auditor', 'writer', 'messenger'],
+    example: 'Competitors and pricing for a small bakery in Lekki, Lagos that wants to add cake delivery',
+  },
 ] as const;
 
 /** Services we no longer offer. Their past jobs still show on the job pages and in the books. */
@@ -94,42 +117,27 @@ export const RETIRED = [
     youGet: ['24 real answers: 6 customer questions put to ChatGPT, Gemini, Claude and Perplexity with web search on', 'Every wrong fact quoted word for word next to your real hours, prices and details', 'Who the AIs recommend instead of you, and the pages they cite', 'A prioritised fix list, checked by an independent auditor on a different AI model', 'Emailed to you with a spreadsheet of every answer'],
     team: ['researcher', 'scout', 'reader', 'investigator', 'analyst', 'auditor', 'writer', 'messenger'],
     example: 'Mama Put Kitchen, a restaurant in Yaba, Lagos. Website mamaputkitchen.ng',
-  },  {
+  },
+  {
     id: 'video-ad', name: 'Video Ad', dept: 'Growth Studio', live: false, priceUsd: 15, listedCostUsd: 1.8, etaMin: 8,
     tagline: 'Your product photo, turned into an 8 s video ad with copy to paste.',
     youGet: ['An 8 s ad in 9:16 and 1:1, from your own product photo', 'A hook on screen, an end card with your call to action, and music', 'Hooks, primary text and headlines for Meta and TikTok', 'A still key visual that works as an image ad', 'Checked: no invented claims, frames reviewed before delivery'],
     team: ['researcher', 'scout', 'illustrator', 'producer', 'writer', 'auditor', 'messenger'],
     example: 'Video ad for my small chops party trays, ₦25,000 for 20 guests, order on WhatsApp 0803 555 0142. Photo: https://…',
-  },  {
+  },
+  {
     id: 'best-price', name: 'Best Price Finder', dept: 'Buying & Suppliers', live: false, priceUsd: 3, listedCostUsd: 0.15, etaMin: 5,
     tagline: 'Where to buy it cheapest, delivered, from a seller you can trust.',
     youGet: ['Best pick and runner-up for up to 5 items, with the delivered total in your currency', 'Prices re-checked on each seller’s own page, with stock and delivery fee', 'Scam flags: too-good-to-be-true prices, unknown sellers, bank-transfer-only pages', 'Checked by an independent auditor on a different AI model', 'A spreadsheet (CSV) of every offer we found, emailed to you'],
     team: ['researcher', 'scout', 'analyst', 'reader', 'auditor', 'writer', 'messenger'],
     example: 'Two Samsung Galaxy A16 phones, new, delivered to Lekki, Lagos. Budget ₦400k',
-  },  {
+  },
+  {
     id: 'vendor-check', name: 'Check Before You Pay', dept: 'Buying & Suppliers', live: false, priceUsd: 4, listedCostUsd: 0.5, etaMin: 4,
     tagline: 'About to pay a supplier or vendor upfront? Red, amber or green before the money leaves.',
     youGet: ['A RED / AMBER / GREEN verdict from fixed rules, with the rule that fired', 'Every signal cited: phone fraud checks, domain age, Google Maps, scam reports on Nairaland and Reddit, Instagram history', 'Sanctions screening when $500 or more is at stake', 'What to ask them before paying, and how to pay safely', 'Raw signals as a JSON file, emailed to you'],
     team: ['investigator', 'verifier', 'scout', 'reader', 'analyst', 'writer', 'auditor', 'messenger'],
     example: 'I want to pay ₦850,000 upfront to Gadget Plug NG for 5 iPhone 13s. Instagram @gadgetplug_ng, phone 0803 123 4567, shop in Computer Village Ikeja',
-  },  {
-    id: 'local-business-finder', name: 'Local Business Finder', dept: 'Sales & Growth', live: false, priceUsd: 3, listedCostUsd: 0.2, etaMin: 3,
-    tagline: 'Every business of a type in an area, with phone, website and rating.',
-    youGet: ['A clean spreadsheet (CSV) of up to 60 businesses', 'Phone numbers normalised to +234', 'Filters like "no website" or "has a phone"', 'Checked by rules: no duplicates, every row complete, filter holds', 'Emailed to you with the spreadsheet attached'],
-    team: ['researcher', 'scout', 'verifier', 'analyst', 'auditor', 'messenger'],
-    example: 'Every café and coffee shop in Lekki Phase 1 that has no website',
-  },  {
-    id: 'lead-list', name: 'Lead List', dept: 'Sales & Growth', live: false, priceUsd: 5, listedCostUsd: 0.5, etaMin: 8,
-    tagline: '25 verified business emails, each with a personalised first line.',
-    youGet: ['Up to 25 leads with emails that passed a live deliverability check', 'Where each email came from (their own site or a finder)', 'One opening line per lead, written from real data', 'You send; we never cold-email for you', 'Emailed to you with the spreadsheet attached'],
-    team: ['researcher', 'scout', 'reader', 'verifier', 'writer', 'auditor', 'messenger'],
-    example: '25 boutique hotels in Victoria Island, Lagos, for my bakery\'s weekly pastry delivery',
-  },  {
-    id: 'research-brief', name: 'Research Brief', dept: 'Research', live: false, priceUsd: 3, listedCostUsd: 0.3, etaMin: 6,
-    tagline: 'Competitors, market and pricing, with every claim cited.',
-    youGet: ['A 600–900 word brief with a 3-point summary', 'Every factual claim cited to a source you can open', 'Concrete recommendations', 'Checked by an independent auditor on a different AI model', 'Emailed to you when it is done'],
-    team: ['researcher', 'scout', 'reader', 'auditor', 'writer', 'messenger'],
-    example: 'Competitors and pricing for a small bakery in Lekki, Lagos that wants to add cake delivery',
   },
 ] as const;
 

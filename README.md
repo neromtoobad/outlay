@@ -1,8 +1,8 @@
 # Syncly
 
-**The first AI company with open books.** A team of AI agents does real paid work for small businesses. An AI CFO runs the company's money on Arc in USDC, inside limits a smart contract enforces, and every receipt, decision and transaction is public.
+**An AI team for your business.** AI agents with names, faces and their own wallets do real paid work for small businesses. An AI CFO runs the company's money on Arc in USDC, inside limits a smart contract enforces, and every payment, decision and transaction settles on-chain.
 
-**Live on Arc mainnet:** [hiresyncly.site](https://hiresyncly.site) · [the books and the CFO's desk](https://hiresyncly.site/books) · [the office, live](https://hiresyncly.site/live) · [traction](TRACTION.md) ([live copy](https://hiresyncly.site/api/traction.md))
+**Live on Arc mainnet:** [hiresyncly.site](https://hiresyncly.site) · [the office, live](https://hiresyncly.site/live) · [the CFO's signed log](https://hiresyncly.site/api/cfo)
 
 Built for the [Tameion Agents Hackathon](https://tameion.thecanteenapp.com) (Canteen × Circle), Sep 27 – Oct 10, 2026. Everything here was built during the event: the `tameion-kickoff` tag marks the first commit.
 
@@ -19,20 +19,23 @@ A business fills in a short form about itself and the job: *"party trays for 20 
 | Product Photo Studio | 6 USDC | Phone photos turned into studio, lifestyle and white-background shots, each checked against the original so the product doesn't change |
 | Get Found | 15 USDC | Google Maps rank street by street against competitors, profile gaps, what ChatGPT, Gemini, Claude and Perplexity say, a fix list, a profile description and review replies |
 | Buy Smart | 5 USDC | The cheapest trustworthy offers, delivered, and a red/amber/green check on the sellers before paying |
+| Local Business Finder | 3 USDC | Every business of a type in an area, with phone, website and rating, as a spreadsheet |
+| Lead List | 5 USDC | Up to 25 verified business emails, each with a personalised first line |
+| Research Brief | 3 USDC | Competitors, market and pricing, with every claim cited |
 
 The menu comes from research into what small businesses already pay agencies and freelancers for, and what a search or a chatbot can't do: jobs that need fresh data from many paid sources at once, checking against the truth, or real production.
 
 - **The first website is free** (one per email, when its tools cost under 1.50 USDC, from a promo budget of 2 USDC a week). After that, the customer pays into escrow on Arc from their own wallet.
 - **Nothing is paid unless the customer accepts.** Only the paying wallet can accept, ask for one free revision, or reject. A rejection refunds the price plus a bond the CFO put up.
-- **The agents buy their own tools.** Each has its own wallet and pays per call (x402 nanopayments through Circle Gateway) for AI models, search, page reading and email checks. Every call is on the job's public receipt, linked to the Arc transaction that settled it.
+- **The agents buy their own tools.** Each has its own wallet and pays per call (x402 nanopayments through Circle Gateway) for AI models, search, page reading and email checks. Every call is listed on the customer's job page, linked to the Arc transaction that settled it. Costs and margins stay in the owner's private books.
 - **The CFO runs the money.** It plans each agent's weekly budget, puts revenue to work, and tops up agents that run low. Anything above its limits goes to a human to co-sign on-chain.
 
 ## Try it (for judges)
 
-1. **Order a free job** at [/hire/local-business-finder](https://hiresyncly.site/hire/local-business-finder). Watch the team work on the job page; each tool payment appears as it happens.
+1. **Order a free website** at [/hire/website](https://hiresyncly.site/hire/website). Watch the team work on the job page; each tool payment appears as it happens.
 2. **Watch the office** at [/live](https://hiresyncly.site/live). The agents act out real events: the CFO stamps the quote and walks the brief to the whiteboard, and the Messenger carries the delivery out.
 3. **Check a receipt.** Job #1 ([ord_mulrvp33_0603](https://hiresyncly.site/job/ord_mulrvp33_0603)) found 9 restaurants with 5 x402 payments, each linked to its settlement on Arc ([0xb76f18…](https://arcscan.app/tx/0xb76f1819087eea9c3bbd9886384a44556450a6fa831a1575818165fa0355fe25), [0xc99ba1…](https://arcscan.app/tx/0xc99ba105332d26b54c73cc1ba1677e299c9dc632eb3f835e50309a40d41d4fbd)).
-4. **Read the CFO's desk** on [/books](https://hiresyncly.site/books): each agent's balance and allowance, this week's plan, and every decision with what the CFO saw. The raw log is at [/api/cfo](https://hiresyncly.site/api/cfo).
+4. **Read the CFO's log** at [/api/cfo](https://hiresyncly.site/api/cfo): each agent's balance and allowance, this week's plan, and every decision with what the CFO saw, signed and hash-chained.
 5. **Pay for a job** (needs about 3.05 USDC on Arc in a browser wallet). The page walks through the steps: connect the wallet, the CFO opens the escrow, then approve and fund. On the job page you then accept, revise or reject from the same wallet.
 
 ## On Arc mainnet (chain 5042)
@@ -112,7 +115,7 @@ Canteen's [essay](https://thecanteenapp.com/analysis/2026/09/12/agents-and-ledge
 | Releasing money on a model's confidence | The customer's wallet accepts or rejects. The CFO's rules are deterministic, and models only produce the work and check it. |
 | An entry with no document behind it | Every ledger line points to its job. Each escrow seals the hash of the agreed terms (`specHash`) and of the delivery (`deliverableHash`) on-chain, so terms, delivery and payment can be matched. |
 
-**Why beancount:** the ledger is written in [beancount](https://github.com/beancount/beancount) format (download it from [/api/books.beancount](https://hiresyncly.site/api/books.beancount)). Precision is declared in the entry itself, not hidden in a column type, and a human can read what the agent wrote.
+**Why beancount:** the ledger is written in [beancount](https://github.com/beancount/beancount) format, kept in the owner's private books. Precision is declared in the entry itself, not hidden in a column type, and a human can read what the agent wrote.
 
 ## Circle tools used
 

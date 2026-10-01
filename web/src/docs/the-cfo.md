@@ -51,8 +51,8 @@ Every decision goes into an append-only log:
 - **A hash of the entry**, chained to the one before it.
 - **A signature** from the CFO's key.
 
-The vault transaction's `reason` field carries the hash of the decision behind it. The log is public at [/api/cfo](/api/cfo) and on the [CFO's desk](/books). [Verify it yourself](/docs/verify#the-cfos-decision-log).
+The vault transaction's `reason` field carries the hash of the decision behind it. The log is public at [/api/cfo](/api/cfo). [Verify it yourself](/docs/verify#the-cfos-decision-log).
 
 ## Proposals and the Boss
 
-When the CFO needs more than it may do alone, it writes an on-chain **proposal**, for example "move 4.05 USDC from OPERATING to RESERVE". The proposal appears on [/books](/books) under **Waiting on the Boss**, with a co-sign button that only the vault owner's wallet can use. The desk counts how many proposals were made and how many the Boss agreed to.
+When the CFO needs more than it may do alone, it writes an on-chain **proposal**, for example "move 4.05 USDC from OPERATING to RESERVE". The proposal appears on the owner's private desk under **Waiting on the Boss**, with a co-sign button that only the vault owner's wallet can use. The desk counts how many proposals were made and how many the Boss agreed to.

@@ -1,4 +1,4 @@
-// Open books: every money movement becomes a balanced double-entry transaction, each one linked to
+// The books (private to the owner): every money movement becomes a balanced double-entry transaction, each one linked to
 // its document (job id / receipt line) and its on-chain reference. Output is beancount text, so
 // anyone can load it into bean-query or Fava, plus a P&L computed from the same entries.
 //
@@ -87,7 +87,7 @@ const esc = (s: string) => s.replace(/"/g, "'");
 export function toBeancount(entries: Entry[]): string {
   const accounts = [...new Set(entries.flatMap((e) => e.postings.map((p) => p.account)))].sort();
   const first = entries.map((e) => e.date).sort()[0] ?? new Date().toISOString().slice(0, 10);
-  const head = [`option "title" "Syncly: open books"`, `option "operating_currency" "USDC"`, `commodity USDC`, '', ...accounts.map((a) => `${first} open ${a} USDC`), ''];
+  const head = [`option "title" "Syncly: the books"`, `option "operating_currency" "USDC"`, `commodity USDC`, '', ...accounts.map((a) => `${first} open ${a} USDC`), ''];
   const body = [...entries].sort((a, b) => a.date.localeCompare(b.date)).map((e) => {
     assertBalanced(e);
     const meta = Object.entries(e.meta).filter(([, v]) => v).map(([k, v]) => `  ${k}: "${esc(String(v))}"`);

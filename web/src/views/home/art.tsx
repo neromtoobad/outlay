@@ -83,11 +83,11 @@ export function EscrowArt() {
   );
 }
 
-/** 3 · The team works in the open: every tool it buys is a line on a public receipt. */
+/** 3 · You watch them work: every tool the team buys is a line on your job page. */
 export function ReceiptArt() {
   const rows = [['Scout', 'Exa search', '0.0070'], ['Researcher', 'BlockRun', '0.0030'], ['Reader', 'Exa contents', '0.0010'], ['Auditor', 'BlockRun', '0.0030']];
   return (
-    <svg className="art" viewBox="0 0 400 300" role="img" aria-label="A public receipt of tool payments">
+    <svg className="art" viewBox="0 0 400 300" role="img" aria-label="A receipt of the tools the team paid for">
       <g className="pc" style={v(0)}><path d="M116 30h168v222l-12 10-12-10-12 10-12-10-12 10-12-10-12 10-12-10-12 10-12-10-12 10-12-10-12 10-12-10z" fill={PAPER} stroke={INK} strokeWidth="1.4" strokeLinejoin="round" /></g>
       <g className="pc" style={v(1)}><text x="200" y="58" textAnchor="middle" fontFamily="var(--mono)" fontSize="11" letterSpacing="2.4" fill={INK}>SYNCLY · RECEIPT</text><rect x="136" y="70" width="128" height="1" fill="#E7E2D6" /></g>
       {rows.map((r, k) => (

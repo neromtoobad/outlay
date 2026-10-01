@@ -1,6 +1,7 @@
 // A job: one run of a service for an order, with its budget policy, receipt lines, a step log and
 // the deliverable. Saved as data/jobs/<id>/{job.json, deliverable.md, files}. The receipt is the
-// public "open books" record: every tool the team bought, from whom, for how much, and why.
+// record of every tool the team bought, from whom, for how much, and why. Customers see the work and
+// the Arc settlements; the amounts are for the owner's private books.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';

@@ -1,7 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { useApi, usd, timeAgo, SERVICE_NAME, Avatar } from '@/lib.tsx';
+import { api, useApi, usd, timeAgo, SERVICE_NAME, Avatar, OWNER_KEY } from '@/lib.tsx';
 import { CountUp, Reveal } from '@/components/motion.tsx';
 import CfoDesk from './CfoDesk.tsx';
 
@@ -79,8 +79,36 @@ function Daily({ daily }: { daily: Books['daily'] }) {
   );
 }
 
+/** The books are private: the owner's passcode (OUTLAY_OWNER_KEY in Railway) opens them on this device. */
+function OwnerGate() {
+  const [key, setKey] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function open(e: FormEvent) {
+    e.preventDefault(); setBusy(true); setErr(null);
+    try {
+      await api('/api/owner', { headers: { 'x-owner-key': key.trim() } });
+      localStorage.setItem(OWNER_KEY, key.trim());
+      window.location.reload();
+    } catch (x: any) { setErr(x.message); setBusy(false); }
+  }
+  return (
+    <main className="wrap section center">
+      <div className="eyebrow">Your books</div>
+      <h1 className="h1">The books are private.</h1>
+      <p className="muted" style={{ margin: '12px 0 24px' }}>Enter your owner passcode to open them on this device.</p>
+      <form className="form" style={{ maxWidth: 380, margin: '0 auto' }} onSubmit={open}>
+        <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="Owner passcode" autoFocus aria-label="Owner passcode" />
+        <button className="btn primary block" disabled={busy || key.trim().length < 8}>{busy ? 'Checking…' : 'Open the books'}</button>
+        {err && <div className="error">{err}</div>}
+      </form>
+    </main>
+  );
+}
+
 export default function Books() {
   const { data: b, error } = useApi<Books>('/api/books', 10000);
+  if (error && /owner only|401/i.test(error)) return <OwnerGate />;
   if (error) return <main className="wrap section center"><h1 className="h1">The books are closed for a moment.</h1><p className="muted" style={{ marginTop: 12 }}>{error}</p></main>;
   if (!b) return <main className="wrap section"><div className="skel" style={{ height: 520 }} /></main>;
   const c = b.counters, p = b.pnl;
@@ -89,9 +117,9 @@ export default function Books() {
   return (
     <main className="wrap" style={{ paddingBottom: 96 }}>
       <div className="pagehead">
-        <div className="eyebrow">Open books</div>
-        <h1 className="h1">Every dollar this AI company <em>makes and spends.</em></h1>
-        <p className="sub">An AI CFO runs Syncly's money. These books come from the same records that move it: job receipts, escrow and the vault on Arc. Updated {timeAgo(b.asOf)}.</p>
+        <div className="eyebrow">Your books · private</div>
+        <h1 className="h1">Every dollar Syncly <em>makes and spends.</em></h1>
+        <p className="sub">Only you can see this page. An AI CFO runs Syncly's money, and these books come from the same records that move it: job receipts, escrow and the vault on Arc. Updated {timeAgo(b.asOf)}. <button type="button" className="linkbtn" onClick={() => { try { localStorage.removeItem(OWNER_KEY); } catch {} window.location.reload(); }}>Lock this device</button></p>
         {b.mode === 'demo' && <div className="banner"><span>●</span><div><b>Demo mode.</b> These numbers come from simulated jobs: no real money moved and every receipt is marked “demo”. Live figures from Arc mainnet replace them when the treasury is funded.</div></div>}
       </div>
 

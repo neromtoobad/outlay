@@ -1,5 +1,5 @@
 // The Messenger emails every delivery to the customer. It pays for AgentMail with x402 from its own
-// Gateway balance, so each email is a line on the job's public receipt like any other tool.
+// Gateway balance, so each email is a line on the job's receipt like any other tool.
 //   OUTLAY_MAIL=aisa (default): AgentMail via AIsa, 0.10 USDC to open the mailbox once, 0.10 per email
 //   OUTLAY_MAIL=orthogonal:     AgentMail via Orthogonal, 2 USDC a month for the mailbox, 0.01 per email
 //                               (too big for a job's budget: open it once yourself and set OUTLAY_MAIL_INBOX)
@@ -72,7 +72,7 @@ export function compose(job: Pick<Job, 'deliverable' | 'files'>, o: Order) {
       ? 'This one was your free first job. Tell us on the job page if it was good.'
       : 'Accept, revise or reject it on the job page.';
   const subject = `${revised ? 'Revised: ' : ''}your ${name} is ready · ${brief}`;
-  const text = `The Syncly team finished your job.\n\n"${o.brief}"\n\n${job.deliverable}\n\n${decide}\n${link}\n\nEvery tool we paid for this job is on its public receipt. This email was sent and paid for by our Messenger agent, in USDC on Arc.\n`;
+  const text = `The Syncly team finished your job.\n\n"${o.brief}"\n\n${job.deliverable}\n\n${decide}\n${link}\n\nYour job page shows every step the team took. This email was sent and paid for by our Messenger agent, in USDC on Arc.\n`;
   const html = `<div style="background:#faf7f1;padding:28px 12px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;color:#1b1a17">
 <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #ebe5d8;border-radius:18px;padding:28px">
 <div style="font-family:Georgia,serif;letter-spacing:.18em;font-size:14px;color:#17473b;margin-bottom:18px">SYNCLY</div>
@@ -81,7 +81,7 @@ export function compose(job: Pick<Job, 'deliverable' | 'files'>, o: Order) {
 <p style="margin:0 0 22px"><a href="${link}" style="display:inline-block;background:#17473b;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600;font-size:14px">Review &amp; decide →</a></p>
 <div style="font-size:14px;line-height:1.55;border-top:1px solid #ebe5d8;padding-top:14px">${render(job.deliverable)}</div>
 <p style="font-size:13.5px;color:#4b4841;background:#f3eee4;border-radius:12px;padding:12px 14px;margin:18px 0 0">${esc(decide)}</p>
-<p style="font-size:12px;color:#847d70;margin:18px 0 0">Every tool we paid for this job is on its <a href="${link}" style="color:#17473b">public receipt</a>. This email was sent, and paid for, by our Messenger agent in USDC on Arc.</p>
+<p style="font-size:12px;color:#847d70;margin:18px 0 0">Your <a href="${link}" style="color:#17473b">job page</a> shows every step the team took. This email was sent, and paid for, by our Messenger agent in USDC on Arc.</p>
 </div></div>`;
   // Text files ride along; images, video and sites are linked from the order page instead (mail size).
   const attachments = job.files.filter((f) => typeof f.content === 'string' && f.content.length < 2_000_000)

@@ -7,7 +7,7 @@ import { gsap } from 'gsap';
 import { Sound } from './music.ts';
 
 export type OfficeEvent = { type: 'step' | 'purchase' | 'order'; orderId?: string; jobId?: string; at?: string; data: any };
-export type Books = { revenue: number; tools: number; margin: number; accepted: number; acceptance: number | null; jobs: number };
+export type Stats = { jobs: number; calls: number; settled: number };
 type P = { x: number; y: number };
 
 // ------------------------------------------------------------------ the building (4K art coordinates)
@@ -18,9 +18,11 @@ const DESK = { top: 1344, bottom: 1478, back: 1442 };
 const DESK_X = [947, 1149, 1350, 1551, 1758, 1970, 2171, 2374, 2573, 2778];
 const DESK_EDGE: [number, number][] = [[850, 1044], [1056, 1242], [1258, 1442], [1461, 1642], [1666, 1850], [1880, 2060], [2079, 2264], [2282, 2467], [2479, 2667], [2677, 2879]];
 const LAPTOP_X = [955, 1154, 1354, 1554, 1761, 1968, 2169, 2372, 2571, 2770];
-const SEATS = ['scout', 'researcher', 'reader', 'writer', 'verifier', 'analyst', 'auditor', 'illustrator', 'mailer', 'messenger'];
-// Agents hired after the office was drawn work from a colleague's desk until they get their own.
-const SHARES: Record<string, string> = { producer: 'illustrator', investigator: 'verifier', bookkeeper: 'analyst', linguist: 'writer' };
+const SEATS = ['scout', 'researcher', 'reader', 'writer', 'verifier', 'analyst', 'auditor', 'illustrator', 'producer', 'messenger'];
+// The Investigator joined after the office was drawn: he stands at the Verifier's desk, his partner on checks.
+const VISITORS: Record<string, string> = { investigator: 'verifier' };
+// Agents without a character yet work from a colleague's desk.
+const SHARES: Record<string, string> = { bookkeeper: 'analyst', linguist: 'writer', mailer: 'messenger' };
 const ROW_END = 2935; // walk behind the desks to here, then step forward onto the lane
 const CFO_SPOT = { x: 2518, y: 885 };
 const CFO_DESK = { x0: 2302, x1: 2798, top: 762, bottom: 909 };
@@ -50,7 +52,7 @@ const WF = { idle: 0, walkA: 1, walkB: 2, type: 3, cheer: 4, sad: 5, box: 6, coi
 const CF = { idle: 0, walkA: 1, walkB: 2, talk: 3, stamp: 4, stern: 5, thumbs: 6, deny: 7 };
 const SERVICE: Record<string, string> = { website: 'Website', 'content-pack': 'Content Pack', 'motion-ad': 'Motion Ad', 'ad-launch': 'Ad Launch', 'product-photos': 'Product Photo Studio', 'get-found': 'Get Found', 'buy-smart': 'Buy Smart', 'video-ad': 'Video Ad', 'ai-answer-audit': 'AI Answer Audit', 'best-price': 'Best Price Finder', 'vendor-check': 'Check Before You Pay', 'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List' };
 const NAME: Record<string, string> = { cfo: 'The CFO', scout: 'Scout', researcher: 'Researcher', writer: 'Writer', illustrator: 'Designer', verifier: 'Verifier', mailer: 'Mailer', reader: 'Reader', analyst: 'Analyst', messenger: 'Messenger', auditor: 'Auditor', producer: 'Producer', investigator: 'Investigator' };
-const COLOR: Record<string, number> = { cfo: 0x17473b, scout: 0xd9a21b, researcher: 0x7a2335, writer: 0xe1705c, illustrator: 0x8f79c9, verifier: 0x5f97d1, mailer: 0xec7418, reader: 0x556b2f, analyst: 0x2848b8, messenger: 0xcf2a2a, auditor: 0x5a2d5f };
+const COLOR: Record<string, number> = { cfo: 0x17473b, scout: 0xd9a21b, researcher: 0x7a2335, writer: 0xe1705c, illustrator: 0x8f79c9, verifier: 0x5f97d1, mailer: 0xec7418, reader: 0x556b2f, analyst: 0x2848b8, messenger: 0xcf2a2a, auditor: 0x5a2d5f, producer: 0xc2187a, investigator: 0x8a6232 };
 
 // Camera shots: centre + visible width in world units (height follows the 16:9 canvas).
 const SHOTS = {
@@ -236,7 +238,7 @@ export class OfficeScene {
     this.app.canvas.style.display = 'block';
     el.appendChild(this.app.canvas);
 
-    const ids = [...SEATS, 'cfo'];
+    const ids = [...SEATS, ...Object.keys(VISITORS), 'cfo'];
     const [bgTex, ...chars] = await Promise.all([PIXI.Assets.load(small ? '/scene/building-1920.webp' : '/scene/building.webp'), ...ids.map(loadFrames)]);
     if (this.destroyed) return;
     this.bgTex = bgTex as PIXI.Texture;
@@ -287,8 +289,16 @@ export class OfficeScene {
       this.under.addChild(glow);
       this.laptopGlow.set(id, glow);
     });
+    for (const [id, host] of Object.entries(VISITORS)) {
+      const i = SEATS.indexOf(host);
+      const a = new Actor(id, byId[id], WF, DESK_X[i] + 62, DESK.back, BEHIND);
+      a.mode = 'behind'; a.cycles = cycles[id]; a.last = `at the ${NAME[host]}'s desk`;
+      this.seats.addChild(a.root);
+      this.actors.set(id, a);
+      a.root.on('pointertap', () => this.onAgentClick?.(id));
+    }
     const cfo = new Actor('cfo', byId.cfo, CF, CFO_SPOT.x, CFO_SPOT.y, CFO_SCALE);
-    cfo.mode = 'behind'; cfo.last = 'watching the books'; cfo.cycles = cycles.cfo;
+    cfo.mode = 'behind'; cfo.last = 'watching the vault'; cfo.cycles = cycles.cfo;
     this.seats.addChild(cfo.root);
     this.actors.set('cfo', cfo);
     cfo.root.on('pointertap', () => this.onAgentClick?.('cfo'));
@@ -332,7 +342,7 @@ export class OfficeScene {
 
   private buildScreen() {
     const c = new PIXI.Container(); c.position.set(SCREEN.x0 + 26, SCREEN.y0 + 18);
-    const title = this.txt('SYNCLY · OPEN BOOKS', { fontFamily: this.fonts.mono, fontSize: 19, fill: 0xe2ab45, letterSpacing: 3, fontWeight: '600' }, 3);
+    const title = this.txt('SYNCLY · THE TEAM AT WORK', { fontFamily: this.fonts.mono, fontSize: 19, fill: 0xe2ab45, letterSpacing: 3, fontWeight: '600' }, 3);
     const clock = this.txt('', { fontFamily: this.fonts.mono, fontSize: 19, fill: 0x9fb8ae }, 3); clock.anchor.set(1, 0); clock.x = SCREEN.x1 - SCREEN.x0 - 52;
     const rev = this.txt('—', { fontFamily: this.fonts.serif, fontSize: 64, fill: 0xf4ecda }, 3); rev.y = 30;
     const sub = this.txt('', { fontFamily: this.fonts.mono, fontSize: 18, fill: 0xc9d6cf }, 3); sub.y = 108;
@@ -682,11 +692,11 @@ export class OfficeScene {
     for (const [id, a] of this.actors) a.root.alpha = !team || id === 'cfo' || id === 'messenger' || team.includes(id) ? 1 : 0.35;
   }
 
-  setBooks(b: Books) {
+  setStats(s: Stats) {
     if (!this.screen) return;
     const v = this.screen.value;
-    this.tw(v, { rev: b.revenue, duration: 1.2, ease: 'power2.out', onUpdate: () => { this.screen.rev.text = `${v.rev.toFixed(2)} USDC`; } });
-    this.screen.sub.text = `tools ${b.tools.toFixed(3)} · margin ${b.margin.toFixed(2)} · ${b.jobs} jobs · ${b.acceptance == null ? '—' : Math.round(b.acceptance * 100) + '%'} accepted`;
+    this.tw(v, { rev: s.jobs, duration: 1.2, ease: 'power2.out', onUpdate: () => { this.screen.rev.text = `${Math.round(v.rev)} jobs delivered`; } });
+    this.screen.sub.text = `${s.calls} paid calls · ${s.settled} settled on Arc`;
   }
 
   handle(e: OfficeEvent) {
@@ -701,7 +711,7 @@ export class OfficeScene {
       const a = this.actors.get(seat); if (!a) return;
       a.busyUntil = performance.now() + 7000;
       if (d.agent === 'auditor' && (d.step === 'check' || d.step === 'audit') && !/fail|missing|revise/i.test(String(d.note ?? ''))) { this.signOff(`${d.step} · ${d.note ?? 'pass'}`); return; }
-      if (a.mode === 'seat' || a.id === 'cfo') this.say(seat, `${tag}${d.step}${d.note ? ` · ${d.note}` : ''}`);
+      if (a.mode === 'seat' || a.id === 'cfo' || (a.id in VISITORS && a.mode === 'behind')) this.say(seat, `${tag}${d.step}${d.note ? ` · ${d.note}` : ''}`);
       else a.last = `${tag}${d.step}${d.note ? ` · ${d.note}` : ''}`;
       this.want('work', 2600);
     } else if (e.type === 'purchase') {
@@ -712,9 +722,9 @@ export class OfficeScene {
       this.coin(from, to, { arc: 200 + Math.random() * 120, onLand: () => {
         this.shelfGlow.alpha = 0.22; this.tw(this.shelfGlow, { alpha: 0, duration: 0.9 });
         this.sparkle(to.x, to.y, 0x9ff0dc, 6);
-        this.float({ x: to.x, y: to.y - 60 }, `−${Number(d.usd).toFixed(3)} ${String(d.vendor ?? '').split(' ')[0]}`);
+        this.float({ x: to.x, y: to.y - 60 }, `paid ${String(d.vendor ?? '').split(' ')[0]}`);
       } });
-      this.screen.tick.text = `${NAME[d.agent] ?? d.agent} → ${d.vendor} −${Number(d.usd).toFixed(4)}`;
+      this.screen.tick.text = `${NAME[d.agent] ?? d.agent} → ${d.vendor}`;
       this.want('work', 2000);
     } else if (e.type === 'order') {
       const team: string[] = (d.team ?? []).filter((r: string) => this.actors.has(r));

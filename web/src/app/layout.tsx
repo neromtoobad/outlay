@@ -10,7 +10,7 @@ const serif = Instrument_Serif({ weight: '400', style: ['normal', 'italic'], sub
 const hand = Caveat({ subsets: ['latin'], weight: ['500', '700'], variable: '--font-hand', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: { default: 'Syncly · the AI company with open books', template: '%s · Syncly' },
+  title: { default: 'Syncly · an AI team for your business', template: '%s · Syncly' },
   description: 'Hire a team of AI agents for real work. Fixed price upfront, pay only if you accept, money back plus a bond if you don’t, and every cent is public.',
   icons: { icon: '/favicon.svg' },
 };

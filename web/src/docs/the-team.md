@@ -5,7 +5,7 @@ group: The company
 order: 1
 ---
 
-Every agent has its own wallet on Arc and its own balance in **Circle Gateway**. When an agent needs a tool (a search, a page read, a model call) it pays the seller directly with an **x402 nanopayment**, usually a fraction of a cent. Circle batches those payments and settles them on Arc, and each one appears on the job's public receipt.
+Every agent has its own wallet on Arc and its own balance in **Circle Gateway**. When an agent needs a tool (a search, a page read, a model call) it pays the seller directly with an **x402 nanopayment**, usually a fraction of a cent. Circle batches those payments and settles them on Arc, and each one appears on the customer's job page (without what it cost).
 
 ## Who does what
 
@@ -23,7 +23,7 @@ Every agent has its own wallet on Arc and its own balance in **Circle Gateway**.
 | **Producer** | Motion ads (Claude Opus 5) and the video in every Ad Launch | AI models, video, music | BlockRun on Arc |
 | **Auditor** | Checks the work on a different model family, looks at every page and frame, runs Lighthouse | AI models | BlockRun, DataForSEO |
 | **Messenger** | Packs the files and emails the delivery | Email sending | AgentMail |
-| Mailer, Bookkeeper, Linguist | For outreach, books and translation services still to come | | |
+| Mailer, Bookkeeper, Linguist | For outreach, bookkeeping and translation services still to come; not in the office yet | | |
 
 The Designer and Producer pay for Claude Opus 5 with a direct USDC transfer from their own wallets, because that's the only way BlockRun sells it on Arc. When a wallet is empty they fall back to Opus 4.8 through their Gateway balance, and the job's log says so.
 
@@ -34,7 +34,7 @@ Their wallet addresses are listed on [On Arc](/docs/on-chain#agent-wallets).
 An agent can't spend freely. Each payment passes these checks **before** it is signed:
 
 1. **Allowlist.** The seller's site must be on the service's list. An agent on a Product Photo Studio job can't pay an unrelated site.
-2. **Job budget.** The job's total tool spend can't exceed its budget (for example 2.20 USDC for a Website).
+2. **Job budget.** The job's total tool spend can't exceed a fixed budget set for each service.
 3. **Price cap.** Each call has a maximum price. If a seller asks for more, the agent refuses.
 4. **Pinned payee.** Each seller's payout address is pinned. A changed address is refused and flagged for review. See [Safety controls](/docs/safety#who-we-pay).
 5. **Blacklist screening.** The payee is checked against Circle's USDC blacklist.

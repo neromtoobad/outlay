@@ -1,0 +1,92 @@
+{
+  "name": "producer",
+  "source": "assets/sheets/producer.png",
+  "frameWidth": 256,
+  "frameHeight": 363,
+  "anchor": {
+    "x": 0.44229379490345755,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "producer-0.png",
+      "bbox": [
+        112,
+        8,
+        223,
+        364
+      ]
+    },
+    {
+      "index": 1,
+      "file": "producer-1.png",
+      "bbox": [
+        415,
+        9,
+        594,
+        362
+      ]
+    },
+    {
+      "index": 2,
+      "file": "producer-2.png",
+      "bbox": [
+        751,
+        8,
+        929,
+        362
+      ]
+    },
+    {
+      "index": 3,
+      "file": "producer-3.png",
+      "bbox": [
+        1059,
+        47,
+        1293,
+        320
+      ]
+    },
+    {
+      "index": 4,
+      "file": "producer-4.png",
+      "bbox": [
+        52,
+        383,
+        250,
+        735
+      ]
+    },
+    {
+      "index": 5,
+      "file": "producer-5.png",
+      "bbox": [
+        432,
+        387,
+        578,
+        735
+      ]
+    },
+    {
+      "index": 6,
+      "file": "producer-6.png",
+      "bbox": [
+        760,
+        384,
+        932,
+        736
+      ]
+    },
+    {
+      "index": 7,
+      "file": "producer-7.png",
+      "bbox": [
+        1110,
+        383,
+        1280,
+        735
+      ]
+    }
+  ]
+}

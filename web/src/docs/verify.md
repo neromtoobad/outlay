@@ -21,7 +21,7 @@ On any job page, each receipt line ends with **settled on Arc ↗**. That links 
 cast call {{vault}} "balances()(uint256[5])" --rpc-url $RPC
 ```
 
-The five numbers are OPERATING, TOOLS, BOND, RESERVE and PROMO, in USDC's 6 decimals (1000000 = 1 USDC). They should match the CFO's desk on [/books](/books).
+The five numbers are OPERATING, TOOLS, BOND, RESERVE and PROMO, in USDC's 6 decimals (1000000 = 1 USDC). They should match the latest vault snapshot in [/api/cfo](/api/cfo).
 
 ## The CFO's limits
 

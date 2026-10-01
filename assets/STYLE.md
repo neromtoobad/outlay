@@ -48,6 +48,8 @@ Every worker wears **one signature colour** plus a small gold Byzantine trim det
 | analyst | Kenyan woman in her 30s, **cobalt** trouser suit | ✅ first try |
 | messenger | young Senegalese man, **red** hoodie, high-tops | ✅ first try |
 | auditor | Middle Eastern woman in her 40s, **deep purple** hijab and long coat | ✅ first try |
+| producer | young Nigerian woman in her late 20s, short natural afro, headphones around her neck, **fuchsia** bomber jacket, black jeans, white high-tops | ✅ first try (Oct 1); takes the Mailer's desk in the office |
+| investigator | Ghanaian man in his early 50s, close-cropped grey hair and short grey beard, dark-rimmed glasses, **camel** belted trench coat, brown brogues | ✅ first try (Oct 1); stands at the Verifier's desk |
 
 Review boards: `sprites/cast-a.png` and `sprites/cast-b.png`. The worker frame order is: 0 idle, 1 walk A, 2 walk B, 3 typing (waist up), 4 cheer, 5 sad, 6 carrying a box, 7 tossing a coin.
 
@@ -70,4 +72,5 @@ Review boards: `sprites/cast-a.png` and `sprites/cast-b.png`. The worker frame o
 | Sep 28 | CFO walk ×4 + Auditor walk ×4 (medium 2k, refs = their sheets); chosen CFO s1 → `sprites/cfo-walk`, Auditor s5 → `sprites/auditor-walk` | 2 |
 | Sep 29 | rename to Syncly: rooftop sign edit ×2 (high 2k, crop of the sign only; chosen db298faf, blended into `scene/building.webp`) | 2.75 |
 | Oct 1 | service examples: 2 "owner phone photos" (small chops tray, shea butter jar) + 3 Ad Launch scenes + 8 Product Photo Studio shots (gpt_image_2_5, medium 2k, 1 each) | 13 |
-| **Total** | | **37.63 / 500** |
+| Oct 1 | producer + investigator pose sheets ×4 each (chosen 1bdb7643 → `sheets/producer.png`, 092a1cdb → `sheets/investigator.png`) | 0.5 |
+| **Total** | | **38.13 / 500** |

@@ -6,6 +6,7 @@ import { serve } from '@hono/node-server';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { timingSafeEqual } from 'node:crypto';
 import { DATA_DIR, DRY } from './config.ts';
 import { account, hasSeed } from './wallets.ts';
 import { bus, type SynclyEvent } from './bus.ts';
@@ -41,12 +42,34 @@ bootstrap();
 
 const app = new Hono();
 
+// The books are private. The owner's key (OUTLAY_OWNER_KEY, set in Railway) opens them, sent as x-owner-key.
+const OWNER_KEY = process.env.OUTLAY_OWNER_KEY?.trim() ?? '';
+function isOwner(c: any): boolean {
+  const got = String(c.req.header('x-owner-key') ?? '');
+  return OWNER_KEY.length >= 8 && got.length === OWNER_KEY.length && timingSafeEqual(Buffer.from(got), Buffer.from(OWNER_KEY));
+}
+// Everyone else sees the work, the sellers and the Arc transactions, never what a tool cost us.
+const COST_KEYS = new Set(['usd', 'spentUsd', 'expectUsd', 'maxUsd', 'estCostUsd', 'expectedProfitUsd', 'budgetUsd', 'listedCostUsd']);
+const COST_REASON = /tool cost|E\[profit\]|promo covers|promo left|promo budget/;
+function scrub<T>(x: T): T {
+  if (Array.isArray(x)) return x.map(scrub) as T;
+  if (!x || typeof x !== 'object') return x;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(x)) {
+    if (COST_KEYS.has(k)) continue;
+    out[k] = k === 'reasons' && Array.isArray(v) ? v.filter((r) => !COST_REASON.test(String(r))) : scrub(v);
+  }
+  return out as T;
+}
+const shown = <T>(c: any, x: T): T => (isOwner(c) ? x : scrub(x));
+
 /** The treasury's public address proves which seed is loaded without revealing it. */
 function treasury() {
   try { return hasSeed() ? account('treasury').address : null; } catch { return 'invalid seed'; }
 }
 app.get('/api/health', (c) => c.json({ ok: true, mode: DRY ? 'demo' : 'live', keys: DRY || hasSeed(), treasury: treasury() }));
-app.get('/api/services', (c) => c.json({ mode: DRY ? 'demo' : 'live', services: CATALOG }));
+app.get('/api/services', (c) => c.json({ mode: DRY ? 'demo' : 'live', services: shown(c, CATALOG) }));
+app.get('/api/owner', (c) => (isOwner(c) ? c.json({ ok: true }) : c.json({ error: 'That key doesn\'t open the books.' }, 401)));
 app.get('/api/escrow', (c) => c.json(escrowConfig()));
 
 app.post('/api/quote', async (c) => {
@@ -63,7 +86,7 @@ app.post('/api/quote', async (c) => {
   try {
     const unfunded = await teamShortfall(service);
     if (unfunded) return c.json({ error: unfunded }, 409);
-    return c.json(createQuote({ service, brief, email, details }));
+    return c.json(shown(c, createQuote({ service, brief, email, details })));
   } catch (e: any) {
     return c.json({ error: e.message }, 400);
   }
@@ -106,7 +129,7 @@ app.post('/api/orders/:id/start', async (c) => {
   const { mode } = await c.req.json().catch(() => ({ mode: 'promo' }));
   try {
     await start(o, mode === 'simulated' ? 'simulated' : 'promo');
-    return c.json(view(o.id));
+    return c.json(shown(c, view(o.id)));
   } catch (e: any) {
     return c.json({ error: e.message }, 400);
   }
@@ -120,7 +143,7 @@ app.post('/api/orders/:id/escrow', async (c) => {
   const { customer } = await c.req.json().catch(() => ({}));
   try {
     await openEscrow(o.id, String(customer ?? ''));
-    return c.json(view(o.id));
+    return c.json(shown(c, view(o.id)));
   } catch (e: any) {
     console.error(`escrow open ${o.id}: ${e.shortMessage ?? e.message}`);
     return c.json({ error: e.shortMessage ?? e.message }, 400);
@@ -136,7 +159,7 @@ app.post('/api/orders/:id/sync', async (c) => {
   try {
     if (note) noteForRevision(o, String(email ?? ''), String(note));
     await syncEscrow(o.id, tx ? String(tx) : undefined);
-    return c.json(view(o.id));
+    return c.json(shown(c, view(o.id)));
   } catch (e: any) {
     return c.json({ error: e.shortMessage ?? e.message }, 400);
   }
@@ -149,7 +172,7 @@ app.post('/api/orders/:id/retry', async (c) => {
   if (String(email ?? '').trim().toLowerCase() !== o.email) return c.json({ error: 'Only the customer who placed this order can retry it.' }, 403);
   try {
     retry(o);
-    return c.json(view(o.id));
+    return c.json(shown(c, view(o.id)));
   } catch (e: any) {
     return c.json({ error: e.message }, 400);
   }
@@ -163,7 +186,7 @@ app.post('/api/orders/:id/:action{accept|reject|revise}', async (c) => {
   if (String(email ?? '').trim().toLowerCase() !== o.email) return c.json({ error: 'Only the customer who placed this order can decide on it.' }, 403);
   try {
     decide(o, c.req.param('action') as 'accept' | 'reject' | 'revise', note);
-    return c.json(view(o.id));
+    return c.json(shown(c, view(o.id)));
   } catch (e: any) {
     return c.json({ error: e.message }, 400);
   }
@@ -172,7 +195,7 @@ app.post('/api/orders/:id/:action{accept|reject|revise}', async (c) => {
 app.get('/api/orders/:id', (c) => {
   const o = getOrder(c.req.param('id'));
   if (!o) return c.json({ error: 'not found' }, 404);
-  return c.json(view(o.id));
+  return c.json(shown(c, view(o.id)));
 });
 
 const MEDIA: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', svg: 'image/svg+xml', zip: 'application/zip', html: 'text/plain; charset=utf-8' };
@@ -180,6 +203,7 @@ app.get('/api/orders/:id/files/:name', (c) => {
   const o = getOrder(c.req.param('id'));
   const name = c.req.param('name');
   if (!o || !/^[a-z0-9._-]+$/i.test(name)) return c.text('not found', 404);
+  if (name === 'job.json' && !isOwner(c)) return c.text('not found', 404); // the job record holds our costs
   const last = o.runs[o.runs.length - 1];
   const f = last && join(DATA_DIR, 'jobs', last, name);
   if (!f || !existsSync(f)) return c.text('not found', 404);
@@ -214,7 +238,12 @@ app.get('/s/:slug', site);
 app.get('/s/:slug/', site);
 app.get('/s/:slug/:file', site);
 
-app.get('/api/books', async (c) => c.json(await books()));
+app.get('/api/books', async (c) => (isOwner(c) ? c.json(await books()) : c.json({ error: 'owner only' }, 401)));
+// What anyone can see: how much work the team has done, without any money figures.
+app.get('/api/stats', async (c) => {
+  const b = await books();
+  return c.json({ mode: b.mode, toolCalls: b.counters.toolCalls, settled: b.ledger.filter((e: any) => e.meta?.kind === 'tool' && e.meta?.settled).length, delivered: b.counters.delivered, customers: b.counters.customers });
+});
 
 // The CFO in public: what it sees, the rules it follows, and every decision it made (signed, hash-chained).
 let verified: { at: number; v: Awaited<ReturnType<typeof verifyLog>> } | null = null;
@@ -231,15 +260,17 @@ app.get('/api/cfo', async (c) => {
     decisions: log,
   });
 });
-app.get('/api/team', (c) => c.json(team()));
-app.get('/api/replay', (c) => c.json({ mode: DRY ? 'demo' : 'live', orders: replay(Number(c.req.query('limit') ?? 6), c.req.query('order') || undefined) }));
+app.get('/api/team', (c) => c.json(shown(c, team())));
+app.get('/api/replay', (c) => c.json({ mode: DRY ? 'demo' : 'live', orders: shown(c, replay(Number(c.req.query('limit') ?? 6), c.req.query('order') || undefined)) }));
 app.get('/api/traction.md', (c) => {
+  if (!isOwner(c)) return c.text('owner only', 401);
   if (DRY) return c.text('Traction is only reported from live books.', 404);
   c.header('content-type', 'text/markdown; charset=utf-8');
   return c.body(tractionReport().md);
 });
-app.get('/api/traction', (c) => c.json(DRY ? null : tractionReport().summary));
+app.get('/api/traction', (c) => (isOwner(c) ? c.json(DRY ? null : tractionReport().summary) : c.json({ error: 'owner only' }, 401)));
 app.get('/api/books.beancount', (c) => {
+  if (!isOwner(c)) return c.text('owner only', 401);
   c.header('content-type', 'text/plain; charset=utf-8');
   return c.body(beancount());
 });
@@ -257,7 +288,7 @@ bus.on('event', (e: SynclyEvent) => {
 app.get('/api/events', (c) =>
   streamSSE(c, async (stream) => {
     const only = c.req.query('order');
-    const send = (e: SynclyEvent) => { if (!only || e.orderId === only) void stream.writeSSE({ data: JSON.stringify(e), event: e.type }); };
+    const send = (e: SynclyEvent) => { if (!only || e.orderId === only) void stream.writeSSE({ data: JSON.stringify(scrub(e)), event: e.type }); };
     bus.on('event', send);
     const ping = setInterval(() => void stream.writeSSE({ data: '{}', event: 'ping' }), 20_000);
     await new Promise<void>((resolve) => stream.onAbort(() => resolve()));

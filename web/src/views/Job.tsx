@@ -39,32 +39,33 @@ function Timeline({ steps }: { steps: Step[] }) {
   );
 }
 
+/** Every call the team made for this job, each linked to its settlement on Arc. Costs show only to the owner. */
 function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
   const q = o.quote;
-  const spent = receipt.reduce((s, r) => s + r.usd, 0);
+  const owner = receipt.some((r) => typeof r.usd === 'number');
+  const spent = receipt.reduce((s, r) => s + (r.usd ?? 0), 0);
   const price = q.promo || o.refund ? 0 : q.priceUsd; // a refunded job earned nothing
   const bond = o.refund?.bondUsd ?? 0;
   return (
     <div className="receipt">
       <div className="rh"><b>SYNCLY</b><span>{o.id} · {new Date(o.createdAt).toLocaleDateString()}</span></div>
-      <div style={{ fontSize: 11.5, color: 'var(--muted)', textAlign: 'center' }}>Every tool the team bought for this job</div>
+      <div style={{ fontSize: 11.5, color: 'var(--muted)', textAlign: 'center' }}>Every tool the team paid for on this job</div>
       <hr />
       <div className="scroll">
         {receipt.length === 0 && <div className="empty">Nothing bought yet</div>}
         {receipt.map((r, i) => (
           <motion.div key={i} className="ln" initial={{ opacity: 0, y: -6, clipPath: 'inset(0 0 100% 0)' }} animate={{ opacity: 1, y: 0, clipPath: 'inset(0 0 0% 0)' }} transition={{ delay: Math.min(i, 12) * 0.05, duration: 0.3 }}>
             <span className="who"><Avatar role={r.agent} />{r.vendor}</span>
-            <span className="v">{r.usd.toFixed(4)}</span>
+            {owner && <span className="v">{r.usd!.toFixed(4)}</span>}
             <span className="why">{r.reason}{r.dry ? ' · demo' : r.settledTx ? <> · <a href={`https://arcscan.app/tx/${r.settledTx}`} target="_blank" rel="noreferrer">settled on Arc ↗</a></> : ' · paid, settling on Arc…'}</span>
           </motion.div>
         ))}
       </div>
       <hr />
-      <div className="tot"><span>Tools ({receipt.length})</span><span>{spent.toFixed(4)}</span></div>
+      <div className="tot"><span>Paid calls</span><span>{receipt.length}</span></div>
       <div className="tot"><span>You pay{q.promo ? ' (free)' : o.refund ? ' (refunded)' : ''}</span><span>{price.toFixed(2)}</span></div>
       {bond > 0 && <div className="tot"><span>Bond paid to you</span><span>−{bond.toFixed(2)}</span></div>}
-      <hr />
-      <div className="tot big"><span>Syncly's margin</span><span>{(price - spent - bond).toFixed(4)}</span></div>
+      {owner && <><hr /><div className="tot"><span>Tools (owner view)</span><span>{spent.toFixed(4)}</span></div><div className="tot big"><span>Margin</span><span>{(price - spent - bond).toFixed(4)}</span></div></>}
       <div className="foot">USDC · {o.demo ? 'demo receipt, no money moved' : 'paid per call via x402 on Arc'}</div>
     </div>
   );
@@ -360,7 +361,7 @@ export default function Job({ id }: { id: string }) {
               <ol className="why">{q.reasons.map((r) => <li key={r}>{r}</li>)}</ol>
             </details>
           </section>
-          <p className="muted" style={{ fontSize: 13.5 }}>Every receipt here is public. <Link href="/books">See the company's books →</Link></p>
+          <p className="muted" style={{ fontSize: 13.5 }}>Each agent paid for its own tools, per call, and every payment settles on Arc.</p>
         </aside>
       </div>
     </main>

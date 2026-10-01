@@ -642,6 +642,11 @@ body:has(.home) .foot { margin-top: var(--gutter); }
 .ob__art { position: relative; padding: clamp(16px, 3vw, 40px) clamp(16px, 3vw, 40px) 22px; border-radius: var(--r-xl); background: var(--paper-2); overflow: hidden; }
 .ob__art::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(19, 39, 28, 0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(19, 39, 28, 0.045) 1px, transparent 1px); background-size: 30px 30px; }
 .ob__art .art { position: relative; }
+.ob__wallets { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.ob__wallets > div { display: grid; justify-items: center; gap: 6px; padding: 14px 8px 12px; border-radius: 16px; background: #fff; border: 1px solid var(--line); text-align: center; }
+.ob__wallets b { font-size: 14px; font-weight: 600; }
+.ob__wallets .mono { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+@media (max-width: 520px) { .ob__wallets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .ob__cap { position: relative; margin-top: 8px; text-align: center; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 @media (max-width: 900px) { .ob { grid-template-columns: minmax(0, 1fr); } }
 
@@ -843,3 +848,5 @@ body:has(.home) .foot { margin-top: var(--gutter); }
 .bform div.field { display: grid; gap: 8px; font-size: 14px; font-weight: 600; color: var(--ink); }
 .bform .field .hint { display: block; font-weight: 400; color: var(--muted); font-size: 13px; margin-top: -4px; }
 .bform label.field .hint { margin-top: -4px; }
+
+.linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent, #17473b); text-decoration: underline; cursor: pointer; }

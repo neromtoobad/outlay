@@ -11,6 +11,13 @@ import BusinessForm, { type Details } from './BusinessForm.tsx';
 // Services that take the structured business form instead of a one-line brief.
 const FORM_SERVICES = new Set(['website', 'content-pack', 'motion-ad', 'ad-launch', 'product-photos', 'get-found', 'buy-smart']);
 
+// One-line examples for the services ordered in a sentence (the rest use the business form).
+const EXAMPLES: Record<string, string[]> = {
+  'local-business-finder': ['Every café and coffee shop in Lekki Phase 1 that has no website', 'Pharmacies in Yaba, Lagos with a phone number', 'Hair salons in Wuse 2, Abuja rated 4 stars or more'],
+  'lead-list': ['25 fitness studios and gyms in Lekki and Ikoyi for my smoothie delivery business', 'Boutique hotels in Victoria Island for our laundry service', 'Private schools in Ikeja for our school-bus app'],
+  'research-brief': ['Competitors and pricing for a small bakery in Lekki that wants to add cake delivery', 'Is there demand for solar inverter rentals in Ibadan?', 'How do Lagos co-working spaces price day passes?'],
+};
+
 type QuotedOrder = { id: string; status: string; quote: Quote; demo: boolean; brief?: string };
 
 
@@ -28,7 +35,6 @@ function QuoteDoc({ s, order }: { s: Service; order: QuotedOrder }) {
         <div className="srow"><span className="lbl">{s.name}</span><span className="fill" /><span className="v">{usd(s.priceUsd)}</span></div>
         {q.promo && <div className="srow"><span className="lbl">First job free</span><span className="fill" /><span className="v">({usd(s.priceUsd)})</span></div>}
         <div className="srow"><span className="lbl">Bond paid to you if you reject<small>{q.promo ? 'n/a on free jobs' : `${Math.round(q.bondBps / 100)}% of price`}</small></span><span className="fill" /><span className="v">{q.promo ? '—' : `+${usd(q.bondUsd)}`}</span></div>
-        <div className="srow"><span className="lbl">Tools the team will buy<small>we pay this</small></span><span className="fill" /><span className="v">~{usd(q.estCostUsd, 3)}</span></div>
         <div className="srow"><span className="lbl">Delivery</span><span className="fill" /><span className="v">~{s.etaMin} min</span></div>
         <div className="srow total"><span className="lbl">You pay, only if you accept</span><span className="fill" /><span className="v">{q.promo ? '0.00' : usd(q.priceUsd)} USDC</span></div>
       </Stagger>
@@ -150,7 +156,7 @@ export default function Hire({ service }: { service: string }) {
       router.push(`/job/${order.id}`);
     } catch (e: any) { setErr(e.message); setBusy(false); }
   }
-  const examples = s.example ? [s.example] : [];
+  const examples = EXAMPLES[s.id] ?? (s.example ? [s.example] : []);
   const q = order?.quote;
   const others = data!.services.filter((x) => x.live && x.id !== s.id);
 
@@ -173,7 +179,7 @@ export default function Hire({ service }: { service: string }) {
 
           <div className="facts">
             <div><div className="k">Price</div><div className="v">{s.priceUsd} USDC<small>{ngn(s.priceUsd)}</small></div></div>
-            <div><div className="k">Tools it usually needs</div><div className="v">~{s.listedCostUsd} USDC<small>paid by us, on a public receipt</small></div></div>
+            <div><div className="k">The team</div><div className="v">{s.team.length} agents<small>each pays for its own tools</small></div></div>
             <div><div className="k">Delivered in</div><div className="v">~{s.etaMin} min<small>you watch it happen</small></div></div>
           </div>
           {others.length > 0 && <p className="muted" style={{ fontSize: 14, marginTop: 22 }}>Need something else? {others.map((o, i) => <span key={o.id}>{i ? ' · ' : ''}<Link href={`/hire/${o.id}`}>{o.name}</Link></span>)}</p>}

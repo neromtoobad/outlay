@@ -25,6 +25,8 @@ export const ROLES: Record<string, { title: string; blurb: string; c: string; t:
   analyst: { title: "Crunches the numbers", blurb: "Counts, ratings, patterns: the summary on top of every list.", c: "#2848b8", t: "#e2e7f8" },
   messenger: { title: "Delivers the work", blurb: "Packages files and gets them to you.", c: "#cf2a2a", t: "#fbe2df" },
   auditor: { title: "Quality control", blurb: "Checks the work on a different AI model before you ever see it.", c: "#5a2d5f", t: "#eee3ef" },
+  producer: { title: "Makes the videos", blurb: "Motion ads with their own soundtrack, and the video in every ad launch.", c: "#c2187a", t: "#fbe0ee" },
+  investigator: { title: "Digs deeper", blurb: "Asks the AI assistants what they say about you, and checks sellers before you pay.", c: "#8a6232", t: "#f4eadb" },
 };
 export const HAS_ART = new Set(Object.keys(ROLES));
 export const tint = (role: string) => ({ ["--t" as any]: ROLES[role]?.t, ["--c" as any]: ROLES[role]?.c }) as React.CSSProperties;
@@ -58,8 +60,12 @@ export function Seal({ size = 32 }: { size?: number }) {
   );
 }
 
+/** The owner's key for the private books, kept on this device only. With it, the API also returns costs. */
+export const OWNER_KEY = 'syncly:owner';
+const ownerHeader = (): Record<string, string> => { try { const k = localStorage.getItem(OWNER_KEY); return k ? { 'x-owner-key': k } : {}; } catch { return {}; } };
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(path, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } });
+  const r = await fetch(path, { ...init, headers: { 'content-type': 'application/json', ...ownerHeader(), ...(init?.headers ?? {}) } });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error ?? `HTTP ${r.status}`);
   return j as T;
@@ -94,13 +100,13 @@ export const timeAgo = (iso: string) => {
 };
 
 export type Service = {
-  id: string; name: string; dept: string; live: boolean; priceUsd: number; listedCostUsd: number; etaMin: number;
+  id: string; name: string; dept: string; live: boolean; priceUsd: number; listedCostUsd?: number; etaMin: number;
   tagline: string; youGet: string[]; team: string[]; example: string;
 };
-export type Quote = { priceUsd: number; promo: boolean; bondUsd: number; bondBps: number; estCostUsd: number; pAccept: number; expectedProfitUsd: number; decision: 'quote' | 'decline'; deliverHours: number; reasons: string[] };
-export type Receipt = { at: string; agent: string; vendor: string; usd: number; transaction: string; reason: string; dry: boolean; settledTx?: string };
+export type Quote = { priceUsd: number; promo: boolean; bondUsd: number; bondBps: number; estCostUsd?: number; pAccept: number; expectedProfitUsd?: number; decision: 'quote' | 'decline'; deliverHours: number; reasons: string[] };
+export type Receipt = { at: string; agent: string; vendor: string; usd?: number; transaction: string; reason: string; dry: boolean; settledTx?: string };
 export type Step = { at: string; agent: string; step: string; note: string };
-export type Run = { id: string; status: string; steps: Step[]; receipt: Receipt[]; deliverable: string; files: string[]; qa?: { verdict: string; notes: string; model: string }; spentUsd: number; error?: string };
+export type Run = { id: string; status: string; steps: Step[]; receipt: Receipt[]; deliverable: string; files: string[]; qa?: { verdict: string; notes: string; model: string }; spentUsd?: number; error?: string };
 export type Order = {
   id: string; service: string; brief: string; email: string; createdAt: string; quote: Quote; status: string;
   payment?: { mode: string; at: string; tx?: string }; runs: Run[]; revisionNote?: string; deliveredAt?: string;

@@ -5,21 +5,18 @@ group: Build and verify
 order: 1
 ---
 
-Base URL: `https://hiresyncly.site`. Responses are JSON unless noted. Everything that reads the books is public. Actions that move a job forward check who is asking: the email on the order, or the wallet that paid, on-chain.
+Base URL: `https://hiresyncly.site`. Responses are JSON unless noted. The books are private to the owner (sent with an `x-owner-key` header); everything else that reads is public, without cost figures. Actions that move a job forward check who is asking: the email on the order, or the wallet that paid, on-chain.
 
 ## Read
 
 | Endpoint | Returns |
 |---|---|
 | `GET /api/health` | `{ ok, mode: "live" \| "demo", keys, treasury }`. `treasury` is the treasury's public address, which proves which keys are loaded without revealing them. |
-| `GET /api/services` | The menu: each service's price, listed tool cost, team, what you get, and whether it's live |
+| `GET /api/services` | The menu: each service's price, team, what you get, and whether it's live |
 | `GET /api/escrow` | What a browser needs to pay: chain id, RPC, explorer, and the escrow, vault and USDC addresses |
-| `GET /api/books` | Counters, P&L, per-service unit economics, the daily series, the ledger, and the vault's buckets |
-| `GET /api/books.beancount` | The ledger as a beancount file (text) |
+| `GET /api/stats` | Counts of the team's work: tool payments, payments settled on Arc, jobs delivered, businesses served |
 | `GET /api/cfo` | The CFO's mode, policy, latest snapshot of the vault and agents, this week's plan, metrics, the log's verification result, and the last 150 decisions |
-| `GET /api/team` | Each agent's jobs, steps, paid calls, spend and sellers |
-| `GET /api/traction.md` | The traction report as Markdown |
-| `GET /api/traction` | The same figures as JSON |
+| `GET /api/team` | Each agent's jobs, steps, paid calls and sellers |
 | `GET /api/orders/:id` | One order: its quote, status, runs (steps, receipt, deliverable), escrow record and decision. The email is masked. |
 | `GET /api/orders/:id/files/:name` | A deliverable file, for example `businesses.csv` |
 | `GET /api/replay?limit=6` | Recent jobs as event sequences (the office uses this) |

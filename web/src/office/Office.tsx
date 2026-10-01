@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { OfficeScene, OfficeEvent } from './scene.ts';
 
-type BooksApi = { pnl: { revenue: number; tools: number; grossMargin: number }; counters: { accepted: number; acceptanceRate: number | null; delivered: number } };
+type StatsApi = { toolCalls: number; settled: number; delivered: number };
 
 export type FeedItem = { at: string; kind: 'live' | 'replay'; e: OfficeEvent };
 type Props = {
@@ -51,10 +51,10 @@ export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, on
   useEffect(() => { if (ready) scene.current?.focus(team ?? null); }, [ready, team?.join(',')]);
   useEffect(() => { if (ready && scene.current) scene.current.onAgentClick = (id) => cb.current.onAgentClick?.(id); }, [ready]);
 
-  // the wall screen in the office shows the real books
+  // the wall screen in the office shows the team's real work
   useEffect(() => {
     if (!ready) return;
-    const load = () => fetch('/api/books').then((r) => r.json()).then((b: BooksApi) => scene.current?.setBooks({ revenue: b.pnl.revenue, tools: b.pnl.tools, margin: b.pnl.grossMargin, accepted: b.counters.accepted, acceptance: b.counters.acceptanceRate, jobs: b.counters.delivered })).catch(() => {});
+    const load = () => fetch('/api/stats').then((r) => r.json()).then((s: StatsApi) => scene.current?.setStats({ jobs: s.delivered, calls: s.toolCalls, settled: s.settled })).catch(() => {});
     load();
     const t = setInterval(load, 15000);
     return () => clearInterval(t);

@@ -1,0 +1,92 @@
+{
+  "name": "investigator",
+  "source": "assets/sheets/investigator.png",
+  "frameWidth": 268,
+  "frameHeight": 340,
+  "anchor": {
+    "x": 0.502851679349509,
+    "y": 1
+  },
+  "frames": [
+    {
+      "index": 0,
+      "file": "investigator-0.png",
+      "bbox": [
+        99,
+        22,
+        238,
+        354
+      ]
+    },
+    {
+      "index": 1,
+      "file": "investigator-1.png",
+      "bbox": [
+        410,
+        22,
+        591,
+        355
+      ]
+    },
+    {
+      "index": 2,
+      "file": "investigator-2.png",
+      "bbox": [
+        743,
+        24,
+        919,
+        356
+      ]
+    },
+    {
+      "index": 3,
+      "file": "investigator-3.png",
+      "bbox": [
+        1034,
+        62,
+        1290,
+        326
+      ]
+    },
+    {
+      "index": 4,
+      "file": "investigator-4.png",
+      "bbox": [
+        61,
+        403,
+        271,
+        727
+      ]
+    },
+    {
+      "index": 5,
+      "file": "investigator-5.png",
+      "bbox": [
+        414,
+        422,
+        554,
+        729
+      ]
+    },
+    {
+      "index": 6,
+      "file": "investigator-6.png",
+      "bbox": [
+        732,
+        403,
+        919,
+        728
+      ]
+    },
+    {
+      "index": 7,
+      "file": "investigator-7.png",
+      "bbox": [
+        1069,
+        405,
+        1247,
+        729
+      ]
+    }
+  ]
+}

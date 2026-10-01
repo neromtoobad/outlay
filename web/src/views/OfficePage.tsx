@@ -5,12 +5,12 @@ import Office, { type FeedItem } from '@/office/Office.tsx';
 import { AnimatePresence, motion } from 'motion/react';
 import { Avatar, ROLE_NAME, SERVICE_NAME } from '@/lib.tsx';
 
-const ROSTER = ['cfo', 'scout', 'researcher', 'writer', 'reader', 'verifier', 'analyst', 'auditor', 'illustrator', 'mailer', 'messenger'];
+const ROSTER = ['cfo', 'scout', 'researcher', 'writer', 'reader', 'verifier', 'investigator', 'analyst', 'auditor', 'illustrator', 'producer', 'messenger'];
 
 export function describe(f: FeedItem): { who: string; text: string; amount?: string; order?: string } {
   const d = f.e.data ?? {};
   if (f.e.type === 'step') return { who: d.agent, text: `${d.step}${d.note ? ` · ${d.note}` : ''}`, order: f.e.orderId };
-  if (f.e.type === 'purchase') return { who: d.agent, text: `bought ${d.vendor}`, amount: `−${Number(d.usd).toFixed(4)}`, order: f.e.orderId };
+  if (f.e.type === 'purchase') return { who: d.agent, text: `bought ${d.vendor}`, order: f.e.orderId };
   const label: Record<string, string> = { queued: 'started', delivered: 'delivered', accepted: 'accepted', rejected: 'rejected: refund + bond', failed: 'failed: refund + bond', revision: 'revision requested', running: 'running' };
   return { who: 'cfo', text: `${SERVICE_NAME[d.service] ?? d.service} ${label[d.status] ?? d.status}`, amount: d.status === 'accepted' && !d.promo ? `+${Number(d.price).toFixed(2)}` : undefined, order: f.e.orderId };
 }

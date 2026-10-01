@@ -6,19 +6,18 @@ import { useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Office from '@/office/Office.tsx';
-import { useApi, usd, timeAgo, ROLE_NAME, ROLES, DEPT_TINT, SERVICE_NAME, type Service, type AgentStats, type BooksSummary } from '@/lib.tsx';
+import { useApi, usd, timeAgo, ROLE_NAME, ROLES, DEPT_TINT, Avatar, tint, type Service, type AgentStats } from '@/lib.tsx';
 import { clamp, Rv, SplitLines, useFrame, useInView, useStickyProgress } from '@/components/scroll.tsx';
-import { CostArt, DecideArt, EscrowArt, MarkBlock, QuoteArt, ReceiptArt, VaultArt } from './home/art.tsx';
+import { DecideArt, EscrowArt, MarkBlock, QuoteArt, ReceiptArt, VaultArt } from './home/art.tsx';
 
-type Ledger = { date: string; narration: string; postings: { account: string; amount: number }[]; meta: { agent?: string; reason?: string; kind: string; tx?: string; settled?: boolean } }[];
-type Books = BooksSummary & { ledger: Ledger; perService: Record<string, { jobs: number; avgCost: number; price: number }>; vault: null | { buckets: Record<string, number> } };
+type Stats = { mode: 'demo' | 'live'; toolCalls: number; settled: number; delivered: number; customers: number };
 type Cfo = { enabled: boolean; mode: string; metrics: { done: number; escalated: number }; verify: { ok: boolean; entries: number }; snapshot: null | { buckets: Record<string, number> }; decisions: { summary: string; at: string; tx?: string; status: string; kind: string }[] };
 
 const Arrow = () => <span className="pill__ic">→</span>;
 
 // ---------------------------------------------------------------- hero
 
-function Hero({ books }: { books: Books | null }) {
+function Hero({ stats }: { stats: Stats | null }) {
   const media = useRef<HTMLDivElement>(null);
   useFrame(() => {
     const el = media.current;
@@ -26,28 +25,20 @@ function Hero({ books }: { books: Books | null }) {
     const t = clamp(window.scrollY / window.innerHeight);
     el.style.transform = `scale(${1.04 + t * 0.08}) translateY(${t * 40}px)`;
   });
-  const last = books?.ledger.find((e) => e.meta.kind === 'tool');
   return (
     <section className="hx">
       <div className="hx__panel">
-        <div className="hx__media" ref={media}><img src="/scene/building-1920.webp" alt="Syncly HQ: a three-storey office in Lagos where the AI team works" /></div>
+        <div className="hx__media" ref={media}><img src="/scene/building-1920.webp" alt="Syncly HQ: a three-storey office where the AI team works" /></div>
         <div className="hx__shade" />
         <div className="hx__copy">
-          <span className="hx__tag"><span className="dot" />{books?.mode === 'demo' ? 'Demo mode · nothing real moves' : 'Live on Arc mainnet'}</span>
-          <SplitLines as="h1" text="The first AI company with open books." />
-          <Rv as="p" delay={0.35}>Hire a team of AI agents for real work. A fixed price upfront, you pay only if you accept, and every cent they spend is public, settled in USDC on Arc.</Rv>
+          <span className="hx__tag"><span className="dot" />{stats?.mode === 'demo' ? 'Demo mode · nothing real moves' : 'Live on Arc mainnet'}</span>
+          <SplitLines as="h1" text="Hire an AI team that grows your business." />
+          <Rv as="p" delay={0.35}>Websites, ads, product photos and research, done by AI agents with names, faces and their own wallets. A fixed price upfront, and you pay only if you accept, in USDC on Arc.</Rv>
           <Rv className="hx__cta" delay={0.5}>
             <Link href="/hire/website" className="pill white lg">Hire the team <Arrow /></Link>
-            <Link href="/books" className="pill ghost lg">See the books <Arrow /></Link>
+            <Link href="/office" className="pill ghost lg">Watch them work <Arrow /></Link>
           </Rv>
         </div>
-        {last && (
-          <Rv className="hx__receipt" delay={0.8}>
-            <span className="mono k">Just paid · x402</span>
-            <b>{last.narration.replace(/^(\w+) bought /, (_, a) => `${ROLE_NAME[a] ?? a} bought `)}</b>
-            <span className="mono">{last.postings[0].amount.toFixed(4)} USDC · {last.meta.settled ? 'settled on Arc' : 'settling on Arc'}</span>
-          </Rv>
-        )}
         <div className="hx__foot mono"><span>First website free · refund + bond if you reject</span><span>Scroll ↓</span></div>
       </div>
     </section>
@@ -60,7 +51,10 @@ const CREW: { role: string; buys: string; from: string; line: string }[] = [
   { role: 'scout', buys: 'Search and maps', from: 'Exa · Serper', line: 'Finds every business, page and source the brief asks for.' },
   { role: 'researcher', buys: 'AI models', from: 'BlockRun', line: 'Turns your sentence into a search plan, then pulls out the facts.' },
   { role: 'reader', buys: 'Page reading', from: 'Exa · APEX', line: 'Opens the websites and reads what matters on them.' },
-  { role: 'writer', buys: 'AI models', from: 'BlockRun', line: 'Writes the brief, and a personal first line for every lead.' },
+  { role: 'writer', buys: 'AI models', from: 'BlockRun', line: 'Writes the posts, the ad copy, the briefs, and a personal first line for every lead.' },
+  { role: 'illustrator', buys: 'AI models and images', from: 'BlockRun on Arc', line: 'Builds your website and makes the product photos and ad creatives.' },
+  { role: 'producer', buys: 'Video and music', from: 'BlockRun on Arc', line: 'Makes the motion ads, and the video in every ad launch.' },
+  { role: 'investigator', buys: 'AI-assistant answers', from: 'DataForSEO · Didit', line: 'Asks ChatGPT what it says about you, and checks sellers before you pay.' },
   { role: 'verifier', buys: 'Email checks', from: 'APEX', line: 'Live-checks every email and phone number before you see it.' },
   { role: 'auditor', buys: 'A second model family', from: 'BlockRun', line: 'Checks the work on a different AI before it is delivered.' },
   { role: 'messenger', buys: 'Email delivery', from: 'AgentMail', line: 'Packs the files and gets them to you.' },
@@ -83,7 +77,7 @@ function Team({ agents }: { agents: Record<string, AgentStats> }) {
                   <h2>{ROLE_NAME[c.role]}</h2>
                   <p className="tm__role">{ROLES[c.role]?.title}</p>
                   <p>{c.line} It has its own wallet and pays for its own tools, one call at a time.</p>
-                  <span className="tm__stat"><span className="dot" />{s?.calls ? `${s.calls} paid calls · ${usd(s.usd, 3)} USDC spent` : 'On the team, waiting for its first paid call'}</span>
+                  <span className="tm__stat"><span className="dot" />{s?.calls ? `${s.calls} paid calls, settled on Arc` : 'On the team, waiting for its first paid call'}</span>
                 </div>
               );
             })}
@@ -93,7 +87,7 @@ function Team({ agents }: { agents: Record<string, AgentStats> }) {
           </div>
         </div>
         <div className="tm__stage">
-          <div className="tm__top mono"><span><span className="dot" />Syncly HQ · Lagos</span><span className="tm__prog">{CREW.map((c, i) => <i key={c.role} className={i <= at ? 'on' : ''} />)}</span></div>
+          <div className="tm__top mono"><span><span className="dot" />Syncly HQ</span><span className="tm__prog">{CREW.map((c, i) => <i key={c.role} className={i <= at ? 'on' : ''} />)}</span></div>
           {CREW.map((c, i) => (
             <div key={c.role} className={`tm__fig${i === at ? ' on' : ''}`} style={{ ['--t' as any]: ROLES[c.role]?.t }}>
               <img className="tm__sprite" src={`/sprites/${c.role}/${c.role}-0.png`} alt={ROLE_NAME[c.role]} />
@@ -112,9 +106,9 @@ function Team({ agents }: { agents: Record<string, AgentStats> }) {
 // Categorical colours for the five buckets, validated on the forest surface (CVD-separated, labelled too).
 const BUCKETS: [string, string, string][] = [['operating', 'OPERATING', '#4B8DCF'], ['tools', 'TOOLS', '#59A53B'], ['bond', 'BOND', '#8F5FC0'], ['reserve', 'RESERVE', '#C38300'], ['promo', 'PROMO', '#04A19B']];
 
-function Cfo({ cfo, books }: { cfo: Cfo | null; books: Books | null }) {
+function Cfo({ cfo }: { cfo: Cfo | null }) {
   const [ref, seen] = useInView<HTMLDivElement>();
-  const live = cfo?.snapshot?.buckets ?? books?.vault?.buckets ?? null;
+  const live = cfo?.snapshot?.buckets ?? null;
   const buckets = BUCKETS.map(([key, label, color]) => ({ key, label, color, value: live?.[key] ?? { operating: 1.2, tools: 0.6, bond: 1.5, reserve: 1, promo: 0.4 }[key]! }));
   const latest = cfo?.decisions.find((d) => d.status === 'done' || d.status === 'escalated');
   return (
@@ -142,7 +136,7 @@ function Cfo({ cfo, books }: { cfo: Cfo | null; books: Books | null }) {
               <span><b>{cfo?.metrics.escalated ?? 0}</b> to the Boss</span>
               <span><b>{cfo?.verify.ok ? '✓' : '—'}</b> log verified</span>
             </div>
-            <Link href="/books" className="pill green">Read the CFO's desk <Arrow /></Link>
+            <Link href="/docs/the-cfo" className="pill green">Read the CFO's rules <Arrow /></Link>
           </div>
         </div>
       </div>
@@ -153,9 +147,9 @@ function Cfo({ cfo, books }: { cfo: Cfo | null; books: Books | null }) {
 // ---------------------------------------------------------------- 03 · how a job works, on stacking cards
 
 const HOW = [
-  { n: '01', h: 'You ask. The CFO prices it.', s: 'A fixed price before anything starts.', p: <>Describe the job in a sentence. The CFO prices it from what similar jobs really cost, and puts up <b>a bond you receive if you reject the work</b>. Your first job is free.</>, Art: QuoteArt },
+  { n: '01', h: 'You ask. The CFO prices it.', s: 'A fixed price before anything starts.', p: <>Describe the job in a sentence. The CFO prices it from what similar jobs really cost, and puts up <b>a bond you receive if you reject the work</b>. Your first website is free.</>, Art: QuoteArt },
   { n: '02', h: 'You pay into escrow.', s: 'The money waits in a contract, not with us.', p: <>Pay in USDC from your own wallet into <b>JobEscrow on Arc</b>. Syncly is paid only when you accept, or after 48 hours of silence.</>, Art: EscrowArt },
-  { n: '03', h: 'The team works in the open.', s: 'Every tool they buy is on your receipt.', p: <>The agents buy searches, page reads and model calls with x402 nanopayments, <b>each one linked to its settlement on Arc</b>. You watch it happen on your job page.</>, Art: ReceiptArt },
+  { n: '03', h: 'You watch them work.', s: 'Every call they make is on your job page.', p: <>The agents buy searches, page reads and model calls with x402 nanopayments, <b>each one linked to its settlement on Arc</b>. You watch it happen, step by step.</>, Art: ReceiptArt },
   { n: '04', h: 'You decide.', s: 'Accept, revise once, or reject.', p: <>Only the wallet that paid can decide. Accept to release the payment, ask for one free revision, or reject it and <b>get your money back plus the bond</b>.</>, Art: DecideArt },
 ];
 
@@ -194,32 +188,29 @@ function How() {
   );
 }
 
-// ---------------------------------------------------------------- 04 · the books
+// ---------------------------------------------------------------- 04 · paid on Arc
 
-function OpenBooks({ books }: { books: Books | null }) {
-  const [ref, seen] = useInView<HTMLDivElement>();
-  // the service with the most measured jobs; the Website's listed numbers until there are some
-  const [shownId, lbf] = (['website', 'content-pack', 'motion-ad', 'ad-launch', 'product-photos', 'get-found', 'buy-smart'] as const).map((id) => [id, books?.perService?.[id]] as const).filter(([, x]) => x && x.jobs > 0 && x.avgCost > 0).sort((a, b) => b[1]!.jobs - a[1]!.jobs)[0] ?? ['website', undefined];
-  const cost = lbf ? lbf.avgCost : 0.7;
-  const settled = books?.ledger.filter((e) => e.meta.kind === 'tool' && e.meta.settled).length ?? 0;
-  const c = books?.counters, p = books?.pnl;
+const WALLETS = ['scout', 'researcher', 'reader', 'writer', 'illustrator', 'producer', 'investigator', 'verifier', 'analyst', 'auditor', 'messenger', 'cfo'];
+
+function PaidOnArc({ stats }: { stats: Stats | null }) {
   return (
     <section className="ob wrap">
       <div className="ob__copy">
-        <span className="label"><span className="n">04</span>Open books</span>
-        <SplitLines text="Every cent is public. Here are ours." />
-        <Rv as="p" className="lede">Most companies show you a price. We show you the receipt behind it: what each job cost us in tools, measured, and every payment our agents made, each settled on Arc.</Rv>
+        <span className="label"><span className="n">04</span>Paid on Arc</span>
+        <SplitLines text="Every agent pays its own way." />
+        <Rv as="p" className="lede">Each agent has its own wallet. When it searches, reads a page or calls a model, it pays the seller itself, per call, in USDC, and the payment settles on Arc. Your job page shows every call the team made for you.</Rv>
         <div className="ob__nums">
-          <Rv><b>{c?.toolCalls ?? '—'}</b><span>tool payments by agents</span></Rv>
-          <Rv delay={0.08}><b>{settled}</b><span>settled on Arc so far</span></Rv>
-          <Rv delay={0.16}><b>{p ? usd(p.tools, 3) : '—'}</b><span>USDC spent on tools</span></Rv>
-          <Rv delay={0.24}><b>{c?.delivered ?? '—'}</b><span>jobs delivered</span></Rv>
+          <Rv><b>{stats?.toolCalls ?? '—'}</b><span>tool payments by agents</span></Rv>
+          <Rv delay={0.08}><b>{stats?.settled ?? '—'}</b><span>settled on Arc so far</span></Rv>
+          <Rv delay={0.16}><b>{stats?.delivered ?? '—'}</b><span>jobs delivered</span></Rv>
+          <Rv delay={0.24}><b>{stats?.customers ?? '—'}</b><span>businesses served</span></Rv>
         </div>
-        <Rv delay={0.2}><Link href="/books" className="pill dark">Open the books <Arrow /></Link></Rv>
+        <Rv delay={0.2}><Link href="/office" className="pill dark">Watch them work <Arrow /></Link></Rv>
       </div>
-      <div className={`ob__art${seen ? ' in' : ''}`} ref={ref}>
-        <CostArt price={lbf?.price ?? 15} cost={cost} />
-        <p className="mono ob__cap">{SERVICE_NAME[shownId]}: its price next to what a job {lbf ? 'measurably costs' : 'is listed to cost'} us in tools</p>
+      <div className="ob__art">
+        <div className="ob__wallets">
+          {WALLETS.map((r) => <div key={r} style={tint(r)}><Avatar role={r} lg /><b>{ROLE_NAME[r]}</b><span className="mono">own wallet · Arc</span></div>)}
+        </div>
       </div>
     </section>
   );
@@ -324,16 +315,16 @@ function Close() {
 
 export default function Home() {
   const { data: svc } = useApi<{ services: Service[] }>('/api/services');
-  const { data: books } = useApi<Books>('/api/books', 20000);
+  const { data: stats } = useApi<Stats>('/api/stats', 20000);
   const { data: team } = useApi<{ agents: Record<string, AgentStats> }>('/api/team', 30000);
   const { data: cfo } = useApi<Cfo>('/api/cfo', 30000);
   return (
     <main className="home">
-      <Hero books={books} />
+      <Hero stats={stats} />
       <Team agents={team?.agents ?? {}} />
-      <Cfo cfo={cfo?.enabled ? cfo : null} books={books} />
+      <Cfo cfo={cfo?.enabled ? cfo : null} />
       <How />
-      <OpenBooks books={books} />
+      <PaidOnArc stats={stats} />
       <TheOffice />
       {svc && <Services services={svc.services} />}
       <Close />

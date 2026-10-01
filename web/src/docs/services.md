@@ -1,11 +1,11 @@
 ---
 title: Services
-description: Seven things the team does for a business, what each costs, and what it costs us.
+description: What the team does for a business, and what each job costs you.
 group: Start here
 order: 3
 ---
 
-Syncly does seven jobs for small businesses, the ones an owner would otherwise pay an agency or a freelancer for. Every job starts with a short form about your business, so the work is about you, not generic.
+Syncly does the jobs a small business would otherwise pay an agency or a freelancer for, plus research you can order in a sentence. Growth and buying jobs start with a short form about your business, so the work is about you, not generic.
 
 | Service | Price | Typical time | You get |
 |---|---|---|---|
@@ -16,6 +16,9 @@ Syncly does seven jobs for small businesses, the ones an owner would otherwise p
 | **Product Photo Studio** | 6 USDC | ~8 min | Your phone photos turned into studio, lifestyle and white-background shots, sized for where you sell |
 | **Get Found** | 15 USDC | ~10 min | Where you rank on Google Maps street by street, what ChatGPT and Gemini say about you, and the fixes |
 | **Buy Smart** | 5 USDC | ~8 min | The cheapest trustworthy offers for what you need, and a risk check on the sellers before you pay |
+| **Local Business Finder** | 3 USDC | ~3 min | Every business of a type in an area, with phone, website and rating |
+| **Lead List** | 5 USDC | ~8 min | Up to 25 verified business emails, each with a personalised first line |
+| **Research Brief** | 3 USDC | ~6 min | Competitors, market and pricing, with every claim cited |
 
 You pay into an escrow on Arc. The money only leaves when you accept the work; reject it and you get it back, plus a bond. See [Escrow payments](/docs/escrow).
 
@@ -55,23 +58,29 @@ Customers find a business in two places now: Google Maps and AI assistants. The 
 
 For *"two chest freezers, 300 litres, delivered to Surulere, budget ₦900k"*. The team compares Google Shopping and marketplaces such as Jumia, Konga and Jiji, counts delivery, and re-opens the best offers to confirm the price is really on the page. Then it checks the sellers that matter before you pay: the ones you're already talking to, and any best pick from classifieds, Instagram or an unknown site. Each gets a red, amber or green verdict from fixed rules, with every signal cited: phone fraud checks, the website's age, whether the business is really on the map, scam reports on Nairaland and Reddit. It reports risk; it never calls anyone a fraudster. It replaces Best Price Finder and Check Before You Pay.
 
-## What we stopped doing
+## Research
 
-Local Business Finder, Lead List, Research Brief, Video Ad (now part of Ad Launch), AI Answer Audit (now part of Get Found), Best Price Finder and Check Before You Pay (now Buy Smart). Their past jobs are still on [Open books](/books).
+Ordered in a sentence, no form needed.
 
-## What a job costs us
+### Local Business Finder
 
-The books show each service's measured tool cost next to its price; see the live figures on [Open books](/books). Each service has a hard **budget per job** the agents can't exceed, and a **price cap on every call**. Rendering (site screenshots, creatives, motion frames, video editing) runs on our own server and costs nothing per job.
+Built for requests like *"pharmacies in Yaba, Lagos with a phone number"* or *"cafés in Lekki with no website"*. The Researcher turns your sentence into a search plan. The Scout searches maps and the web. The Analyst summarises counts, ratings and how many businesses you can reach. Fixed rules check the list: no duplicates, every row complete, and the filter really holds.
 
-| Service | Tool budget per job (plus email delivery) |
-|---|---|
-| Website | 2.20 USDC |
-| Content Pack | 1.60 USDC |
-| Ad Launch | 3.00 USDC |
-| Motion Ad | 2.40 USDC |
-| Product Photo Studio | 1.50 USDC |
-| Get Found | 4.50 USDC |
-| Buy Smart | 2.00 USDC |
+### Lead List
+
+For *"25 fitness studios in Ikoyi for my smoothie delivery business"*. The team finds the businesses, reads their sites, finds contact emails, and the Verifier live-checks each one. The Writer adds an opening line per lead, written from something real about that business. **You send the emails; we never cold-email for you.**
+
+### Research Brief
+
+For *"is there demand for solar inverter rentals in Ibadan?"*. The Researcher plans the questions, the Scout and Reader gather sources, the Writer drafts, and the Auditor, running a different model family, checks every claim against its citation.
+
+## Folded into other services
+
+Video Ad is now part of Ad Launch, the AI Answer Audit is part of Get Found, and Best Price Finder and Check Before You Pay are now Buy Smart.
+
+## Limits on every job
+
+Each service has a hard **budget per job** the agents can't exceed, and a **price cap on every call**. Rendering (site screenshots, creatives, motion frames, video editing) runs on our own server.
 
 ## Models, and who pays for them
 
