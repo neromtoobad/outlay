@@ -1,13 +1,15 @@
-// The Messenger emails every delivery to the customer. It pays for AgentMail with x402 from its own
-// Gateway balance, so each email is a line on the job's receipt like any other tool.
-//   OUTLAY_MAIL=aisa (default): AgentMail via AIsa, 0.10 USDC to open the mailbox once, 0.10 per email
+// The Messenger emails every delivery to the customer.
+//   RESEND_API_KEY set:         Resend, from MAIL_FROM (default "Syncly <hello@hiresyncly.site>"); used whenever
+//                               the key is there, unless AgentMail is asked for by name
+//   OUTLAY_MAIL=aisa (default without Resend): AgentMail via AIsa, paid by x402 from the Messenger's Gateway
+//                               balance (a line on the job's receipt): 0.10 USDC for the mailbox once, 0.10 per email
 //   OUTLAY_MAIL=orthogonal:     AgentMail via Orthogonal, 2 USDC a month for the mailbox, 0.01 per email
 //                               (too big for a job's budget: open it once yourself and set OUTLAY_MAIL_INBOX)
-//   OUTLAY_MAIL=off:            no emails (the job page is still the delivery)
+//   OUTLAY_MAIL=off:            no emails unless Resend is set up (the job page is still the delivery)
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { marked } from 'marked';
-import { DATA_DIR } from './config.ts';
+import { DATA_DIR, DRY } from './config.ts';
 import { buy } from './x402.ts';
 import type { Job } from './job.ts';
 import type { Order } from './orders.ts';
@@ -16,8 +18,12 @@ const PRESETS = {
   aisa: { vendor: 'AgentMail (AIsa)', base: 'https://api.aisa.one/apis/v2/agentmail', inboxUsd: 0.1, sendUsd: 0.1 },
   orthogonal: { vendor: 'AgentMail (Orthogonal)', base: 'https://np.orthogonal.com/agentmail/v0', inboxUsd: 2, sendUsd: 0.01 },
 } as const;
-const choice = (process.env.OUTLAY_MAIL ?? 'aisa') as keyof typeof PRESETS | 'off';
-export const MAIL = choice === 'off' ? null : PRESETS[choice] ?? PRESETS.aisa;
+const want = process.env.OUTLAY_MAIL;
+const RESEND_KEY = process.env.RESEND_API_KEY?.trim() || undefined;
+export const MAIL_FROM = process.env.MAIL_FROM?.trim() || 'Syncly <hello@hiresyncly.site>';
+export const MAILER: 'resend' | 'agentmail' | null = want === 'aisa' || want === 'orthogonal' ? 'agentmail' : RESEND_KEY ? 'resend' : want === 'off' ? null : 'agentmail';
+/** AgentMail's x402 seller, when that is the mailer (Resend is a plain API, outside the agents' budgets). */
+export const MAIL = MAILER === 'agentmail' ? PRESETS[(want ?? 'aisa') as keyof typeof PRESETS] ?? PRESETS.aisa : null;
 export const MAIL_HOST = MAIL ? new URL(MAIL.base).host : '';
 /** Mail costs each service's budget must leave room for: the per-email price plus the one-off mailbox. */
 export const MAIL_BUDGET_USD = MAIL ? MAIL.sendUsd + Math.min(MAIL.inboxUsd, 0.1) : 0;
@@ -72,7 +78,7 @@ export function compose(job: Pick<Job, 'deliverable' | 'files'>, o: Order) {
       ? 'This one was your free first job. Tell us on the job page if it was good.'
       : 'Accept, revise or reject it on the job page.';
   const subject = `${revised ? 'Revised: ' : ''}your ${name} is ready · ${brief}`;
-  const text = `The Syncly team finished your job.\n\n"${o.brief}"\n\n${job.deliverable}\n\n${decide}\n${link}\n\nYour job page shows every step the team took. This email was sent and paid for by our Messenger agent, in USDC on Arc.\n`;
+  const text = `The Syncly team finished your job.\n\n"${o.brief}"\n\n${job.deliverable}\n\n${decide}\n${link}\n\nYour job page shows every step the team took. ${MAIL ? 'This email was sent and paid for by our Messenger agent, in USDC on Arc.' : 'This email was sent by our Messenger agent.'}\n`;
   const html = `<div style="background:#faf7f1;padding:28px 12px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;color:#1b1a17">
 <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #ebe5d8;border-radius:18px;padding:28px">
 <div style="font-family:Georgia,serif;letter-spacing:.18em;font-size:14px;color:#17473b;margin-bottom:18px">SYNCLY</div>
@@ -81,7 +87,7 @@ export function compose(job: Pick<Job, 'deliverable' | 'files'>, o: Order) {
 <p style="margin:0 0 22px"><a href="${link}" style="display:inline-block;background:#17473b;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600;font-size:14px">Review &amp; decide →</a></p>
 <div style="font-size:14px;line-height:1.55;border-top:1px solid #ebe5d8;padding-top:14px">${render(job.deliverable)}</div>
 <p style="font-size:13.5px;color:#4b4841;background:#f3eee4;border-radius:12px;padding:12px 14px;margin:18px 0 0">${esc(decide)}</p>
-<p style="font-size:12px;color:#847d70;margin:18px 0 0">Your <a href="${link}" style="color:#17473b">job page</a> shows every step the team took. This email was sent, and paid for, by our Messenger agent in USDC on Arc.</p>
+<p style="font-size:12px;color:#847d70;margin:18px 0 0">Your <a href="${link}" style="color:#17473b">job page</a> shows every step the team took. ${MAIL ? 'This email was sent, and paid for, by our Messenger agent in USDC on Arc.' : 'This email was sent by our Messenger agent.'}</p>
 </div></div>`;
   // Text files ride along; images, video and sites are linked from the order page instead (mail size).
   const attachments = job.files.filter((f) => typeof f.content === 'string' && f.content.length < 2_000_000)
@@ -89,18 +95,38 @@ export function compose(job: Pick<Job, 'deliverable' | 'files'>, o: Order) {
   return { subject, text, html, attachments };
 }
 
+/** Send one email through Resend. Demo mode never sends. */
+export async function resend(m: { to: string; subject: string; text: string; html: string; attachments?: { filename: string; content: string }[] }): Promise<{ id: string }> {
+  if (!RESEND_KEY) throw new Error('Resend is not set up (RESEND_API_KEY)');
+  if (DRY) return { id: 'demo-not-sent' };
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST', headers: { authorization: `Bearer ${RESEND_KEY}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ from: MAIL_FROM, to: [m.to], subject: m.subject, text: m.text, html: m.html, ...(process.env.MAIL_REPLY_TO ? { reply_to: process.env.MAIL_REPLY_TO } : {}), ...(m.attachments?.length ? { attachments: m.attachments } : {}) }),
+  });
+  const j: any = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`Resend ${r.status}: ${j?.message ?? j?.name ?? 'send failed'}`);
+  return { id: String(j?.id ?? '') };
+}
+
 /** Email the delivery. Never fails the job: a problem is logged on the job and the page still has everything. */
 export async function emailDelivery(job: Job, o: Order) {
-  if (!MAIL || job.status !== 'delivered') return;
+  if (!MAILER || job.status !== 'delivered') return;
   const to = maskEmail(o.email);
   try {
     job.log('messenger', 'email', `sending the delivery to ${to}`);
+    if (MAILER === 'resend') {
+      const { subject, text, html, attachments } = compose(job, o);
+      const r = await resend({ to: o.email, subject, text, html, attachments: attachments.map(({ filename, content }) => ({ filename, content })) });
+      job.log('messenger', 'emailed', `delivered to ${to}${DRY ? ' (demo: not really sent)' : ` (${r.id.slice(0, 8)})`}`);
+      job.save();
+      return;
+    }
     const inbox = await mailbox(job);
     const { subject, text, html, attachments } = compose(job, o);
     await buy(job, {
-      agent: 'messenger', vendor: MAIL.vendor, url: `${MAIL.base}/inboxes/${encodeURIComponent(inbox)}/messages/send`,
+      agent: 'messenger', vendor: MAIL!.vendor, url: `${MAIL!.base}/inboxes/${encodeURIComponent(inbox)}/messages/send`,
       body: { to: [o.email], subject, text, html, attachments },
-      reason: `email the delivery to ${to}`, maxUsd: MAIL.sendUsd * 1.05, expectUsd: MAIL.sendUsd,
+      reason: `email the delivery to ${to}`, maxUsd: MAIL!.sendUsd * 1.05, expectUsd: MAIL!.sendUsd,
       dryData: () => ({ message_id: 'dry-run' }),
     });
     job.log('messenger', 'emailed', `delivered to ${to}`);

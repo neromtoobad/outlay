@@ -20,6 +20,7 @@ import { decisions as cfoDecisions, verifyLog } from './cfo/log.ts';
 import { tractionReport } from './traction.ts';
 import { books, beancount, team } from './books.ts';
 import { resolveSettlements } from './settle.ts';
+import { MAILER, MAIL_FROM, resend } from './mail.ts';
 
 process.env.OUTLAY_QUIET ??= '1';
 
@@ -67,8 +68,19 @@ const shown = <T>(c: any, x: T): T => (isOwner(c) ? x : scrub(x));
 function treasury() {
   try { return hasSeed() ? account('treasury').address : null; } catch { return 'invalid seed'; }
 }
-app.get('/api/health', (c) => c.json({ ok: true, mode: DRY ? 'demo' : 'live', keys: DRY || hasSeed(), treasury: treasury() }));
+app.get('/api/health', (c) => c.json({ ok: true, mode: DRY ? 'demo' : 'live', keys: DRY || hasSeed(), treasury: treasury(), mail: MAILER ?? 'off' }));
 app.get('/api/services', (c) => c.json({ mode: DRY ? 'demo' : 'live', services: shown(c, CATALOG) }));
+// The owner can send themselves a test email from the private books page.
+app.post('/api/owner/test-email', async (c) => {
+  if (!isOwner(c)) return c.json({ error: 'owner only' }, 401);
+  const to = String((await c.req.json().catch(() => ({})))?.to ?? '').trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return c.json({ error: 'Enter a valid email address.' }, 400);
+  if (MAILER !== 'resend') return c.json({ error: `Email goes through ${MAILER ?? 'nothing'} right now, not Resend: set RESEND_API_KEY in Railway.` }, 400);
+  try {
+    const r = await resend({ to, subject: 'Syncly test email', text: `This is a test from Syncly, sent from ${MAIL_FROM}. Deliveries reach customers the same way.`, html: `<p>This is a test from <b>Syncly</b>, sent from ${MAIL_FROM.replace(/</g, '&lt;')}.</p><p>Deliveries reach customers the same way.</p>` });
+    return c.json({ ok: true, id: r.id });
+  } catch (e: any) { return c.json({ error: e.message }, 502); }
+});
 app.get('/api/owner', (c) => (isOwner(c) ? c.json({ ok: true }) : c.json({ error: 'That key doesn\'t open the books.' }, 401)));
 app.get('/api/escrow', (c) => c.json(escrowConfig()));
 
@@ -321,3 +333,7 @@ setTimeout(settle, 3000);
 setInterval(settle, 120_000);
 const port = Number(process.env.PORT ?? 8790);
 serve({ fetch: app.fetch, port }, () => console.log(`outlay api on :${port} (${DRY ? 'DEMO mode: no money moves' : 'LIVE'})`));
+// Which mailer delivers. With Resend, live, one check email goes to Resend's test inbox so a bad key shows in the logs.
+console.log(`mail: ${MAILER ?? 'off'}${MAILER === 'resend' ? ` from ${MAIL_FROM}` : ''}`);
+if (MAILER === 'resend' && !DRY) resend({ to: 'delivered@resend.dev', subject: 'Syncly mail check', text: 'Startup check.', html: '<p>Startup check.</p>' })
+  .then((r) => console.log(`mail check: Resend accepted it (${r.id})`), (e) => console.log(`mail check FAILED: ${e.message}`));

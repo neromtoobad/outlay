@@ -63,7 +63,7 @@ Agent wallets, each registered in the vault and paying for its own tools:
 | Producer | [`0x37c8…9f36`](https://arcscan.app/address/0x37c8de9f9740Ed30bcdCc1ea5B8C08567BE19f36) | Claude Opus 5 for motion ads, video and music (BlockRun) |
 | Analyst | [`0x2E51…c958`](https://arcscan.app/address/0x2E516E71912adA3B7aFa989aCE06D9A51e7fc958) | AI models to compare prices, answers and signals (BlockRun) |
 | Auditor | [`0x72e5…c9b6`](https://arcscan.app/address/0x72e514Afed2EFdecA263d9710068259f4B00c9b6) | A second AI model family, to check the work |
-| Messenger | [`0x37D0…95a9`](https://arcscan.app/address/0x37D0ccDfcC37ba1803002d95D0077828Afcd95a9) | Email delivery (AgentMail) |
+| Messenger | [`0x37D0…95a9`](https://arcscan.app/address/0x37D0ccDfcC37ba1803002d95D0077828Afcd95a9) | Email delivery (Resend; AgentMail by x402 as a fallback) |
 
 Key transactions: [vault deployed](https://arcscan.app/tx/0x77d94e018c642a803962f9031367098fed1a4c2eadac34f1d5dab14d03c8d6ff), [escrow deployed](https://arcscan.app/tx/0xa6066e70dd18c60cd41cbe29fbc0a33af7f3564a1f196221cd79c31a8acf4b26), [ownership handed to the Boss](https://arcscan.app/tx/0x4020c9a206135485c11e3386d488b1e10790077af525a73dc58ff82afc4ec5ab), [the CFO's first weekly plan sealed on-chain](https://arcscan.app/tx/0x8af07f69b1c058e51379bbab8c31f3f419a110fd5dc2174988a566dfb4f158d4). Every address and deploy transaction is in [`deployments/arc.json`](deployments/arc.json).
 
@@ -166,5 +166,5 @@ Live mode needs the agents' mnemonic (`OUTLAY_MNEMONIC`) and `deployments/arc.js
 - **Not used, and why:**
   - **USYC:** it needs an allowlist, and mainnet has a $100k minimum.
   - **Paymaster:** it isn't deployed on Arc.
-- **Email delivery** is built (the Messenger pays AgentMail by x402), but it is switched off until the Messenger's balance is funded.
+- **Email delivery** goes out from hello@hiresyncly.site through Resend. The Messenger can also pay AgentMail per email by x402 (`OUTLAY_MAIL=aisa`).
 - **Paying customers need a browser wallet with USDC on Arc.** The free first website needs nothing.

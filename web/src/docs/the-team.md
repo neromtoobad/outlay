@@ -21,7 +21,7 @@ Every agent has its own wallet on Arc and its own balance in **Circle Gateway**.
 | **Designer** | Websites (Claude Opus 5), product photos, ad creatives and post images | AI models, images | BlockRun on Arc |
 | **Producer** | Motion ads (Claude Opus 5) and the video in every Ad Launch | AI models, video, music | BlockRun on Arc |
 | **Auditor** | Checks the work on a different model family, looks at every page and frame, runs Lighthouse | AI models | BlockRun, DataForSEO |
-| **Messenger** | Packs the files and emails the delivery | Email sending | AgentMail |
+| **Messenger** | Packs the files and emails the delivery from hello@hiresyncly.site | Email sending | Resend (AgentMail by x402 as a fallback) |
 | Mailer, Bookkeeper, Linguist | For outreach, bookkeeping and translation services still to come; not in the office yet | | |
 
 The Verifier, who live-checked emails and phone numbers, retired on 1 October 2026; the Investigator does that work now.

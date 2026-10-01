@@ -106,6 +106,26 @@ function OwnerGate() {
   );
 }
 
+/** Owner tool: send a test email the way deliveries go out, to check the mail setup end to end. */
+function TestEmail() {
+  const [to, setTo] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function send(e: FormEvent) {
+    e.preventDefault(); setBusy(true); setMsg(null);
+    try { await api('/api/owner/test-email', { method: 'POST', body: JSON.stringify({ to }) }); setMsg(`Sent. Check ${to} (and the spam folder).`); }
+    catch (x: any) { setMsg(x.message); } finally { setBusy(false); }
+  }
+  return (
+    <form className="testmail" onSubmit={send}>
+      <span className="mono">Email check</span>
+      <input type="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="you@gmail.com" aria-label="Send a test email to" />
+      <button className="btn secondary sm" disabled={busy || !to.includes('@')}>{busy ? 'Sending…' : 'Send a test email'}</button>
+      {msg && <span className="muted">{msg}</span>}
+    </form>
+  );
+}
+
 export default function Books() {
   const { data: b, error } = useApi<Books>('/api/books', 10000);
   if (error && /owner only|401/i.test(error)) return <OwnerGate />;
@@ -120,6 +140,7 @@ export default function Books() {
         <div className="eyebrow">Your books · private</div>
         <h1 className="h1">Every dollar Syncly <em>makes and spends.</em></h1>
         <p className="sub">Only you can see this page. An AI CFO runs Syncly's money, and these books come from the same records that move it: job receipts, escrow and the vault on Arc. Updated {timeAgo(b.asOf)}. <button type="button" className="linkbtn" onClick={() => { try { localStorage.removeItem(OWNER_KEY); } catch {} window.location.reload(); }}>Lock this device</button></p>
+        <TestEmail />
         {b.mode === 'demo' && <div className="banner"><span>●</span><div><b>Demo mode.</b> These numbers come from simulated jobs: no real money moved and every receipt is marked “demo”. Live figures from Arc mainnet replace them when the treasury is funded.</div></div>}
       </div>
 

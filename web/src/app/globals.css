@@ -851,3 +851,8 @@ body:has(.home) .foot { margin-top: var(--gutter); }
 .bform label.field .hint { margin-top: -4px; }
 
 .linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent, #17473b); text-decoration: underline; cursor: pointer; }
+
+.testmail { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+.testmail input { flex: 1 1 220px; max-width: 320px; }
+.testmail .mono { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.testmail .muted { font-size: 13px; }
