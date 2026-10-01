@@ -1,7 +1,7 @@
 // Lead List: 25 verified leads with a personalized opener each.
 // Researcher parses the target → Scout pulls businesses WITH websites from Google Maps → Reader reads
 // each site's homepage + contact page (APEX, 10 pages per $0.003) and extracts emails → the CFO rule
-// "cheapest first": only sites with no email on their pages get a paid Tomba lookup → Verifier bulk-
+// "cheapest first": only sites with no email on their pages get a paid Tomba lookup → Investigator bulk-
 // checks every address (APEX, 100 per $0.009) → Writer drafts one opener per lead → deterministic QA.
 import { Job } from '../job.ts';
 import { MODELS } from '../config.ts';
@@ -87,17 +87,17 @@ export const leadList = {
       const missing = leads.filter((l) => !l.email);
       const need = Math.max(0, spec.want - leads.filter((l) => l.email).length);
       const lookups = missing.slice(0, Math.min(need + 3, 20));
-      job.log('verifier', 'tomba', `${lookups.length} paid lookups (skipped ${missing.length - lookups.length}: list already full or over cap)`);
+      job.log('investigator', 'tomba', `${lookups.length} paid lookups (skipped ${missing.length - lookups.length}: list already full or over cap)`);
       for (const l of lookups) {
-        const found = await domainEmails(job, 'verifier', l.domain, `no email on ${l.domain}'s own pages`);
+        const found = await domainEmails(job, 'investigator', l.domain, `no email on ${l.domain}'s own pages`);
         const best = found.sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
         if (best) { l.email = best.email; l.emailSource = 'tomba'; }
       }
 
       // 4. Verify every address in one or two bulk calls
       const withEmail = leads.filter((l) => l.email);
-      job.log('verifier', 'verify', `${withEmail.length} addresses`);
-      const verdicts = await verifyEmails(job, 'verifier', withEmail.map((l) => l.email!), 'check deliverability before anyone sends');
+      job.log('investigator', 'verify', `${withEmail.length} addresses`);
+      const verdicts = await verifyEmails(job, 'investigator', withEmail.map((l) => l.email!), 'check deliverability before anyone sends');
       const vmap = new Map(verdicts.map((v) => [v.email, v]));
       const good = withEmail.filter((l) => vmap.get(l.email!)?.ok).slice(0, spec.want);
       for (const l of withEmail) l.verdict = vmap.get(l.email!)?.verdict ?? 'unchecked';

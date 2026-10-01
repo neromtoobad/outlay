@@ -42,14 +42,14 @@ Every worker wears **one signature colour** plus a small gold Byzantine trim det
 | researcher | South Asian man in his 30s, glasses, **burgundy** cardigan, chinos | ✅ first try |
 | writer | Ghanaian woman in her 40s, **coral** head wrap and wrap dress, cream cardigan | ✅ first try |
 | illustrator | young East Asian man, **lavender** beret and smock, round glasses | ✅ first try |
-| verifier | young Nigerian man, **sky-blue** shirt, navy bow tie | ✅ first try |
+| verifier | young Nigerian man, **sky-blue** shirt, navy bow tie | ✅ first try · retired Oct 1 (the Investigator took over his work and desk) |
 | mailer | Latina woman in her 30s, curly ponytail, **orange** blazer | ✅ first try |
 | reader | man in his 60s, bald with a white fringe, **olive** waistcoat, half-moon glasses | ✅ first try |
 | analyst | Kenyan woman in her 30s, **cobalt** trouser suit | ✅ first try |
 | messenger | young Senegalese man, **red** hoodie, high-tops | ✅ first try |
 | auditor | Middle Eastern woman in her 40s, **deep purple** hijab and long coat | ✅ first try |
 | producer | young Nigerian woman in her late 20s, short natural afro, headphones around her neck, **fuchsia** bomber jacket, black jeans, white high-tops | ✅ first try (Oct 1); takes the Mailer's desk in the office |
-| investigator | Ghanaian man in his early 50s, close-cropped grey hair and short grey beard, dark-rimmed glasses, **camel** belted trench coat, brown brogues | ✅ first try (Oct 1); stands at the Verifier's desk |
+| investigator | Ghanaian man in his early 50s, close-cropped grey hair and short grey beard, dark-rimmed glasses, **camel** belted trench coat, brown brogues | ✅ first try (Oct 1); took the Verifier's desk |
 
 Review boards: `sprites/cast-a.png` and `sprites/cast-b.png`. The worker frame order is: 0 idle, 1 walk A, 2 walk B, 3 typing (waist up), 4 cheer, 5 sad, 6 carrying a box, 7 tossing a coin.
 

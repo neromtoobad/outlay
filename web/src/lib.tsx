@@ -19,14 +19,15 @@ export const ROLES: Record<string, { title: string; blurb: string; c: string; t:
   researcher: { title: "Plans the work", blurb: "Turns your brief into a search plan, then drafts the answer with citations.", c: "#7a2335", t: "#f4e2e5" },
   writer: { title: "Writes it up", blurb: "Plain-English briefs and a personal first line for every lead.", c: "#e1705c", t: "#fce6df" },
   illustrator: { title: "Makes the images", blurb: "On-brand images for content packs and social posts.", c: "#8f79c9", t: "#eee8f8" },
-  verifier: { title: "Checks every contact", blurb: "Live-checks every email and phone number before it reaches you.", c: "#5f97d1", t: "#e2edf9" },
   mailer: { title: "Sends the outreach", blurb: "Sends and tracks outreach on your behalf.", c: "#ec7418", t: "#fde9d6" },
   reader: { title: "Reads the sources", blurb: "Opens websites and PDFs and pulls out what matters.", c: "#556b2f", t: "#e9eedb" },
   analyst: { title: "Crunches the numbers", blurb: "Counts, ratings, patterns: the summary on top of every list.", c: "#2848b8", t: "#e2e7f8" },
   messenger: { title: "Delivers the work", blurb: "Packages files and gets them to you.", c: "#cf2a2a", t: "#fbe2df" },
   auditor: { title: "Quality control", blurb: "Checks the work on a different AI model before you ever see it.", c: "#5a2d5f", t: "#eee3ef" },
   producer: { title: "Makes the videos", blurb: "Motion ads with their own soundtrack, and the video in every ad launch.", c: "#c2187a", t: "#fbe0ee" },
-  investigator: { title: "Digs deeper", blurb: "Asks the AI assistants what they say about you, and checks sellers before you pay.", c: "#8a6232", t: "#f4eadb" },
+  investigator: { title: "Checks everything", blurb: "Live-checks every email, phone number and seller, and asks the AI assistants what they say about you.", c: "#8a6232", t: "#f4eadb" },
+  // retired on 2026-10-01 (the Investigator took over); kept so old jobs still show his face
+  verifier: { title: "Checked contacts (retired)", blurb: "Live-checked emails and phone numbers; the Investigator does this now.", c: "#5f97d1", t: "#e2edf9" },
 };
 export const HAS_ART = new Set(Object.keys(ROLES));
 export const tint = (role: string) => ({ ["--t" as any]: ROLES[role]?.t, ["--c" as any]: ROLES[role]?.c }) as React.CSSProperties;

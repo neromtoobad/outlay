@@ -16,14 +16,15 @@ Every agent has its own wallet on Arc and its own balance in **Circle Gateway**.
 | **Researcher** | Turns the brief into a plan and pulls out the facts | AI models, AI-assistant answers | BlockRun, DataForSEO via AIsa |
 | **Reader** | Opens websites and PDFs and pulls out what matters | Page reading | Exa, APEX |
 | **Writer** | Writes posts, ad copy, Google profile descriptions and review replies | AI models | BlockRun |
-| **Verifier** | Live-checks emails, phone numbers (SIM swap, call forwarding) and domains | Verification lookups | APEX, BlockRun (Twilio), DataForSEO |
 | **Analyst** | Compares prices, answers and signals; the numbers on every report | AI models, business records | BlockRun, Openmart |
-| **Investigator** | Asks ChatGPT, Gemini, Claude and Perplexity what they tell customers; leads seller checks | AI-assistant answers, screening | DataForSEO via AIsa, Didit |
+| **Investigator** | Live-checks emails, phone numbers (SIM swap, call forwarding), domains and sellers, and asks ChatGPT, Gemini, Claude and Perplexity what they tell customers | Verification lookups, AI-assistant answers, screening | APEX, BlockRun (Twilio), DataForSEO via AIsa, Didit |
 | **Designer** | Websites (Claude Opus 5), product photos, ad creatives and post images | AI models, images | BlockRun on Arc |
 | **Producer** | Motion ads (Claude Opus 5) and the video in every Ad Launch | AI models, video, music | BlockRun on Arc |
 | **Auditor** | Checks the work on a different model family, looks at every page and frame, runs Lighthouse | AI models | BlockRun, DataForSEO |
 | **Messenger** | Packs the files and emails the delivery | Email sending | AgentMail |
 | Mailer, Bookkeeper, Linguist | For outreach, bookkeeping and translation services still to come; not in the office yet | | |
+
+The Verifier, who live-checked emails and phone numbers, retired on 1 October 2026; the Investigator does that work now.
 
 The Designer and Producer pay for Claude Opus 5 with a direct USDC transfer from their own wallets, because that's the only way BlockRun sells it on Arc. When a wallet is empty they fall back to Opus 4.8 through their Gateway balance, and the job's log says so.
 

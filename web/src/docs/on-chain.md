@@ -28,10 +28,12 @@ order: 3
 | Researcher | [`{{agents.researcher}}`](https://arcscan.app/address/{{agents.researcher}}) |
 | Reader | [`{{agents.reader}}`](https://arcscan.app/address/{{agents.reader}}) |
 | Writer | [`{{agents.writer}}`](https://arcscan.app/address/{{agents.writer}}) |
-| Verifier | [`{{agents.verifier}}`](https://arcscan.app/address/{{agents.verifier}}) |
+| Designer | [`{{agents.illustrator}}`](https://arcscan.app/address/{{agents.illustrator}}) |
+| Producer | [`{{agents.producer}}`](https://arcscan.app/address/{{agents.producer}}) |
+| Investigator | [`{{agents.investigator}}`](https://arcscan.app/address/{{agents.investigator}}) |
+| Analyst | [`{{agents.analyst}}`](https://arcscan.app/address/{{agents.analyst}}) |
 | Auditor | [`{{agents.auditor}}`](https://arcscan.app/address/{{agents.auditor}}) |
 | Messenger | [`{{agents.messenger}}`](https://arcscan.app/address/{{agents.messenger}}) |
-| Analyst | [`{{agents.analyst}}`](https://arcscan.app/address/{{agents.analyst}}) |
 
 Every agent is registered in the vault, which is what lets the CFO top it up.
 

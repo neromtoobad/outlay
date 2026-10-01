@@ -7,7 +7,7 @@
 // to check, by rules in code: every seller the owner listed (up to 3), plus the best pick for an item when
 // it comes from a classified ad, an Instagram/WhatsApp seller or a shop we don't know (big retailers and
 // marketplace stores are skipped, with the reason); at most 3 checks, planned inside the job's budget →
-// the Check Before You Pay core runs on each, one after another: Verifier (phone fraud signals, domain
+// the Check Before You Pay core runs on each, one after another: Investigator (phone fraud signals, domain
 // age, business status, and sanctions only when $500+ is at stake and no red flag already says "don't pay
 // upfront"), Scout (scam-report searches, Places), Analyst (Instagram), Reader; the verdict comes from
 // fixed rules; Writer explains it, Auditor checks the wording → one report, offers.csv and the raw signals

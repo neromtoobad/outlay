@@ -5,7 +5,7 @@ import Office, { type FeedItem } from '@/office/Office.tsx';
 import { AnimatePresence, motion } from 'motion/react';
 import { Avatar, ROLE_NAME, SERVICE_NAME } from '@/lib.tsx';
 
-const ROSTER = ['cfo', 'scout', 'researcher', 'writer', 'reader', 'verifier', 'investigator', 'analyst', 'auditor', 'illustrator', 'producer', 'messenger'];
+const ROSTER = ['cfo', 'scout', 'researcher', 'writer', 'reader', 'investigator', 'analyst', 'auditor', 'illustrator', 'producer', 'messenger'];
 
 export function describe(f: FeedItem): { who: string; text: string; amount?: string; order?: string } {
   const d = f.e.data ?? {};

@@ -54,8 +54,8 @@ const CREW: { role: string; buys: string; from: string; line: string }[] = [
   { role: 'writer', buys: 'AI models', from: 'BlockRun', line: 'Writes the posts, the ad copy, the briefs, and a personal first line for every lead.' },
   { role: 'illustrator', buys: 'AI models and images', from: 'BlockRun on Arc', line: 'Builds your website and makes the product photos and ad creatives.' },
   { role: 'producer', buys: 'Video and music', from: 'BlockRun on Arc', line: 'Makes the motion ads, and the video in every ad launch.' },
-  { role: 'investigator', buys: 'AI-assistant answers', from: 'DataForSEO · Didit', line: 'Asks ChatGPT what it says about you, and checks sellers before you pay.' },
-  { role: 'verifier', buys: 'Email checks', from: 'APEX', line: 'Live-checks every email and phone number before you see it.' },
+  { role: 'investigator', buys: 'Checks and screening', from: 'APEX · DataForSEO · Didit', line: 'Checks every email, phone number and seller, and asks ChatGPT what it says about you.' },
+  { role: 'analyst', buys: 'AI models', from: 'BlockRun', line: 'Compares prices, answers and signals: the numbers on every report.' },
   { role: 'auditor', buys: 'A second model family', from: 'BlockRun', line: 'Checks the work on a different AI before it is delivered.' },
   { role: 'messenger', buys: 'Email delivery', from: 'AgentMail', line: 'Packs the files and gets them to you.' },
 ];
@@ -190,7 +190,7 @@ function How() {
 
 // ---------------------------------------------------------------- 04 · paid on Arc
 
-const WALLETS = ['scout', 'researcher', 'reader', 'writer', 'illustrator', 'producer', 'investigator', 'verifier', 'analyst', 'auditor', 'messenger', 'cfo'];
+const WALLETS = ['scout', 'researcher', 'reader', 'writer', 'illustrator', 'producer', 'investigator', 'analyst', 'auditor', 'messenger', 'cfo'];
 
 function PaidOnArc({ stats }: { stats: Stats | null }) {
   return (
@@ -209,7 +209,7 @@ function PaidOnArc({ stats }: { stats: Stats | null }) {
       </div>
       <div className="ob__art">
         <div className="ob__wallets">
-          {WALLETS.map((r) => <div key={r} style={tint(r)}><Avatar role={r} lg /><b>{ROLE_NAME[r]}</b><span className="mono">own wallet · Arc</span></div>)}
+          {WALLETS.map((r) => <div key={r} className={r === 'cfo' ? 'cfo' : undefined} style={tint(r)}><Avatar role={r} lg /><b>{ROLE_NAME[r]}</b><span className="mono">own wallet · Arc</span></div>)}
         </div>
       </div>
     </section>

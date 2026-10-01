@@ -68,7 +68,7 @@ Built for requests like *"pharmacies in Yaba, Lagos with a phone number"* or *"c
 
 ### Lead List
 
-For *"25 fitness studios in Ikoyi for my smoothie delivery business"*. The team finds the businesses, reads their sites, finds contact emails, and the Verifier live-checks each one. The Writer adds an opening line per lead, written from something real about that business. **You send the emails; we never cold-email for you.**
+For *"25 fitness studios in Ikoyi for my smoothie delivery business"*. The team finds the businesses, reads their sites, finds contact emails, and the Investigator live-checks each one. The Writer adds an opening line per lead, written from something real about that business. **You send the emails; we never cold-email for you.**
 
 ### Research Brief
 

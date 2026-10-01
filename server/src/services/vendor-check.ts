@@ -1,7 +1,7 @@
 // Check Before You Pay: before a customer pays a supplier, importer or Instagram vendor upfront, gather
 // independent signals and return RED / AMBER / GREEN, each signal cited. Investigator parses the brief
 // (phone, site, handle, email and wallet are also pulled out by regex, and a value the model returns is
-// kept only if it is really in the brief). Then in parallel: Verifier checks the phone (Twilio fraud
+// kept only if it is really in the brief). Then in parallel: Investigator checks the phone (Twilio fraud
 // signals via BlockRun), the domain's registration date (registry RDAP, free; DataForSEO WHOIS only when
 // the TLD has no RDAP), the wallet (Circle's USDC blacklist, a free read) and, for large amounts,
 // sanctions (Didit AML); Scout runs Google searches for scam reports (Nairaland, Reddit) and a Places
@@ -191,7 +191,7 @@ export type Payee = ReturnType<typeof settle>;
 
 async function phoneLookup(job: Job, sc: Scenario, ph: Phone) {
   const data = await buy<any>(job, {
-    agent: 'verifier', vendor: 'BlockRun phone fraud lookup', url: `https://${HOSTS.blockrun}/api/v1/phone/lookup/fraud`, method: 'POST',
+    agent: 'investigator', vendor: 'BlockRun phone fraud lookup', url: `https://${HOSTS.blockrun}/api/v1/phone/lookup/fraud`, method: 'POST',
     body: { phoneNumber: ph.e164 }, reason: `SIM swap, call forwarding and line type for ${ph.local}`, expectUsd: COST.phone, maxUsd: 0.06,
     dryData: () => fx.phone(sc, ph.e164),
   });
@@ -213,7 +213,7 @@ async function rdap(sc: Scenario, domain: string): Promise<{ created?: string; r
 
 async function whois(job: Job, sc: Scenario, domain: string) {
   const res = await dataforseo<any>(job, 'domain_analytics/whois/overview/live', { filters: ['domain', '=', domain], limit: 1 }, {
-    agent: 'verifier', vendor: 'DataForSEO WHOIS (AIsa)', reason: `registration date of ${domain} (its TLD has no RDAP)`, expectUsd: COST.whois, maxUsd: 0.15, dry: () => fx.whois(sc, domain),
+    agent: 'investigator', vendor: 'DataForSEO WHOIS (AIsa)', reason: `registration date of ${domain} (its TLD has no RDAP)`, expectUsd: COST.whois, maxUsd: 0.15, dry: () => fx.whois(sc, domain),
   });
   const it = res?.[0]?.items?.[0];
   return { created: it?.created_datetime as string | undefined, registrar: it?.registrar as string | undefined };
@@ -272,7 +272,7 @@ async function instagram(job: Job, sc: Scenario, handle: string) {
 async function amlScreen(job: Job, sc: Scenario, v: Payee) {
   const body = { full_name: v.name, entity_type: v.entity, include_adverse_media: true, ...(v.entity === 'person' && v.country ? { nationality: v.country } : {}) };
   const d = await ortho<any>(job, 'didit/v3/aml', { body }, {
-    agent: 'verifier', vendor: 'Didit AML screening (Orthogonal)', reason: `sanctions, watchlists, PEP and adverse media for "${v.name}"`, expectUsd: COST.aml, maxUsd: 0.4,
+    agent: 'investigator', vendor: 'Didit AML screening (Orthogonal)', reason: `sanctions, watchlists, PEP and adverse media for "${v.name}"`, expectUsd: COST.aml, maxUsd: 0.4,
     dry: () => fx.aml(sc, v.name, v.entity),
   });
   return d?.aml ?? d;
@@ -378,31 +378,31 @@ export async function checkVendor(job: Job, v: Payee, opts: CheckOpts): Promise<
   const runAml = due && !opts.noSanctions;
   const deferAml = runAml && opts.sanctions === 'unless-red';
   const screen = () => {
-    job.log('verifier', 'aml', `sanctions, watchlists, PEP and adverse media for "${v.name}" (${v.amountUsd ? `~$${v.amountUsd} at stake` : 'you asked'})`);
-    return amlScreen(job, sc, v).catch(failed('verifier', 'Sanctions', 'AML screening'));
+    job.log('investigator', 'aml', `sanctions, watchlists, PEP and adverse media for "${v.name}" (${v.amountUsd ? `~$${v.amountUsd} at stake` : 'you asked'})`);
+    return amlScreen(job, sc, v).catch(failed('investigator', 'Sanctions', 'AML screening'));
   };
 
   await Promise.all([
     (async () => {
       if (!v.phone) return v.phoneRaw ? skip('Phone', 'Phone checks', `couldn't tell which country ${v.phoneRaw} is in; give it with the country code`) : undefined;
-      job.log('verifier', 'phone', `Twilio fraud signals for ${v.phone.e164}`);
-      tw = await phoneLookup(job, sc, v.phone).catch(failed('verifier', 'Phone', 'Phone lookup'));
+      job.log('investigator', 'phone', `Twilio fraud signals for ${v.phone.e164}`);
+      tw = await phoneLookup(job, sc, v.phone).catch(failed('investigator', 'Phone', 'Phone lookup'));
       // BlockRun forwards Twilio's own answer; an error body (or nothing) means the number wasn't looked up.
       if (tw && (tw.error || tw.message || (tw.valid === undefined && !tw.line_type_intelligence))) { skip('Phone', 'Phone lookup', `no carrier data came back (${String(tw.error ?? tw.message ?? 'empty answer').slice(0, 60)})`); tw = undefined; }
     })(),
     (async () => {
       if (!v.domain) return;
-      job.log('verifier', 'domain', `registration date of ${v.domain} from its registry (RDAP, free)`);
-      const r = await rdap(sc, v.domain).catch((e) => { job.log('verifier', 'rdap', `RDAP failed (${String(e?.message ?? e).slice(0, 50)}); trying WHOIS`); return { noService: true } as const; });
+      job.log('investigator', 'domain', `registration date of ${v.domain} from its registry (RDAP, free)`);
+      const r = await rdap(sc, v.domain).catch((e) => { job.log('investigator', 'rdap', `RDAP failed (${String(e?.message ?? e).slice(0, 50)}); trying WHOIS`); return { noService: true } as const; });
       if ('noService' in r && r.noService) {
-        const w = await whois(job, sc, v.domain).catch(failed('verifier', 'Website', 'Domain age'));
+        const w = await whois(job, sc, v.domain).catch(failed('investigator', 'Website', 'Domain age'));
         if (w) dom = { created: toDate(w.created), registrar: w.registrar, source: 'DataForSEO WHOIS via AIsa' };
       } else dom = { created: toDate(r.created), registrar: r.registrar, notFound: r.notFound, source: 'Registry RDAP', url: `https://rdap.org/domain/${v.domain}` };
     })(),
     (async () => {
       if (!v.wallet) return;
       if (!/^0x[a-fA-F0-9]{40}$/.test(v.wallet)) return skip('Wallet', "Circle's USDC blacklist", 'only EVM (0x…) addresses can be checked against USDC on Arc');
-      job.log('verifier', 'wallet', `Circle's USDC blacklist for ${v.wallet.slice(0, 8)}…`);
+      job.log('investigator', 'wallet', `Circle's USDC blacklist for ${v.wallet.slice(0, 8)}…`);
       onBlacklist = await blacklisted(v.wallet);
     })(),
     (async () => {
@@ -437,10 +437,10 @@ export async function checkVendor(job: Job, v: Payee, opts: CheckOpts): Promise<
   let voygr: any;
   const vAddress = listing?.address ?? [v.address, v.location].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(', ');
   if (v.name && v.name !== v.instagram && vAddress && (listing || v.address)) {
-    job.log('verifier', 'status', `does "${listing?.title ?? v.name}" exist and trade at ${vAddress}?`);
+    job.log('investigator', 'status', `does "${listing?.title ?? v.name}" exist and trade at ${vAddress}?`);
     voygr = await ortho<any>(job, 'voygr/v1/business-status', { body: { name: listing?.title ?? v.name, address: vAddress } }, {
-      agent: 'verifier', vendor: 'Voygr business status (Orthogonal)', reason: `is "${listing?.title ?? v.name}" at ${vAddress} and open?`, expectUsd: COST.status, maxUsd: 0.01, dry: () => fx.voygr(sc),
-    }).catch(failed('verifier', 'Existence', 'Business status'));
+      agent: 'investigator', vendor: 'Voygr business status (Orthogonal)', reason: `is "${listing?.title ?? v.name}" at ${vAddress} and open?`, expectUsd: COST.status, maxUsd: 0.01, dry: () => fx.voygr(sc),
+    }).catch(failed('investigator', 'Existence', 'Business status'));
   }
 
   // 4. Read the site and the pages that might be reports, in one call

@@ -644,6 +644,7 @@ body:has(.home) .foot { margin-top: var(--gutter); }
 .ob__art .art { position: relative; }
 .ob__wallets { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .ob__wallets > div { display: grid; justify-items: center; gap: 6px; padding: 14px 8px 12px; border-radius: 16px; background: #fff; border: 1px solid var(--line); text-align: center; }
+.ob__wallets > div.cfo { grid-column: span 2; }
 .ob__wallets b { font-size: 14px; font-weight: 600; }
 .ob__wallets .mono { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 @media (max-width: 520px) { .ob__wallets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

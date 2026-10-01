@@ -1,5 +1,5 @@
 // Local Business Finder: "every café in Lekki without a website" → a clean CSV + summary.
-// Researcher parses the brief → Scout pulls Google Maps pages (Serper Maps) → Verifier dedupes and
+// Researcher parses the brief → Scout pulls Google Maps pages (Serper Maps) → Investigator dedupes and
 // normalizes phone numbers → Analyst summarizes → QA is deterministic code, not an LLM grading itself:
 // no duplicates, every row has a name and address, and the customer's filter actually holds.
 import { Job } from '../job.ts';
@@ -80,7 +80,7 @@ export const localBusinessFinder = {
         source = mapsDown ? 'the open web via Exa (the Maps seller was down)' : 'the open web via Exa';
       }
       if (!byKey.size) throw new Error('no search came back; nothing to deliver');
-      job.log('verifier', 'clean', `${byKey.size} unique places → applying "${spec.filter}", normalizing phones`);
+      job.log('investigator', 'clean', `${byKey.size} unique places → applying "${spec.filter}", normalizing phones`);
       const rows = [...byKey.values()]
         .filter(keep)
         .map((p) => ({ ...p, phone: normPhone(p.phone) }))

@@ -83,21 +83,21 @@ export const CATALOG = [
     id: 'buy-smart', name: 'Buy Smart', dept: 'Buying & Suppliers', live: true, priceUsd: 5, listedCostUsd: 0.7, etaMin: 8,
     tagline: 'Where to buy it cheapest, delivered, and whether the seller is safe to pay.',
     youGet: ['Best pick and runner-up for up to 5 items, with the delivered total in your currency', 'Every price re-checked on the seller’s own page, with stock and delivery fee', 'A RED / AMBER / GREEN check on up to 3 sellers: the ones you’re talking to, and any pick from a classified ad or a shop we don’t know', 'Every signal cited, what to ask each seller, and how to pay safely', 'A spreadsheet of every offer and the raw seller signals, emailed to you'],
-    team: ['researcher', 'scout', 'reader', 'analyst', 'investigator', 'verifier', 'writer', 'auditor', 'messenger'],
+    team: ['researcher', 'scout', 'reader', 'analyst', 'investigator', 'writer', 'auditor', 'messenger'],
     example: '2 chest freezers (300 L) and a double-basket deep fryer, new, delivered to Surulere, Lagos. Budget ₦900k. Also talking to @frostking_ng on Instagram',
   },
   {
     id: 'local-business-finder', name: 'Local Business Finder', dept: 'Research', live: true, priceUsd: 3, listedCostUsd: 0.2, etaMin: 3,
     tagline: 'Every business of a type in an area, with phone, website and rating.',
     youGet: ['A clean spreadsheet (CSV) of up to 60 businesses', 'Phone numbers normalised to +234', 'Filters like "no website" or "has a phone"', 'Checked by rules: no duplicates, every row complete, filter holds', 'Emailed to you with the spreadsheet attached'],
-    team: ['researcher', 'scout', 'verifier', 'analyst', 'auditor', 'messenger'],
+    team: ['researcher', 'scout', 'investigator', 'analyst', 'auditor', 'messenger'],
     example: 'Every café and coffee shop in Lekki Phase 1 that has no website',
   },
   {
     id: 'lead-list', name: 'Lead List', dept: 'Research', live: true, priceUsd: 5, listedCostUsd: 0.5, etaMin: 8,
     tagline: 'Up to 25 verified business emails, each with a personalised first line.',
     youGet: ['Up to 25 leads with emails that passed a live deliverability check', 'Where each email came from (their own site or a finder)', 'One opening line per lead, written from real data', 'You send; we never cold-email for you', 'Emailed to you with the spreadsheet attached'],
-    team: ['researcher', 'scout', 'reader', 'verifier', 'writer', 'auditor', 'messenger'],
+    team: ['researcher', 'scout', 'reader', 'investigator', 'writer', 'auditor', 'messenger'],
     example: '25 boutique hotels in Victoria Island, Lagos, for my bakery\'s weekly pastry delivery',
   },
   {
@@ -136,7 +136,7 @@ export const RETIRED = [
     id: 'vendor-check', name: 'Check Before You Pay', dept: 'Buying & Suppliers', live: false, priceUsd: 4, listedCostUsd: 0.5, etaMin: 4,
     tagline: 'About to pay a supplier or vendor upfront? Red, amber or green before the money leaves.',
     youGet: ['A RED / AMBER / GREEN verdict from fixed rules, with the rule that fired', 'Every signal cited: phone fraud checks, domain age, Google Maps, scam reports on Nairaland and Reddit, Instagram history', 'Sanctions screening when $500 or more is at stake', 'What to ask them before paying, and how to pay safely', 'Raw signals as a JSON file, emailed to you'],
-    team: ['investigator', 'verifier', 'scout', 'reader', 'analyst', 'writer', 'auditor', 'messenger'],
+    team: ['investigator', 'scout', 'reader', 'analyst', 'writer', 'auditor', 'messenger'],
     example: 'I want to pay ₦850,000 upfront to Gadget Plug NG for 5 iPhone 13s. Instagram @gadgetplug_ng, phone 0803 123 4567, shop in Computer Village Ikeja',
   },
 ] as const;

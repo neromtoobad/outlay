@@ -58,7 +58,10 @@ Agent wallets, each registered in the vault and paying for its own tools:
 | Researcher | [`0x02aA…d3eb`](https://arcscan.app/address/0x02aA3749c7af3181C85Eee4CBa999747E449d3eb) | AI models (BlockRun) to plan and extract |
 | Reader | [`0x594E…54Cf`](https://arcscan.app/address/0x594EC11A38d68a8c2A365C941d8d76eEe9e954Cf) | Page reading (Exa contents, APEX) |
 | Writer | [`0x16a4…2B28`](https://arcscan.app/address/0x16a4f6FCfAb3B607df1965A443Aa8819fed52B28) | AI models (BlockRun) |
-| Verifier | [`0x00D5…f0FE`](https://arcscan.app/address/0x00D59a4795350B8A9eBA6B51417ae0184E77f0FE) | Email verification (APEX) |
+| Investigator | [`0x7E0C…BCB0`](https://arcscan.app/address/0x7E0C1c33FcE6605630c473d4a44255f26463BCB0) | Email, phone and seller checks (APEX, Twilio via BlockRun, Didit), and AI-assistant answers (DataForSEO) |
+| Designer | [`0x00aF…DAF4`](https://arcscan.app/address/0x00aFF88Ae2B22f67cf87Ca74d36d37f7BA6fDAF4) | Claude Opus 5 for websites, and images (BlockRun) |
+| Producer | [`0x37c8…9f36`](https://arcscan.app/address/0x37c8de9f9740Ed30bcdCc1ea5B8C08567BE19f36) | Claude Opus 5 for motion ads, video and music (BlockRun) |
+| Analyst | [`0x2E51…c958`](https://arcscan.app/address/0x2E516E71912adA3B7aFa989aCE06D9A51e7fc958) | AI models to compare prices, answers and signals (BlockRun) |
 | Auditor | [`0x72e5…c9b6`](https://arcscan.app/address/0x72e514Afed2EFdecA263d9710068259f4B00c9b6) | A second AI model family, to check the work |
 | Messenger | [`0x37D0…95a9`](https://arcscan.app/address/0x37D0ccDfcC37ba1803002d95D0077828Afcd95a9) | Email delivery (AgentMail) |
 

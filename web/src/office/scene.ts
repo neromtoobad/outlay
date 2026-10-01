@@ -18,11 +18,9 @@ const DESK = { top: 1344, bottom: 1478, back: 1442 };
 const DESK_X = [947, 1149, 1350, 1551, 1758, 1970, 2171, 2374, 2573, 2778];
 const DESK_EDGE: [number, number][] = [[850, 1044], [1056, 1242], [1258, 1442], [1461, 1642], [1666, 1850], [1880, 2060], [2079, 2264], [2282, 2467], [2479, 2667], [2677, 2879]];
 const LAPTOP_X = [955, 1154, 1354, 1554, 1761, 1968, 2169, 2372, 2571, 2770];
-const SEATS = ['scout', 'researcher', 'reader', 'writer', 'verifier', 'analyst', 'auditor', 'illustrator', 'producer', 'messenger'];
-// The Investigator joined after the office was drawn: he stands at the Verifier's desk, his partner on checks.
-const VISITORS: Record<string, string> = { investigator: 'verifier' };
-// Agents without a character yet work from a colleague's desk.
-const SHARES: Record<string, string> = { bookkeeper: 'analyst', linguist: 'writer', mailer: 'messenger' };
+const SEATS = ['scout', 'researcher', 'reader', 'writer', 'investigator', 'analyst', 'auditor', 'illustrator', 'producer', 'messenger'];
+// Retired roles (old jobs still replay) and roles without a character yet work from a colleague's desk.
+const SHARES: Record<string, string> = { verifier: 'investigator', mailer: 'messenger', bookkeeper: 'analyst', linguist: 'writer' };
 const ROW_END = 2935; // walk behind the desks to here, then step forward onto the lane
 const CFO_SPOT = { x: 2518, y: 885 };
 const CFO_DESK = { x0: 2302, x1: 2798, top: 762, bottom: 909 };
@@ -238,7 +236,7 @@ export class OfficeScene {
     this.app.canvas.style.display = 'block';
     el.appendChild(this.app.canvas);
 
-    const ids = [...SEATS, ...Object.keys(VISITORS), 'cfo'];
+    const ids = [...SEATS, 'cfo'];
     const [bgTex, ...chars] = await Promise.all([PIXI.Assets.load(small ? '/scene/building-1920.webp' : '/scene/building.webp'), ...ids.map(loadFrames)]);
     if (this.destroyed) return;
     this.bgTex = bgTex as PIXI.Texture;
@@ -289,14 +287,6 @@ export class OfficeScene {
       this.under.addChild(glow);
       this.laptopGlow.set(id, glow);
     });
-    for (const [id, host] of Object.entries(VISITORS)) {
-      const i = SEATS.indexOf(host);
-      const a = new Actor(id, byId[id], WF, DESK_X[i] + 62, DESK.back, BEHIND);
-      a.mode = 'behind'; a.cycles = cycles[id]; a.last = `at the ${NAME[host]}'s desk`;
-      this.seats.addChild(a.root);
-      this.actors.set(id, a);
-      a.root.on('pointertap', () => this.onAgentClick?.(id));
-    }
     const cfo = new Actor('cfo', byId.cfo, CF, CFO_SPOT.x, CFO_SPOT.y, CFO_SCALE);
     cfo.mode = 'behind'; cfo.last = 'watching the vault'; cfo.cycles = cycles.cfo;
     this.seats.addChild(cfo.root);
@@ -342,7 +332,7 @@ export class OfficeScene {
 
   private buildScreen() {
     const c = new PIXI.Container(); c.position.set(SCREEN.x0 + 26, SCREEN.y0 + 18);
-    const title = this.txt('SYNCLY · THE TEAM AT WORK', { fontFamily: this.fonts.mono, fontSize: 19, fill: 0xe2ab45, letterSpacing: 3, fontWeight: '600' }, 3);
+    const title = this.txt('SYNCLY · AT WORK', { fontFamily: this.fonts.mono, fontSize: 19, fill: 0xe2ab45, letterSpacing: 3, fontWeight: '600' }, 3);
     const clock = this.txt('', { fontFamily: this.fonts.mono, fontSize: 19, fill: 0x9fb8ae }, 3); clock.anchor.set(1, 0); clock.x = SCREEN.x1 - SCREEN.x0 - 52;
     const rev = this.txt('—', { fontFamily: this.fonts.serif, fontSize: 64, fill: 0xf4ecda }, 3); rev.y = 30;
     const sub = this.txt('', { fontFamily: this.fonts.mono, fontSize: 18, fill: 0xc9d6cf }, 3); sub.y = 108;
@@ -711,7 +701,7 @@ export class OfficeScene {
       const a = this.actors.get(seat); if (!a) return;
       a.busyUntil = performance.now() + 7000;
       if (d.agent === 'auditor' && (d.step === 'check' || d.step === 'audit') && !/fail|missing|revise/i.test(String(d.note ?? ''))) { this.signOff(`${d.step} · ${d.note ?? 'pass'}`); return; }
-      if (a.mode === 'seat' || a.id === 'cfo' || (a.id in VISITORS && a.mode === 'behind')) this.say(seat, `${tag}${d.step}${d.note ? ` · ${d.note}` : ''}`);
+      if (a.mode === 'seat' || a.id === 'cfo') this.say(seat, `${tag}${d.step}${d.note ? ` · ${d.note}` : ''}`);
       else a.last = `${tag}${d.step}${d.note ? ` · ${d.note}` : ''}`;
       this.want('work', 2600);
     } else if (e.type === 'purchase') {
