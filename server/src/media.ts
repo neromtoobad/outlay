@@ -3,7 +3,7 @@
 // settles when the clip is ready, so a failed render costs nothing. Local finishing (captions, end
 // cards, resizing) is ffmpeg on our own server, which costs nothing per job.
 import { execFile } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -58,6 +58,26 @@ async function dryMp4(seconds: number, w = 720, h = 1280): Promise<Buffer> {
 }
 const DRY_COLOURS = ['2E7A38', 'C8902F', '4B8DCF', '8F5FC0', '04A19B', '13271C'];
 
+// Demo pictures: with OUTLAY_DRY_IMAGES=<folder>, a dry run serves real pictures from that folder in call
+// order (1.png, 2.jpg, …) and writes each call's prompt beside it (1.txt, …), so an example run can show
+// realistic output. A dry clip becomes a slow push-in on the run's first picture; dry music is skipped.
+const DEMO = DRY ? process.env.OUTLAY_DRY_IMAGES : undefined;
+let demoCall = 0, demoFirst: Buffer | undefined;
+async function demoPicture(prompt: string, w: number, h: number): Promise<Buffer> {
+  if (!DEMO) return dryPng(prompt, w, h);
+  const n = ++demoCall;
+  writeFileSync(join(DEMO, `${n}.txt`), prompt);
+  const f = ['png', 'jpg', 'jpeg'].map((x) => join(DEMO, `${n}.${x}`)).find((x) => existsSync(x));
+  const buf = f ? readFileSync(f) : await dryPng(prompt, w, h);
+  demoFirst ??= f ? buf : undefined;
+  return buf;
+}
+async function demoClip(seconds: number): Promise<Buffer> {
+  if (!DEMO || !demoFirst) return dryMp4(seconds);
+  const fr = seconds * 30;
+  return ffmpeg({ 'still.png': demoFirst }, (f, out) => ['-loop', '1', '-i', f['still.png'], '-vf', `scale=1440:2560:force_original_aspect_ratio=increase,crop=1440:2560,zoompan=z='1+0.12*on/${fr}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${fr}:s=1080x1920:fps=30`, '-t', String(seconds), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', out]);
+}
+
 // ---------- paid generation
 
 export async function image(job: Job, agent: Role, o: { prompt: string; model?: string; size?: '1024x1024' | '1024x1792' | '1792x1024'; reason: string }): Promise<{ buf: Buffer; url?: string }> {
@@ -68,7 +88,7 @@ export async function image(job: Job, agent: Role, o: { prompt: string; model?: 
     body: { model, prompt: o.prompt.slice(0, 4000), size: o.size ?? '1024x1024', n: 1 }, reason: o.reason,
     expectUsd: usd, maxUsd: usd * 1.6 + 0.01, dryData: () => ({ data: [{ url: 'dry://image' }] }),
   });
-  if (DRY) { const [w, h] = (o.size ?? '1024x1024').split('x').map(Number); return { buf: await dryPng(o.prompt, w / 2, h / 2) }; }
+  if (DRY) { const [w, h] = (o.size ?? '1024x1024').split('x').map(Number); return { buf: await demoPicture(o.prompt, w / 2, h / 2) }; }
   const url = firstUrl(data);
   if (!url) throw new Error(`${model}: no image in the response`);
   return { buf: await download(url, 20), url: url.startsWith('data:') ? undefined : url };
@@ -83,7 +103,7 @@ export async function editImage(job: Job, agent: Role, o: { prompt: string; imag
     body: { model, prompt: o.prompt.slice(0, 4000), image: o.images.length === 1 ? dataUri(o.images[0]) : o.images.slice(0, 3).map((b) => dataUri(b)), ...(o.size ? { size: o.size } : {}) },
     reason: o.reason, expectUsd: usd, maxUsd: usd * 1.6 + 0.01, dryData: () => ({ data: [{ url: 'dry://image' }] }),
   });
-  if (DRY) return { buf: await dryPng(o.prompt, 512, 896) };
+  if (DRY) return { buf: await demoPicture(o.prompt, 512, 896) };
   const url = firstUrl(data);
   if (!url) throw new Error(`${model}: no image in the response`);
   return { buf: await download(url, 20), url: url.startsWith('data:') ? undefined : url };
@@ -101,7 +121,7 @@ export async function video(job: Job, agent: Role, o: { prompt: string; imageUrl
     poll: (d) => d?.poll_url ?? (d?.id && d?.status && !firstUrl(d) ? `/api/v1/videos/generations/${d.id}` : undefined),
     dryData: () => ({ status: 'completed', data: [{ url: 'dry://video' }] }),
   });
-  if (DRY) return dryMp4(seconds);
+  if (DRY) return demoClip(seconds);
   const url = firstUrl(data);
   if (!url) throw new Error(`${model}: finished, but no video URL in the response`);
   return download(url, 80);
@@ -114,6 +134,7 @@ export async function music(job: Job, agent: Role, o: { prompt: string; seconds:
     body: { model: 'minimax/music-2.5+', prompt: o.prompt.slice(0, 1000), instrumental: true, duration_seconds: Math.max(5, Math.min(60, Math.round(o.seconds))) },
     reason: o.reason, expectUsd: 0.107, maxUsd: 0.2, dryData: () => ({ url: 'dry://audio' }),
   });
+  if (DRY && DEMO) throw new Error('no music in demo pictures mode');
   if (DRY) {
     const dir = mkdtempSync(join(tmpdir(), 'syncly-dry-'));
     try { const out = join(dir, 'x.mp3'); await run(FFMPEG, ['-y', '-f', 'lavfi', '-i', `sine=f=220:d=${o.seconds}`, out]); return readFileSync(out); }

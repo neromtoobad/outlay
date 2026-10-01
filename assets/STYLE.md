@@ -69,4 +69,5 @@ Review boards: `sprites/cast-a.png` and `sprites/cast-b.png`. The worker frame o
 | Sep 28 | messenger walk ×4 with explicit contact/down/passing/up poses; chosen w10 → `sprites/messenger-walk` | 1 |
 | Sep 28 | CFO walk ×4 + Auditor walk ×4 (medium 2k, refs = their sheets); chosen CFO s1 → `sprites/cfo-walk`, Auditor s5 → `sprites/auditor-walk` | 2 |
 | Sep 29 | rename to Syncly: rooftop sign edit ×2 (high 2k, crop of the sign only; chosen db298faf, blended into `scene/building.webp`) | 2.75 |
-| **Total** | | **24.63 / 500** |
+| Oct 1 | service examples: 2 "owner phone photos" (small chops tray, shea butter jar) + 3 Ad Launch scenes + 8 Product Photo Studio shots (gpt_image_2_5, medium 2k, 1 each) | 13 |
+| **Total** | | **37.63 / 500** |
