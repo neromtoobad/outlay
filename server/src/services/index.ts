@@ -42,10 +42,10 @@ export const CATALOG = [
     example: 'Content for Tolu’s Small Chops in Lagos, Instagram @tolussmallchops',
   },
   {
-    id: 'website', name: 'Website', dept: 'Growth Studio', live: true, priceUsd: 15, listedCostUsd: 0.9, etaMin: 8,
-    tagline: 'A real one-page site from your Google listing and Instagram, live today.',
-    youGet: ['A designed, mobile-first site, live at a link you can share today', 'WhatsApp and call buttons, map, hours, your real reviews and photos', 'Every phone number and price checked against your listing', 'Reviewed on a phone and a laptop, scored by Lighthouse', 'The files to host anywhere, with your own domain'],
-    team: ['researcher', 'scout', 'reader', 'illustrator', 'auditor', 'messenger'],
+    id: 'website', name: 'Website', dept: 'Growth Studio', live: true, priceUsd: 15, listedCostUsd: 0.7, etaMin: 6,
+    tagline: 'A designed site built from your Google listing and Instagram, live today.',
+    youGet: ['A site in one of 7 designed themes, in a colour taken from your own photos, live at a link today', 'Your menu or prices, real Google reviews and your best photos (flyers are left out)', 'WhatsApp on every screen, live "open now" hours, map and directions', 'Every price and phone number checked against your sources; reviewed on a phone and a laptop', 'Search-ready, and the files to host anywhere with your own domain'],
+    team: ['researcher', 'scout', 'reader', 'analyst', 'illustrator', 'auditor', 'messenger'],
     example: 'A website for Tolu’s Small Chops in Surulere, Lagos. WhatsApp 0803 555 0142, Instagram @tolussmallchops',
   },
   {

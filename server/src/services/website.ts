@@ -1,50 +1,40 @@
-// Website: a real one-page site for a small business, live at synclyhq…/s/<name> and downloadable.
-// Researcher parses the brief → Scout finds the Google listing (address, phone, hours, rating) and
-// real reviews → Reader reads any existing site and their recent Instagram posts (their own photos
-// become the gallery) → Illustrator makes a hero image when there are no photos → Designer (Opus 5,
-// or Opus 4.8 when its wallet is empty) writes the site from those facts only → QA: code checks that
-// every phone number and price on the page is in the sources, that it's mobile-ready and has no
-// outside scripts; screenshots on a phone and a laptop go to a vision model for a design review; the
-// Designer fixes what either found, once; Lighthouse scores the live page.
-import { mkdirSync, writeFileSync } from 'node:fs';
+// Website: a designed site for a small business, live at hiresyncly.site/s/<name> and downloadable.
+// It runs on a site engine (src/site): our code owns the design (themes, type, colour, section layouts),
+// and the model only fills a plan. Researcher parses the brief → Scout finds the Google listing and real
+// reviews → Reader reads their site and Instagram (their own photos and prices) → Analyst pulls out the
+// items and prices with the exact words they came from, and a vision model sorts the photos (flyers and
+// text-heavy images are never used) → colours come from their photos → Designer (Opus 5, or Opus 4.8)
+// writes the plan → code checks the copy for invented numbers and filler, renders the page, and a vision
+// model reviews it on a phone and a laptop → the Designer fixes the plan once → Lighthouse on the live page.
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Job } from '../job.ts';
 import { DATA_DIR, DRY, MODELS } from '../config.ts';
-import { HOSTS, llm, mapsSearch, parseJson, webRead, type Msg, type Place } from '../tools.ts';
-import { AISA, ORTHO, aisa, dataforseo, ortho } from '../sellers.ts';
+import { HOSTS, llm, mapsSearch, parseJson, webRead, type Place } from '../tools.ts';
+import { AISA, aisa, dataforseo, ortho } from '../sellers.ts';
 import { download, ffmpeg, image } from '../media.ts';
 import { screenshots } from '../browser.ts';
 import { zip } from '../zip.ts';
 import { MAIL_BUDGET_USD, MAIL_HOST, PUBLIC_URL } from '../mail.ts';
+import { norm, parseHours, type Facts, type Item, type Kind, type Photo, type Review } from '../site/facts.ts';
+import { prepPhoto } from '../site/photos.ts';
+import { brandCandidates } from '../site/color.ts';
+import { CATALOGUE, LIMITS, RECIPES, defaultPlan, validatePlan, type Plan } from '../site/plan.ts';
+import { copyIssues } from '../site/checks.ts';
+import { renderSite } from '../site/engine.ts';
+import { THEMES, themeMenu } from '../site/themes.ts';
 
-type Spec = { business: string; offer: string; location: string; phone?: string; whatsapp?: string; email?: string; instagram?: string; website?: string; style: string; sections: string[]; audience: string; mapsQuery: string };
-type Asset = { name: string; buf: Buffer; about: string };
+type Spec = { business: string; kind: Kind; category: string; offer: string; area?: string; city?: string; country: string; phone?: string; whatsapp?: string; email?: string; instagram?: string; website?: string; look?: string; mapsQuery: string };
 
-const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40) || 'site';
-const digits = (s: string) => s.replace(/\D/g, '');
+const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40) || 'site';
 const handle = (h?: string) => h?.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '').trim() || undefined;
+const KINDS: Kind[] = ['food', 'beauty', 'creative', 'health', 'retail', 'professional', 'events', 'other'];
 
-/** Every check a customer's site must pass, in code. Returns problems as plain sentences. */
-export function checkSite(html: string, facts: string, assets: string[]): string[] {
-  const p: string[] = [];
-  if (html.length > 250_000) p.push(`the page is ${(html.length / 1000).toFixed(0)} KB; keep it under 250 KB`);
-  if (!/<meta[^>]+name=["']viewport/i.test(html)) p.push('no mobile viewport meta tag');
-  if (!/<title>[^<]{3,}<\/title>/i.test(html)) p.push('no <title>');
-  if (!/<meta[^>]+name=["']description/i.test(html)) p.push('no meta description');
-  if ((html.match(/<h1[\s>]/gi) ?? []).length !== 1) p.push('there must be exactly one <h1>');
-  if (/<script[^>]+src=/i.test(html)) p.push('outside scripts are not allowed (inline only)');
-  for (const m of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) if (!assets.includes(m[1])) p.push(`image "${m[1]}" is not one of the provided files`);
-  const factDigits = digits(facts);
-  for (const m of html.matchAll(/(?:\+?\d[\d\s().-]{8,}\d)/g)) {
-    const d = digits(m[0]);
-    if (d.length >= 10 && d.length <= 14 && !factDigits.includes(d.slice(-10))) p.push(`phone-like number "${m[0].trim()}" is not in the sources`);
-  }
-  for (const m of html.matchAll(/(?:₦|NGN|\$|£|€|GH₵|KSh)\s?\d[\d,.]*\s?[kK]?/g)) if (!facts.includes(m[0].replace(/\s/g, '')) && !facts.includes(m[0])) p.push(`price "${m[0]}" is not in the sources`);
-  for (const m of html.matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) { try { JSON.parse(m[1]); } catch { p.push('the JSON-LD block is not valid JSON'); } }
-  return [...new Set(p)];
+async function thumb(buf: Buffer): Promise<string> {
+  const j = await ffmpeg({ in: buf }, (f, o) => ['-i', f.in, '-vf', "scale='min(512,iw)':-2", '-q:v', '6', '-frames:v', '1', o], 'jpg');
+  return `data:image/jpeg;base64,${j.toString('base64')}`;
 }
-
 async function toJpeg(png: Buffer, maxH: number): Promise<Buffer> {
   return ffmpeg({ 'in.png': png }, (f, out) => ['-i', f['in.png'], '-vf', `crop=iw:min(ih\\,${maxH}):0:0`, '-q:v', '4', out], 'jpg');
 }
@@ -57,148 +47,231 @@ export const website = {
 
   async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);
+    const sources: string[] = [`Owner's brief: ${brief}`];
     try {
-      job.log('researcher', 'parse', 'the business, how customers reach it, and the look they want');
+      // 1. The brief
+      job.log('researcher', 'parse', 'the business, its kind, and how customers reach it');
       const spec = parseJson<Spec>(
         await llm(job, 'researcher', [
-          { role: 'system', content: 'Parse a request for a small-business website. Reply JSON only: {"business": name, "offer": what they sell (one sentence), "location": area and city, "phone": as given or null, "whatsapp": as given or null, "email": or null, "instagram": handle or null, "website": existing site url or null, "style": the look they want (default: "bold, warm and modern, mobile-first"), "sections": sections the site needs (default ["hero","what we offer","gallery","reviews","hours & location","contact"]), "audience": who buys, "mapsQuery": a Google Maps search that finds this exact business ("name area city")}' },
+          { role: 'system', content: `Parse a request for a small-business website. Reply JSON only: {"business": name exactly as given, "kind": one of ${KINDS.join('|')}, "category": short category like "Caterer" or "Hair salon", "offer": what they sell in one plain sentence, "area": neighbourhood or null, "city": city or null, "country": ISO-2 code (default "NG"), "phone": as given or null, "whatsapp": as given or null, "email": or null, "instagram": handle or null, "website": existing site URL or null, "look": any look they asked for or null, "mapsQuery": a Google Maps search that finds this exact business ("name area city")}` },
           { role: 'user', content: brief },
         ], 'parse the site brief', { model: MODELS.fast, maxTokens: 500, json: true,
-          dry: () => JSON.stringify({ business: 'Tolu’s Small Chops', offer: 'Small chops trays and party catering for events in Lagos', location: 'Surulere, Lagos', phone: '0803 555 0142', whatsapp: '0803 555 0142', email: null, instagram: '@tolussmallchops', website: null, style: 'bold, warm and modern, mobile-first', sections: ['hero', 'what we offer', 'gallery', 'reviews', 'hours & location', 'contact'], audience: 'Lagos party hosts and office admins', mapsQuery: 'Tolu small chops Surulere Lagos' }) }),
-        { business: brief.slice(0, 50), offer: brief, location: '', style: 'bold, warm and modern, mobile-first', sections: ['hero', 'offer', 'contact'], audience: '', mapsQuery: brief.slice(0, 60) },
+          dry: () => JSON.stringify({ business: 'Tolu’s Small Chops', kind: 'food', category: 'Caterer', offer: 'Small chops trays and party catering for events across Lagos', area: 'Surulere', city: 'Lagos', country: 'NG', phone: '0803 555 0142', whatsapp: '0803 555 0142', email: null, instagram: '@tolussmallchops', website: null, look: null, mapsQuery: 'Tolu small chops Surulere Lagos' }) }),
+        { business: brief.slice(0, 50), kind: 'other', category: '', offer: brief.slice(0, 150), country: 'NG', mapsQuery: brief.slice(0, 60) },
       );
+      if (!KINDS.includes(spec.kind)) spec.kind = 'other';
 
-      // 1. Facts, from sources only
-      const facts: string[] = [`Business: ${spec.business}`, `Offer: ${spec.offer}`, `Brief from the owner: ${brief}`];
+      // 2. The Google listing and its real reviews
       let place: Place | undefined;
       try {
         job.log('scout', 'listing', `Google listing for "${spec.mapsQuery}"`);
         const places = await mapsSearch(job, 'scout', spec.mapsQuery, `find ${spec.business} on Google Maps`);
-        const name = spec.business.toLowerCase().split(/\s+/)[0];
-        place = places.find((p) => p.title?.toLowerCase().includes(name)) ?? undefined;
-        if (place) facts.push(`Google listing: ${place.title}; address ${place.address ?? '?'}; phone ${place.phone ?? '?'}; rating ${place.rating ?? '?'} from ${place.ratingCount ?? 0} reviews; hours ${place.hours ?? '?'}; category ${place.category ?? '?'}`);
+        const words = norm(spec.business).split(' ').filter((w) => w.length > 2);
+        place = places.find((p) => words.filter((w) => norm(p.title ?? '').includes(w)).length >= Math.min(2, words.length));
+        if (place) sources.push(`Google listing: ${place.title}; ${place.address ?? ''}; ${place.phone ?? ''}; ${place.hours ?? ''}; rating ${place.rating ?? ''} (${place.ratingCount ?? 0}); ${place.category ?? ''}`);
         else job.log('scout', 'note', 'no Google listing matched; using the owner\'s details only');
       } catch (e: any) { job.log('scout', 'skip', `Maps lookup failed (${String(e?.message ?? e).slice(0, 50)})`); }
-      const reviews: { text: string; who: string; rating: number }[] = [];
+      const reviews: Review[] = [];
       if (place?.cid) {
         try {
           const d = await ortho<any>(job, 'serper/reviews', { body: { cid: place.cid } }, { agent: 'scout', vendor: 'Serper Reviews (Orthogonal)', reason: `real Google reviews for ${spec.business}`, expectUsd: 0.002, maxUsd: 0.005,
-            dry: () => ({ reviews: [{ rating: 5, snippet: 'The small chops were still hot when they arrived and my guests finished everything.', user: { name: 'Adaeze O.' } }, { rating: 5, snippet: 'Booked for our office party, delivered on time. The puff-puff is elite.', user: { name: 'Kunle A.' } }] }) });
-          for (const r of (d?.reviews ?? []).filter((r: any) => r.rating >= 4 && r.snippet).slice(0, 4)) reviews.push({ text: String(r.snippet).slice(0, 220), who: String(r.user?.name ?? 'Google reviewer').split(' ')[0], rating: r.rating });
-          if (reviews.length) facts.push(`Real Google reviews (quote exactly, first name only): ${reviews.map((r) => `"${r.text}" (${r.who}, ${r.rating}★)`).join(' | ')}`);
+            dry: () => ({ reviews: [{ rating: 5, snippet: 'The small chops were still hot when they arrived and my guests finished everything before the cake came out.', user: { name: 'Adaeze Okafor' } }, { rating: 5, snippet: 'Booked for our office party with two days\' notice. Delivered on time, packed neatly. The puff-puff is elite.', user: { name: 'Kunle Bello' } }, { rating: 5, snippet: 'Fair prices and Tolu replies on WhatsApp within minutes. Our go-to for every birthday now.', user: { name: 'Ifeoma N.' } }] }) });
+          for (const r of (d?.reviews ?? []).filter((r: any) => r.rating >= 4 && r.snippet && String(r.snippet).length >= 40).slice(0, 5)) {
+            reviews.push({ id: `r${reviews.length + 1}`, text: String(r.snippet).trim().slice(0, 260), who: String(r.user?.name ?? 'Google reviewer').split(' ')[0], rating: r.rating });
+          }
         } catch (e: any) { job.log('scout', 'skip', `reviews unavailable (${String(e?.message ?? e).slice(0, 50)})`); }
       }
+
+      // 3. Their own words and photos
       if (spec.website) {
         try {
           job.log('reader', 'read', `their current site ${spec.website}`);
           const [pg] = await webRead(job, 'reader', [spec.website.startsWith('http') ? spec.website : `https://${spec.website}`], 'read their existing site');
-          if (pg?.text) facts.push(`Their current site says: ${pg.text.slice(0, 3500)}`);
+          if (pg?.text) sources.push(`Their current website: ${pg.text.slice(0, 4000)}`);
         } catch (e: any) { job.log('reader', 'skip', `site unreadable (${String(e?.message ?? e).slice(0, 50)})`); }
       }
-      const assets: Asset[] = [];
+      const raw: { buf: Buffer; caption: string }[] = [];
       const ig = handle(spec.instagram);
       if (ig) {
         try {
-          job.log('reader', 'instagram', `@${ig}'s recent posts: captions for facts, photos for the gallery`);
+          job.log('reader', 'instagram', `@${ig}'s recent posts: their photos, prices and how they sell`);
           const d = await aisa<any>(job, 'instagram/user/posts', { query: { handle: ig, trim: true } }, { agent: 'reader', vendor: 'Instagram posts (AIsa)', reason: `@${ig}'s own photos and captions`,
-            dry: () => ({ items: [0, 1, 2, 3].map((i) => ({ code: `P${i}`, display_uri: 'dry://photo', caption: { text: ['Tray of the week: puff-puff, samosa, spring rolls, gizzard', 'Office party for 80, done', 'Weekend orders open. DM to book', 'Wedding trays, Lekki'][i] } })) }) });
-          const items = (d?.items ?? []).slice(0, 12);
-          const caps = items.map((p: any) => p.caption?.text).filter(Boolean).slice(0, 10);
-          if (caps.length) facts.push(`Their Instagram captions: ${caps.map((c: string) => c.slice(0, 200)).join(' | ')}`);
-          for (const p of items.filter((p: any) => p.display_uri || p.image_versions2?.candidates?.[0]?.url).slice(0, 6)) {
-            try {
-              const buf = DRY ? (await image(job, 'illustrator', { prompt: `gallery ${assets.length}`, reason: 'demo photo' })).buf : await download(p.display_uri ?? p.image_versions2.candidates[0].url, 8);
-              assets.push({ name: `photo-${assets.length + 1}.jpg`, buf, about: `their own Instagram photo: ${String(p.caption?.text ?? '').slice(0, 90)}` });
-            } catch { /* expired or blocked image; skip it */ }
+            dry: () => ({ items: ['Party Tray (20 guests) ₦25,000: puff-puff, samosa, spring rolls, peppered gizzard', 'Party Tray (50 guests) ₦58,000. Everything in the 20, plus chicken wings and mini sausage rolls', 'Office Box (10 people) ₦15,500, individually packed, delivered before lunch', 'By the piece: Puff-puff (50 pieces) ₦6,000 · Samosa (25 pieces) ₦7,500 · Spring rolls (25 pieces) ₦7,000 · Peppered gizzard (1 litre) ₦9,000', 'Order 48 hours ahead. Delivery across Lagos Mainland and Island. Pay by transfer or POS on delivery', 'Wedding trays for 200 guests, Lekki', 'Behind the fryer at 6am', 'Weekend orders open, DM to book'].map((t, i) => ({ code: `P${i}`, display_uri: 'dry://photo', caption: { text: t } })) }) });
+          const items = (d?.items ?? []).slice(0, 14);
+          const caps = items.map((p: any) => String(p.caption?.text ?? '')).filter(Boolean);
+          if (caps.length) sources.push(`Their Instagram captions: ${caps.map((c: string) => c.slice(0, 300)).join(' | ')}`);
+          for (const p of items) {
+            const url = p.display_uri ?? p.image_versions2?.candidates?.[0]?.url;
+            if (!url) continue;
+            try { raw.push({ buf: DRY ? (await image(job, 'illustrator', { prompt: `photo ${raw.length}`, reason: 'demo photo' })).buf : await download(url, 10), caption: String(p.caption?.text ?? '').slice(0, 120) }); }
+            catch { /* expired or blocked image; skip it */ }
+            if (raw.length >= 12) break;
           }
         } catch (e: any) { job.log('reader', 'skip', `Instagram unavailable (${String(e?.message ?? e).slice(0, 50)})`); }
       }
-      if (!assets.length || !DRY) {
-        job.log('illustrator', 'design', 'a hero image in their colours');
+
+      // 4. Items and prices, each tied to the words it came from
+      const sourceText = sources.join('\n');
+      job.log('analyst', 'extract', 'what they sell and the prices they publish');
+      const ex = parseJson<{ items: { name: string; price?: string | null; note?: string | null; category?: string | null; quote: string }[]; delivery?: string | null; payments?: string[]; landmark?: string | null }>(
+        await llm(job, 'analyst', [
+          { role: 'system', content: 'From the sources, list what this business sells (up to 16 items or services). For each: name, price exactly as written in the source (or null), note (a short description from the source, or null), category (a group name like "Trays" or "Haircuts", or null), and quote (the exact words in the source that mention it). Also: delivery (how they deliver, from the source, or null), payments (payment methods the source mentions), landmark (a landmark near them the source mentions, or null). Never invent anything not in the sources. Reply JSON only: {"items":[...],"delivery":...,"payments":[...],"landmark":...}' },
+          { role: 'user', content: sourceText.slice(0, 12000) },
+        ], 'pull out items and prices', { model: MODELS.fast, maxTokens: 2000, json: true,
+          dry: () => JSON.stringify({ items: [['Party Tray (20 guests)', '₦25,000', 'Puff-puff, samosa, spring rolls, peppered gizzard', 'Trays'], ['Party Tray (50 guests)', '₦58,000', 'Everything in the 20, plus chicken wings and mini sausage rolls', 'Trays'], ['Office Box (10 people)', '₦15,500', 'Individually packed, delivered before lunch', 'Trays'], ['Puff-puff (50 pieces)', '₦6,000', null, 'By the piece'], ['Samosa (25 pieces)', '₦7,500', null, 'By the piece'], ['Spring rolls (25 pieces)', '₦7,000', null, 'By the piece'], ['Peppered gizzard (1 litre)', '₦9,000', null, 'By the piece']].map(([name, price, note, category]) => ({ name, price, note, category, quote: `${name} ${price}` })), delivery: 'Delivery across Lagos Mainland and Island', payments: ['Bank transfer', 'POS on delivery'], landmark: null }) }),
+        { items: [] },
+      );
+      const srcNorm = norm(sourceText).replace(/\s/g, '');
+      const inSources = (s?: string | null) => !!s && srcNorm.includes(norm(s).replace(/\s/g, '').replace(/^₦/, '')) ;
+      const items: Item[] = [];
+      for (const it of ex.items ?? []) {
+        if (!it?.name) continue;
+        const words = norm(it.name).split(' ').filter((w) => w.length > 2);
+        if (words.length && words.filter((w) => srcNorm.includes(w)).length < Math.ceil(words.length / 2)) continue; // name not in the sources
+        const price = it.price && inSources(String(it.price).replace(/[^\d.,kK]/g, '')) ? String(it.price) : undefined;
+        if (it.price && !price) job.log('analyst', 'drop', `price "${it.price}" for ${it.name} isn't in the sources; not shown`);
+        items.push({ id: `i${items.length + 1}`, name: it.name.slice(0, 60), price, note: it.note && inSources(it.note.split(' ').slice(0, 3).join(' ')) ? it.note.slice(0, 110) : undefined, category: it.category ?? undefined, source: it.quote?.slice(0, 160) ?? '' });
+      }
+
+      // 5. Photos: resized on our server, then sorted by a vision model
+      const photos: Photo[] = [];
+      const files: { name: string; buf: Buffer }[] = [];
+      for (const [i, r] of raw.entries()) {
         try {
-          const { buf } = await image(job, 'illustrator', { prompt: `Hero photograph for the website of ${spec.business}: ${spec.offer}, ${spec.location}. Wide, warm, appetising or aspirational, natural light, real-looking, room on one side for a headline. No text, no logos.`, size: '1792x1024', reason: 'hero image for the site' });
-          assets.unshift({ name: 'hero.png', buf, about: 'generated hero image (wide)' });
-        } catch (e: any) { job.log('illustrator', 'skip', `hero image failed (${String(e?.message ?? e).slice(0, 50)})`); }
+          const p = await prepPhoto(r.buf, 1800);
+          const file = `photo-${i + 1}.jpg`;
+          files.push({ name: file, buf: p.buf });
+          photos.push({ id: `p${i + 1}`, file, w: p.w, h: p.h, kind: 'other', subject: r.caption.slice(0, 80), quality: 3 });
+        } catch { /* unreadable image */ }
       }
-      const factText = facts.join('\n');
-      const names = assets.map((a) => a.name);
+      if (photos.length) {
+        job.log('auditor', 'photos', `sorting ${photos.length} photos with ${MODELS.vision.split('/')[1]}: what each shows, and which are flyers`);
+        const thumbs = await Promise.all(files.map((f) => thumb(f.buf)));
+        const tags = parseJson<{ photos: { id: string; kind: Photo['kind']; subject: string; quality: number; focus?: Photo['focus'] }[] }>(await llm(job, 'auditor', [
+          { role: 'system', content: 'You sort a small business\'s photos for its website. For each photo (in order, ids p1, p2, …) reply: kind (food | people | premises | product | work | flyer | logo | other; "flyer" means any image with lots of text, prices, a poster or a promo graphic), subject (what it shows, under 8 words, plain), quality (1 = blurry/dark/cluttered … 5 = sharp, well lit, appetising or striking), focus (where the main subject sits: center | top | bottom | left | right). Reply JSON only: {"photos":[{"id","kind","subject","quality","focus"}]}' },
+          { role: 'user', content: [{ type: 'text', text: `${photos.length} photos from ${spec.business} (${spec.category}).` }, ...thumbs.map((u) => ({ type: 'image_url' as const, image_url: { url: u } }))] },
+        ], 'sort the photos', { model: MODELS.vision, maxTokens: 1200, json: true, maxUsd: 0.12,
+          dry: () => JSON.stringify({ photos: photos.map((p, i) => ({ id: p.id, kind: i === 3 ? 'flyer' : 'food', subject: ['A full party tray', 'Puff-puff close up', 'Samosas on a tray', 'A price list flyer', 'Packed office boxes', 'Spring rolls frying', 'A wedding buffet table', 'Peppered gizzard in a bowl'][i % 8], quality: [5, 4, 4, 2, 4, 3, 5, 4][i % 8], focus: 'center' })) }) }), { photos: [] });
+        for (const t of tags.photos ?? []) { const p = photos.find((x) => x.id === t.id); if (p) Object.assign(p, { kind: t.kind ?? p.kind, subject: (t.subject ?? p.subject).slice(0, 80), quality: Math.max(1, Math.min(5, Number(t.quality) || 3)), focus: t.focus }); }
+        const flyers = photos.filter((p) => p.kind === 'flyer').length;
+        if (flyers) job.log('auditor', 'photos', `${flyers} flyer${flyers === 1 ? '' : 's'} set aside (text-heavy images are never used as photos)`);
+      }
+      const candidates = await brandCandidates(files.filter((f, i) => photos[i] && !['flyer'].includes(photos[i].kind)).map((f, i) => ({ buf: f.buf, logo: photos[i]?.kind === 'logo' })));
 
-      // 2. Design and build
-      const phone = spec.whatsapp ?? spec.phone ?? place?.phone;
-      const system = `You are a senior web designer building a one-page website for a small business. Output ONE complete HTML file only (no Markdown fences, no commentary).
-Rules:
-- Facts: use ONLY the facts provided. Never invent prices, dishes, services, awards, years in business, testimonials or statistics. Quote reviews exactly as given with first names only; if none are given, show no testimonials. If a price isn't given, don't show one ("Ask for a quote" instead).
-- Contact: a prominent WhatsApp button (https://wa.me/<international number without +>) and a tel: link when a phone is known; a Google Maps iframe (https://www.google.com/maps?q=<url-encoded address>&output=embed) when an address is known; opening hours if known.
-- Images: use only these files, by exact name: ${names.join(', ') || '(none; use colour, type and shape instead)'}. Every <img> needs alt text, width/height attributes and loading="lazy" (except the hero).
-- Design: ${spec.style}. Mobile-first (most visitors are on phones), fluid type with clamp(), a clear palette of 3–4 colours drawn from the business, one display font + one text font from Google Fonts (a <link> is fine), generous spacing, strong visual hierarchy, big tap targets, a sticky mobile call-to-action bar, subtle CSS-only motion (prefers-reduced-motion respected). It should feel designed for this business, not like a template.
-- Technical: exactly one <h1>; <title> and meta description written for local search ("${spec.business} in ${spec.location}"); Open Graph tags; a JSON-LD LocalBusiness block with only known facts; semantic sections; no external scripts (inline JS only if needed); a small footer credit "Site by Syncly".
-- Sections: ${spec.sections.join(', ')}.`;
-      const user = `Facts:\n${factText}\n\nPhone/WhatsApp for buttons: ${phone ?? 'none known'}\nEmail: ${spec.email ?? 'none'}\nAudience: ${spec.audience}\n\nImage files:\n${assets.map((a) => `- ${a.name}: ${a.about}`).join('\n') || '(none)'}`;
-      job.log('illustrator', 'build', `designing and coding the site with ${MODELS.designer.split('/')[1]}`);
-      const dryHtml = () => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${spec.business} in ${spec.location}</title><meta name="description" content="${spec.offer}"><script type="application/ld+json">{"@context":"https://schema.org","@type":"LocalBusiness","name":"${spec.business}"}</script><style>body{margin:0;font-family:system-ui;background:#fbf6ee;color:#2a1a0e}header{padding:48px 20px;background:#7a2e12;color:#fff}h1{font-size:clamp(32px,8vw,64px);margin:0}.cta{position:sticky;bottom:0;display:flex;gap:8px;padding:12px;background:#fff}.cta a{flex:1;padding:14px;border-radius:12px;text-align:center;background:#1f7a3a;color:#fff;text-decoration:none}img{width:100%;height:auto;display:block}</style></head><body><header><h1>${spec.business}</h1><p>${spec.offer}</p></header>${names.map((n) => `<img src="${n}" alt="${spec.business}" width="1024" height="768" loading="lazy">`).join('')}<section><h2>Reviews</h2>${reviews.map((r) => `<blockquote>${r.text} — ${r.who}</blockquote>`).join('')}</section><div class="cta"><a href="https://wa.me/2348035550142">WhatsApp</a><a href="tel:+2348035550142">Call 0803 555 0142</a></div><footer>Site by Syncly</footer></body></html>`;
-      const build = (msgs: Msg[], why: string) => llm(job, 'illustrator', msgs, why, { model: MODELS.designer, fallback: MODELS.designerFallback, maxTokens: 16000, maxUsd: 0.6, dry: dryHtml });
-      const clean = (s: string) => s.replace(/^[\s\S]*?(<!doctype html|<html)/i, '$1').replace(/<\/html>[\s\S]*$/i, '</html>').trim();
-      let html = clean(await build([{ role: 'system', content: system }, { role: 'user', content: user }], 'design and code the site'));
-      if (!/<html/i.test(html)) throw new Error('the designer did not return an HTML page');
-
-      // 3. Publish to a private working folder, then check it like a customer would
-      const slug = `${slugify(spec.business)}-${randomBytes(2).toString('hex')}`;
-      const dir = join(DATA_DIR, 'sites', slug);
-      const publish = () => { mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'index.html'), html); for (const a of assets) writeFileSync(join(dir, a.name), a.buf); };
-      publish();
-      const review = async () => {
-        const shots = await screenshots(join(dir, 'index.html'), [{ name: 'phone', width: 390, height: 844, full: true }, { name: 'laptop', width: 1280, height: 800 }]);
-        const jpgs = await Promise.all(shots.map(async (s) => ({ name: s.name, jpg: await toJpeg(s.png, s.name === 'phone' ? 3400 : 800), png: s.png })));
-        job.log('auditor', 'look', `design review of the phone and laptop screenshots with ${MODELS.vision.split('/')[1]}`);
-        const verdict = parseJson<{ issues: string[] }>(await llm(job, 'auditor', [
-          { role: 'system', content: 'You review a small-business website from screenshots (a full phone page and a laptop first screen). List concrete visual problems only: unreadable text or low contrast, broken or overlapping layout, content cut off, empty sections, images missing or distorted, buttons too small, the page looking unfinished or generic. Ignore taste differences. Reply JSON only: {"issues": [short, specific strings]} (empty if it looks professional).' },
-          { role: 'user', content: [{ type: 'text', text: `The ${spec.business} site. Phone screenshot, then laptop.` }, ...jpgs.map((j) => ({ type: 'image_url' as const, image_url: { url: `data:image/jpeg;base64,${j.jpg.toString('base64')}` } }))] },
-        ], 'look at the site on a phone and a laptop', { model: MODELS.vision, maxTokens: 700, json: true, maxUsd: 0.1, dry: () => JSON.stringify({ issues: [] }) }), { issues: [] });
-        return { shots: jpgs, issues: verdict.issues ?? [] };
+      const facts: Facts = {
+        name: spec.business, kind: spec.kind, category: spec.category || place?.category, offer: spec.offer,
+        area: spec.area ?? undefined, city: spec.city ?? undefined, country: (spec.country || 'NG').toUpperCase(),
+        address: place?.address, landmark: ex.landmark ?? undefined,
+        phone: spec.phone ?? place?.phone, whatsapp: spec.whatsapp ?? spec.phone ?? undefined, email: spec.email ?? undefined,
+        instagram: ig ? `@${ig}` : undefined, website: spec.website ?? undefined,
+        hoursText: place?.hours, hours: parseHours(place?.hours), rating: place?.rating, ratingCount: place?.ratingCount,
+        items, reviews, delivery: ex.delivery ?? undefined, payments: ex.payments, sources: sourceText,
       };
-      let problems = checkSite(html, factText, names);
+      job.log('analyst', 'facts', `${items.length} items (${items.filter((i) => i.price).length} with published prices), ${reviews.length} real reviews, ${photos.filter((p) => !['flyer', 'logo'].includes(p.kind)).length} usable photos${facts.hours ? ', opening hours' : ''}`);
+
+      // 6. The plan (the only thing the model writes)
+      const usable = photos.filter((p) => !['flyer', 'logo'].includes(p.kind));
+      const system = `You are the art director for a small-business website. A site engine renders the page; you only write its plan, as JSON. You never write HTML or CSS.
+Themes (pick the one that fits this business best):
+${themeMenu()}
+${CATALOGUE}
+Suggested sections for a ${spec.kind} business, in order: ${RECIPES[spec.kind].join(', ')}. You may drop or reorder, but keep the CTA last.
+Rules:
+- Facts only. Prices, phone numbers, hours, addresses and reviews are rendered from the facts automatically; your copy must not contain any number the facts don't. No invented years, awards, founders, counts or claims.
+- Write like the owner talking to a customer: plain, specific, warm, local. No filler ("nestled", "elevate", "in the heart of", "culinary journey", "look no further", "where X meets Y", "unforgettable"), no emoji, no exclamation marks.
+- Hero headline: under ${LIMITS.headline} characters; a sharp, specific promise about what they sell (not the business name; the name is already in the header). Optionally mark 1–3 words of it as "accent" (they get the theme's accent style). Sub: one sentence on what, for whom, where.
+- Photos: use photo ids only; prefer quality 4–5; the hero photo should be striking and not busy if the hero is "photo". Never use flyers.
+- brand: pick one of the candidate colours taken from their photos, or one that fits the business if none fit.
+Reply with JSON only: {"theme","brand","title","description","hero":{"variant","eyebrow","headline","accent","sub","photo","primary","secondary"},"sections":[...],"whatsappText"}`;
+      const factsForModel = {
+        name: facts.name, kind: facts.kind, category: facts.category, offer: facts.offer, area: facts.area, city: facts.city, address: facts.address, landmark: facts.landmark,
+        hasPhone: !!(facts.phone ?? facts.whatsapp), hours: facts.hoursText, rating: facts.rating, ratingCount: facts.ratingCount, delivery: facts.delivery, payments: facts.payments,
+        items: items.map((i) => ({ id: i.id, name: i.name, price: i.price ?? null, note: i.note ?? null, category: i.category ?? null })),
+        reviews: reviews.map((r) => ({ id: r.id, text: r.text, rating: r.rating })),
+      };
+      const user = `Facts:\n${JSON.stringify(factsForModel, null, 1)}\n\nPhotos:\n${usable.map((p) => `- ${p.id}: ${p.kind}, ${p.subject}, quality ${p.quality}, ${p.w}x${p.h}`).join('\n') || '(none usable: use the "type" hero and no gallery)'}\n\nBrand colour candidates (from their photos): ${candidates.join(', ') || 'none'}\n${spec.look ? `\nThe owner asked for: ${spec.look}` : ''}\nOwner's brief: ${brief}\n\nSource text, for tone and details:\n${sourceText.slice(0, 5000)}`;
+      const fallback = defaultPlan(facts, photos, candidates);
+      const planWith = async (msgs: { role: 'system' | 'user' | 'assistant'; content: string }[], why: string) => parseJson<any>(await llm(job, 'illustrator', msgs, why, { model: MODELS.designer, fallback: MODELS.designerFallback, maxTokens: 5000, maxUsd: 0.4, json: true, dry: () => JSON.stringify(fallback) }), null);
+      job.log('illustrator', 'plan', `choosing the theme, sections and photos, and writing the copy (${MODELS.designer.split('/')[1]})`);
+      let rawPlan = await planWith([{ role: 'system', content: system }, { role: 'user', content: user }], 'plan the site');
+      if (!rawPlan) { job.log('illustrator', 'fallback', 'the plan came back unreadable; using the default plan for this kind of business'); rawPlan = fallback; }
+      let { plan, notes } = validatePlan(rawPlan, facts, photos, candidates);
+      let issues = copyIssues(plan, facts);
+
+      // 7. Render, publish, look at it
+      const slug = `${slugify(spec.business)}-${randomBytes(2).toString('hex')}`;
+      const url = `${PUBLIC_URL}/s/${slug}`;
+      const dir = join(DATA_DIR, 'sites', slug);
+      let rendered = renderSite(plan, facts, photos, { url });
+      const publish = () => {
+        rmSync(dir, { recursive: true, force: true });
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, 'index.html'), rendered.html);
+        writeFileSync(join(dir, 'llms.txt'), rendered.llms);
+        writeFileSync(join(dir, 'robots.txt'), rendered.robots);
+        for (const f of files) writeFileSync(join(dir, f.name), f.buf);
+      };
+      const review = async () => {
+        const shots = await screenshots(join(dir, 'index.html'), [{ name: 'phone-top', width: 390, height: 844 }, { name: 'phone', width: 390, height: 844, full: true }, { name: 'laptop', width: 1366, height: 860, full: true }]);
+        const jpg = Object.fromEntries(await Promise.all(shots.map(async (s) => [s.name, await toJpeg(s.png, s.name === 'laptop' ? 4200 : 5200)] as const)));
+        job.log('auditor', 'look', `reviewing the site on a phone and a laptop with ${MODELS.vision.split('/')[1]}`);
+        const v = parseJson<{ answers?: Record<string, string>; issues: string[] }>(await llm(job, 'auditor', [
+          { role: 'system', content: 'You review a small-business website from three screenshots: the first screen on a phone, the full page on a phone, the full page on a laptop. Answer each question yes or no: q1 Is every piece of text easy to read (good contrast, not over a busy part of a photo)? q2 Is anything overlapping, cut off or spilling out of its box? q3 Are there empty, broken or placeholder-looking areas? q4 Does the first phone screen show what the business sells and a WhatsApp or call button? q5 Do the photos look right where they are (no awkward crops, no text-heavy flyers, no repeated photo)? q6 Does it look like a finished, premium site made for this business? Then list issues, each phrased as a change to the plan (for example "hero photo p3 is too busy for text on top: use hero variant split", "gallery uses a dark blurry photo p5: drop it", "headline wraps to 5 lines on the phone: shorten it"). Reply JSON only: {"answers":{"q1":"yes|no",…},"issues":[…]} with no issues if all answers are good.' },
+          { role: 'user', content: [{ type: 'text', text: `${spec.business}: phone first screen, phone full page, laptop full page.` }, ...(['phone-top', 'phone', 'laptop'] as const).map((k) => ({ type: 'image_url' as const, image_url: { url: `data:image/jpeg;base64,${jpg[k].toString('base64')}` } }))] },
+        ], 'look at the site on a phone and a laptop', { model: MODELS.vision, maxTokens: 900, json: true, maxUsd: 0.15, dry: () => JSON.stringify({ answers: { q1: 'yes', q2: 'yes', q3: 'yes', q4: 'yes', q5: 'yes', q6: 'yes' }, issues: [] }) }), { issues: [] });
+        return { jpg, issues: v.issues ?? [] };
+      };
+      publish();
       let look = await review();
-      if (problems.length || look.issues.length) {
-        job.log('illustrator', 'revise', `${problems.length + look.issues.length} issues from the checks and the design review`);
-        html = clean(await build([{ role: 'system', content: system }, { role: 'user', content: user },
-          { role: 'assistant', content: html }, { role: 'user', content: `Fix every issue below and return the full corrected HTML file only.\n- ${[...problems, ...look.issues].join('\n- ')}` }], 'fix the issues'));
-        publish();
-        problems = checkSite(html, factText, names);
-        look = await review();
+
+      // 8. One round of fixes, made in the plan only (the design system itself is never touched)
+      if (issues.length || look.issues.length) {
+        job.log('illustrator', 'revise', `${issues.length + look.issues.length} issues from the copy checks and the visual review`);
+        const fixed = await planWith([{ role: 'system', content: system }, { role: 'user', content: user }, { role: 'assistant', content: JSON.stringify(plan) },
+          { role: 'user', content: `Fix every issue by changing the plan (theme, hero variant, photo choices, copy, section order or variants). Return the full corrected plan as JSON only.\n- ${[...issues, ...look.issues].join('\n- ')}` }], 'fix the plan');
+        if (fixed) {
+          ({ plan, notes } = validatePlan(fixed, facts, photos, candidates));
+          issues = copyIssues(plan, facts);
+          rendered = renderSite(plan, facts, photos, { url });
+          publish();
+          look = await review();
+        }
       }
 
-      // 4. Lighthouse on the live page (only when it's publicly reachable)
-      const url = `${PUBLIC_URL}/s/${slug}`;
+      // 9. Lighthouse on the live page (only reachable when this runs on the public server)
       let scores: Record<string, number> | undefined;
       if (!DRY) {
         try {
           job.log('auditor', 'lighthouse', `Lighthouse (mobile) on ${url}`);
           const r = await dataforseo<any>(job, 'on_page/lighthouse/live/json', { url, for_mobile: true, categories: ['performance', 'accessibility', 'best_practices', 'seo'] }, { agent: 'auditor', vendor: 'Lighthouse (DataForSEO via AIsa)', reason: 'score the live site', dry: () => [] });
-          const cats = r?.[0]?.categories ?? {};
-          scores = Object.fromEntries(Object.entries(cats).map(([k, v]: [string, any]) => [k, Math.round((v?.score ?? 0) * 100)]));
+          scores = Object.fromEntries(Object.entries(r?.[0]?.categories ?? {}).map(([k, v]: [string, any]) => [k, Math.round((v?.score ?? 0) * 100)]));
         } catch (e: any) { job.log('auditor', 'skip', `Lighthouse unavailable (${String(e?.message ?? e).slice(0, 60)})`); }
       }
 
-      // 5. Deliver
-      job.files.push({ name: `${slug}.zip`, content: zip([{ name: 'index.html', data: html }, ...assets.map((a) => ({ name: a.name, data: a.buf }))]) });
-      for (const s of look.shots) job.files.push({ name: `${s.name}.jpg`, content: s.jpg });
-      job.files.push({ name: 'index.html', content: html });
+      // 10. Deliver
+      const theme = THEMES[plan.theme];
+      job.files.push({ name: `${slug}.zip`, content: zip([{ name: 'index.html', data: rendered.html }, { name: 'llms.txt', data: rendered.llms }, { name: 'robots.txt', data: rendered.robots }, ...files.map((f) => ({ name: f.name, data: f.buf }))]) });
+      job.files.push({ name: 'phone.jpg', content: look.jpg['phone-top'] }, { name: 'phone-full.jpg', content: look.jpg.phone }, { name: 'laptop.jpg', content: look.jpg.laptop });
+      job.files.push({ name: 'index.html', content: rendered.html }, { name: 'site-plan.json', content: JSON.stringify(plan, null, 2) });
+      const used = new Set([plan.hero.photo, ...plan.sections.flatMap((s) => (s.kind === 'gallery' ? s.photos : s.kind === 'offer' ? s.items.map((i) => i.photo) : s.kind === 'about' ? [s.photo] : []))].filter(Boolean));
       job.deliverable = [
-        `# Your website: ${spec.business}`,
-        `**Live now:** [${url.replace(/^https?:\/\//, '')}](${url})\n\nThe download (\`${slug}.zip\`) has the page and its images, ready for any host. It's one HTML file, no build step.`,
+        `# Your website: ${facts.name}`,
+        `**Live now:** [${url.replace(/^https?:\/\//, '')}](${url})\n\nThe download (\`${slug}.zip\`) has the page, its photos and the files search engines read. It's one HTML file with no build step, so any host works, and it stays yours.`,
         `## What's on it`,
-        `- ${spec.sections.join('\n- ')}`,
-        `- WhatsApp and call buttons${phone ? ` (${phone})` : ''}${place?.address ? `, a map of ${place.address}` : ''}${place?.hours ? ', opening hours' : ''}`,
-        `- ${reviews.length ? `${reviews.length} real Google reviews, quoted exactly` : 'No testimonials: we only show real reviews, and none were found'}`,
-        `- ${assets.filter((a) => a.name.startsWith('photo')).length ? `${assets.filter((a) => a.name.startsWith('photo')).length} of your own Instagram photos` : 'A generated hero image'}; search-ready title, description and business details for Google`,
+        `- **Look:** the ${theme.id} theme (${theme.mood.split(':')[0]}), in a colour taken from your own photos`,
+        `- **Sections:** ${['hero', ...plan.sections.map((s) => s.kind)].join(' → ')}`,
+        `- **WhatsApp everywhere:** a button on the first screen, a contact bar fixed to the bottom of every phone screen${facts.address ? ', directions to your address' : ''}${facts.hours ? ', and a live "open now" from your Google hours' : ''}`,
+        `- **${items.length} items${items.some((i) => i.price) ? ` with ${items.filter((i) => i.price).length} published prices` : ''}**, ${reviews.length ? `${reviews.length} real Google reviews quoted word for word` : 'no testimonials (we only show real reviews)'}, and ${used.size} of your own photos`,
+        `- **Found on Google and by AI assistants:** your business details marked up for search, plus an \`llms.txt\` summary`,
         `## Checks`,
-        `- Every phone number and price on the page was matched against your listing, your brief and your posts: ${problems.length ? `**${problems.length} still open:** ${problems.join('; ')}` : 'all matched'}.`,
-        `- Design review of the phone and laptop screenshots: ${look.issues.length ? `open notes: ${look.issues.join('; ')}` : 'no problems found'}.`,
-        scores ? `- Lighthouse (mobile): ${Object.entries(scores).map(([k, v]) => `${k.replace(/[-_]/g, ' ')} ${v}`).join(' · ')}` : '- Lighthouse: runs on the live page after publishing.',
+        `- **Facts:** every price, phone number, address and review on the page comes from your listing, your posts or your brief; the page can't show one that doesn't.${issues.length ? ` Open notes on the copy: ${issues.join('; ')}.` : ''}`,
+        `- **Looked at on a phone and a laptop:** ${look.issues.length ? `open notes: ${look.issues.join('; ')}` : 'no problems found'}.`,
+        scores ? `- **Lighthouse (mobile):** ${Object.entries(scores).map(([k, v]) => `${k.replace(/[-_]/g, ' ')} ${v}`).join(' · ')}` : '- **Lighthouse:** runs on the live page once it is published on the public server.',
+        notes.length ? `- **Adjusted automatically:** ${notes.join('; ')}.` : '',
         `## Changes`,
-        `Ask for a revision on this order and say what to change (wording, colours, sections, photos). To use your own domain, point it at any static host and upload the zip.`,
-      ].join('\n\n');
-      job.qa = { verdict: problems.length ? 'revise' : 'pass', notes: [...problems, ...look.issues].join(' | ') || `site live at /s/${slug}`, model: `rules + ${MODELS.vision}` };
+        `Ask for a revision on this order and say what to change: wording, photos, colours, sections, or a different theme. To use your own domain, point it at any static host and upload the zip.`,
+      ].filter(Boolean).join('\n\n');
+      job.qa = { verdict: issues.length || look.issues.length ? 'revise' : 'pass', notes: [...issues, ...look.issues].join(' | ') || `site live at /s/${slug}; ${plan.theme} theme`, model: `rules + ${MODELS.vision}` };
       job.status = 'delivered';
     } catch (e: any) {
       job.status = 'failed';

@@ -200,7 +200,7 @@ const SPEND: Record<string, Partial<Record<Role, number>>> = {
   'lead-list': { researcher: 0.02, scout: 0.015, reader: 0.006, verifier: 0.01, writer: 0.03 },
   'research-brief': { researcher: 0.02, scout: 0.015, reader: 0.003, auditor: 0.01 },
   'content-pack': { researcher: 0.01, reader: 0.003, scout: 0.6, analyst: 0.02, writer: 0.05, illustrator: 0.3, auditor: 0.01 },
-  website: { researcher: 0.01, scout: 0.01, reader: 0.1, illustrator: 0.6, auditor: 0.15 },
+  website: { researcher: 0.01, scout: 0.01, reader: 0.1, analyst: 0.03, illustrator: 0.5, auditor: 0.35 },
   'motion-ad': { researcher: 0.01, reader: 0.003, producer: 0.6, auditor: 0.05 },
   'video-ad': { researcher: 0.01, scout: 0.1, illustrator: 0.2, producer: 1.4, writer: 0.01, auditor: 0.03 },
   'ai-answer-audit': { researcher: 1.21, scout: 0.21, reader: 0.03, investigator: 1.2, analyst: 0.18, auditor: 0.03, writer: 0.01 },

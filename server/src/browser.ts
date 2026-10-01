@@ -38,6 +38,18 @@ export async function screenshots(target: string, views: { name: string; width: 
       // A slow font or image must not cost the screenshot: wait for the load, then settle briefly.
       await page.goto(target.startsWith('http') || target.startsWith('file:') ? target : `file://${target}`, { waitUntil: 'load', timeout: 45_000 }).catch(() => undefined);
       await page.waitForNetworkIdle({ idleTime: 500, timeout: 8000 }).catch(() => undefined);
+      // A one-shot capture never scrolls, so show everything that reveals on scroll; in a full-page
+      // shot, fixed bars would be painted mid-page, so hide them there.
+      await page.evaluate(async (full) => {
+        document.querySelectorAll('.rv').forEach((e) => e.classList.add('in'));
+        // scroll through like a visitor so lazy images and maps load, then wait for every image
+        for (let y = 0; y < document.body.scrollHeight; y += Math.round(innerHeight * 0.8)) { scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)); }
+        scrollTo(0, 0);
+        const imgs = [...document.images] as HTMLImageElement[];
+        imgs.forEach((i) => { i.loading = 'eager'; });
+        await Promise.all(imgs.map((i) => (i.complete && i.naturalWidth ? null : new Promise((r) => { i.addEventListener('load', r, { once: true }); i.addEventListener('error', r, { once: true }); setTimeout(r, 5000); }))));
+        if (full) { const st = document.createElement('style'); st.textContent = '.bar,.float-wa{display:none!important}*{animation:none!important;transition:none!important}'; document.head.appendChild(st); }
+      }, !!v.full).catch(() => undefined);
       const png = v.full ? await page.screenshot({ type: 'png', fullPage: true, captureBeyondViewport: true }).catch(() => page.screenshot({ type: 'png' })) : await page.screenshot({ type: 'png' });
       out.push({ name: v.name, png: Buffer.from(png) });
     }
