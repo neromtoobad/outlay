@@ -9,8 +9,9 @@ import { aiAnswerAudit } from './ai-answer-audit.ts';
 import { bestPrice } from './best-price.ts';
 import { vendorCheck } from './vendor-check.ts';
 import type { Job } from '../job.ts';
+import type { BusinessDetails } from '../details.ts';
 
-export type Runnable = { id: string; name: string; priceUsd: number; run: (brief: string, opts?: { orderId?: string }) => Promise<Job> };
+export type Runnable = { id: string; name: string; priceUsd: number; run: (brief: string, opts?: { orderId?: string; details?: BusinessDetails }) => Promise<Job> };
 
 export const SERVICES: Record<string, Runnable> = {
   [researchBrief.id]: researchBrief,

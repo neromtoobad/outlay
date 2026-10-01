@@ -13,6 +13,7 @@ import { isAddress, type Address, type Hex } from 'viem';
 import { DATA_DIR, DRY } from './config.ts';
 import { publish } from './bus.ts';
 import { quote, type Quote } from './cfo/quote.ts';
+import type { BusinessDetails } from './details.ts';
 import { CATALOG, SERVICES } from './services/index.ts';
 import * as chain from './escrow.ts';
 import { emailDelivery } from './mail.ts';
@@ -23,6 +24,7 @@ export type Order = {
   id: string;
   service: string;
   brief: string;
+  details?: BusinessDetails; // from the order form, when the service has one
   email: string;
   createdAt: string;
   quote: Quote;
@@ -132,7 +134,7 @@ function promoLeft(): number {
   return Math.max(0, 2 - used);
 }
 
-export function createQuote(input: { service: string; brief: string; email: string }): Order {
+export function createQuote(input: { service: string; brief: string; email: string; details?: BusinessDetails }): Order {
   const item = CATALOG.find((c) => c.id === input.service);
   if (!item || !item.live) throw new Error('unknown or not-yet-live service');
   const email = input.email.trim().toLowerCase();
@@ -144,7 +146,7 @@ export function createQuote(input: { service: string; brief: string; email: stri
   });
   const o: Order = {
     id: `ord_${Date.now().toString(36)}_${randomBytes(2).toString('hex')}`,
-    service: item.id, brief: input.brief.trim().slice(0, 2000), email, createdAt: new Date().toISOString(),
+    service: item.id, brief: input.brief.trim().slice(0, 6000), ...(input.details ? { details: input.details } : {}), email, createdAt: new Date().toISOString(),
     quote: q, status: q.decision === 'decline' ? 'declined' : 'quoted', runs: [], demo: DRY,
   };
   saveOrder(o);
@@ -168,7 +170,7 @@ async function run(o: Order) {
   o.status = 'running';
   saveOrder(o);
   const brief = o.revisionNote ? `${o.brief}\n\nRevision requested by the customer: ${o.revisionNote}` : o.brief;
-  const job = await svc.run(brief, { orderId: o.id });
+  const job = await svc.run(brief, { orderId: o.id, details: o.details });
   await emailDelivery(job, o); // the Messenger emails the delivery (never fails the job)
   const fresh = getOrder(o.id)!;
   fresh.runs.push(job.id);

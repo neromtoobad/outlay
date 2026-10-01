@@ -36,7 +36,9 @@ The Scout pulls this week's top reels and TikToks for your niche, your own recen
 
 ### Website
 
-The Scout finds your Google listing and real reviews, and the Reader reads your Instagram, whose photos become the gallery. The Designer, running Claude Opus 5, builds the site from those facts only. Code checks that every phone number and price on the page is in your sources, that it's mobile-ready and runs no outside scripts. A vision model reviews screenshots on a phone and a laptop, the Designer fixes what either found, and Lighthouse scores the live page. It's hosted at `hiresyncly.site/s/your-name`; the zip works on any host.
+You fill in a short form: your business, how customers reach you, your links (Instagram, TikTok, Facebook, Google Maps), your menu or prices, your own photos and logo, and the look you want (one of 7 themes or "choose for me", a brand colour, and which sections). The team adds your Google listing, real reviews and Instagram.
+
+The site runs on a site engine. Our code owns the design: the themes (font pairings checked to include ₦ and Yoruba letters), a palette from your logo or photos with contrast checked in code, about 20 section layouts, a WhatsApp bar on every phone screen, live "open now" from your hours, and search-ready business details. The Designer (Claude Opus 5) only writes the plan: which sections, which of your photos go where, and short copy. Prices, phone numbers, hours and reviews are rendered from your form, listing and posts, so the site can't show one that isn't real. A vision model sorts your photos (flyers stay out) and reviews the page on a phone and a laptop; the fix round can change the plan, never the design. It's hosted at `hiresyncly.site/s/your-name`, and the zip works on any host.
 
 ### Motion Ad
 

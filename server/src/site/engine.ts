@@ -18,6 +18,8 @@ const ICON = {
   star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m12 3.2 2.6 5.5 6 .7-4.5 4.1 1.2 5.9L12 16.5l-5.3 2.9 1.2-5.9-4.5-4.1 6-.7L12 3.2Z"/></svg>',
   arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   tag: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M3.5 12.5V4.5a1 1 0 0 1 1-1h8l8 8-9 9-8-8Z"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/></svg>',
+  tiktok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M14 4c.4 2.6 2 4.2 4.6 4.5v3a8 8 0 0 1-4.6-1.5V15a5.5 5.5 0 1 1-5.5-5.5v3.1A2.4 2.4 0 1 0 11 15V4h3Z"/></svg>',
+  fb: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M14 8.5h2.5V5H14a3.5 3.5 0 0 0-3.5 3.5V11H8v3.5h2.5V21H14v-6.5h2.5L17 11h-3V9a.5.5 0 0 1 .5-.5Z"/></svg>',
   ig: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17.3" cy="6.7" r="1.1" fill="currentColor"/></svg>',
 };
 const stars = (n: number) => `<span class="stars" aria-label="${n} out of 5">${Array.from({ length: 5 }, (_, i) => `<i class="${i < Math.round(n) ? 'on' : ''}">${ICON.star}</i>`).join('')}</span>`;
@@ -33,7 +35,7 @@ export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: s
   const chat = f.whatsapp ?? f.phone;
   const wa = (msg = plan.whatsappText) => waLink(chat, msg, f.country);
   const tel = telLink(f.phone ?? f.whatsapp, f.country);
-  const dir = f.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${f.name}, ${f.address}`)}` : undefined;
+  const dir = f.mapsUrl ?? (f.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${f.name}, ${f.address}`)}` : undefined);
   const hasOffer = plan.sections.some((s) => s.kind === 'offer');
 
   const actionHref = (a: Action) => a === 'whatsapp' ? wa() : a === 'book' ? wa(`Hello ${f.name}, I'd like to book.`) : a === 'call' ? tel : a === 'directions' ? dir : hasOffer ? '#offer' : undefined;
@@ -115,7 +117,7 @@ export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: s
 
   // ---------- hero
   const hr = plan.hero;
-  const nav = `<nav class="top${hr.variant === 'photo' ? ' on-photo' : ''}"><div class="wrap"><a class="brand" href="#top">${esc(f.name)}</a><div class="top-links">${hasOffer ? `<a href="#offer">${f.kind === 'food' ? 'Menu' : 'Prices'}</a>` : ''}${plan.sections.some((s) => s.kind === 'reviews') ? '<a href="#reviews">Reviews</a>' : ''}${plan.sections.some((s) => s.kind === 'location') ? '<a href="#visit">Visit</a>' : ''}${chat ? `<a class="btn btn-small" href="${esc(wa())}" target="_blank" rel="noopener">${ICON.whatsapp}<span>WhatsApp</span></a>` : ''}</div></div></nav>`;
+  const nav = `<nav class="top${hr.variant === 'photo' ? ' on-photo' : ''}"><div class="wrap"><a class="brand" href="#top">${f.logo ? `<img class="brand-logo" src="${esc(f.logo)}" alt="" width="40" height="40">` : ''}<span>${esc(f.name)}</span></a><div class="top-links">${hasOffer ? `<a href="#offer">${f.kind === 'food' ? 'Menu' : 'Prices'}</a>` : ''}${plan.sections.some((s) => s.kind === 'reviews') ? '<a href="#reviews">Reviews</a>' : ''}${plan.sections.some((s) => s.kind === 'location') ? '<a href="#visit">Visit</a>' : ''}${chat ? `<a class="btn btn-small" href="${esc(wa())}" target="_blank" rel="noopener">${ICON.whatsapp}<span>WhatsApp</span></a>` : ''}</div></div></nav>`;
   const heroText = `${hr.eyebrow ? `<p class="label hero-eyebrow">${esc(hr.eyebrow)}</p>` : ''}${h(1, hr.headline, hr.accent, 'hero-h')}<p class="hero-sub">${esc(hr.sub)}</p><p class="btns hero-btns">${btn(hr.primary)}${hr.secondary ? btn(hr.secondary, hr.variant === 'photo' || hr.variant === 'type' ? 'btn-line' : 'btn-ghost') : ''}</p>${f.hours ? '<p class="hero-open" data-open-pill hidden></p>' : ''}`;
   const hero = hr.variant === 'photo'
     ? `<header id="top" class="hero hero-photo">${img(hr.photo, '100vw', 'hero-bg', true)}<div class="scrim"></div>${nav}<div class="wrap hero-in">${heroText}</div></header>`
@@ -127,7 +129,7 @@ export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: s
 
   const bar = chat || tel || dir ? `<div class="bar" role="navigation" aria-label="Contact">${chat ? `<a class="b-wa" href="${esc(wa())}" target="_blank" rel="noopener">${ICON.whatsapp}<span>WhatsApp</span></a>` : ''}${tel ? `<a href="${esc(tel)}">${ICON.phone}<span>Call</span></a>` : ''}${dir ? `<a href="${esc(dir)}" target="_blank" rel="noopener">${ICON.pin}<span>Directions</span></a>` : ''}</div>${chat ? `<a class="float-wa" href="${esc(wa())}" target="_blank" rel="noopener" aria-label="Chat on WhatsApp">${ICON.whatsapp}</a>` : ''}` : '';
 
-  const footer = `<footer class="foot"><div class="wrap"><div><p class="brand">${esc(f.name)}</p><p class="muted">${esc(f.offer)}</p></div><ul>${f.address ? `<li>${ICON.pin}<span>${esc(f.address)}</span></li>` : ''}${tel ? `<li>${ICON.phone}<a href="${esc(tel)}">${esc(prettyPhone(f.phone ?? f.whatsapp, f.country))}</a></li>` : ''}${f.instagram ? `<li>${ICON.ig}<a href="https://instagram.com/${esc(f.instagram.replace(/^@/, ''))}" target="_blank" rel="noopener">@${esc(f.instagram.replace(/^@/, ''))}</a></li>` : ''}${f.email ? `<li><a href="mailto:${esc(f.email)}">${esc(f.email)}</a></li>` : ''}</ul><p class="fine">© ${opts.year ?? new Date().getFullYear()} ${esc(f.name)} · <a href="https://hiresyncly.site" target="_blank" rel="noopener">Site by Syncly</a></p></div></footer>`;
+  const footer = `<footer class="foot"><div class="wrap"><div><p class="brand">${esc(f.name)}</p><p class="muted">${esc(f.offer)}</p></div><ul>${f.address ? `<li>${ICON.pin}<span>${esc(f.address)}</span></li>` : ''}${tel ? `<li>${ICON.phone}<a href="${esc(tel)}">${esc(prettyPhone(f.phone ?? f.whatsapp, f.country))}</a></li>` : ''}${f.instagram ? `<li>${ICON.ig}<a href="https://instagram.com/${esc(f.instagram.replace(/^@/, ''))}" target="_blank" rel="noopener">@${esc(f.instagram.replace(/^@/, ''))}</a></li>` : ''}${f.tiktok ? `<li>${ICON.tiktok}<a href="https://www.tiktok.com/@${esc(f.tiktok.replace(/^@/, ''))}" target="_blank" rel="noopener">TikTok @${esc(f.tiktok.replace(/^@/, ''))}</a></li>` : ''}${f.facebook ? `<li>${ICON.fb}<a href="https://facebook.com/${esc(f.facebook)}" target="_blank" rel="noopener">Facebook</a></li>` : ''}${f.email ? `<li><a href="mailto:${esc(f.email)}">${esc(f.email)}</a></li>` : ''}</ul><p class="fine">© ${opts.year ?? new Date().getFullYear()} ${esc(f.name)} · <a href="https://hiresyncly.site" target="_blank" rel="noopener">Site by Syncly</a></p></div></footer>`;
 
   // ---------- structured data (only known facts; no self-serving review markup)
   const ldType = { food: 'Restaurant', beauty: 'BeautySalon', health: 'MedicalBusiness', retail: 'Store', creative: 'ProfessionalService', events: 'ProfessionalService', professional: 'ProfessionalService', other: 'LocalBusiness' }[f.kind];
@@ -135,7 +137,9 @@ export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: s
   if (f.phone ?? f.whatsapp) ld.telephone = `+${e164(f.phone ?? f.whatsapp, f.country)}`;
   if (f.address) ld.address = { '@type': 'PostalAddress', streetAddress: f.address, addressLocality: f.area ?? f.city, addressRegion: f.city, addressCountry: f.country };
   if (f.hours) ld.openingHoursSpecification = f.hours.map((x) => ({ '@type': 'OpeningHoursSpecification', dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][x.day], opens: `${String(Math.floor(x.open / 60)).padStart(2, '0')}:${String(x.open % 60).padStart(2, '0')}`, closes: `${String(Math.floor(Math.min(x.close, 1439) / 60)).padStart(2, '0')}:${String(Math.min(x.close, 1439) % 60).padStart(2, '0')}` }));
-  if (f.instagram) ld.sameAs = [`https://instagram.com/${f.instagram.replace(/^@/, '')}`];
+  const same = [f.instagram && `https://instagram.com/${f.instagram.replace(/^@/, '')}`, f.tiktok && `https://www.tiktok.com/@${f.tiktok.replace(/^@/, '')}`, f.facebook && `https://facebook.com/${f.facebook}`, f.website].filter(Boolean);
+  if (same.length) ld.sameAs = same;
+  if (f.logo) ld.logo = `${opts.url}/${f.logo}`;
   const heroPhoto = hr.photo ? ph.get(hr.photo) : undefined;
   if (heroPhoto) ld.image = `${opts.url}/${heroPhoto.file}`;
 
@@ -228,7 +232,7 @@ ${t.rule ? '.sect+.sect{border-top:1px solid var(--line)}' : ''}
 /* nav */
 .top{position:relative;z-index:5;padding-block:18px}
 .top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px}
-.brand{font-family:var(--display);font-weight:${Math.min(800, t.display.weight + 50)};font-size:1.3rem;letter-spacing:${t.display.tracking};text-decoration:none;${caps ? 'text-transform:uppercase;font-size:1.05rem;' : ''}${t.display.stretch ? `font-stretch:${t.display.stretch};` : ''}}
+.brand-logo{width:40px;height:40px;border-radius:${'50%'};object-fit:cover;background:#fff}.top .brand{display:inline-flex;align-items:center;gap:10px}.brand{font-family:var(--display);font-weight:${Math.min(800, t.display.weight + 50)};font-size:1.3rem;letter-spacing:${t.display.tracking};text-decoration:none;${caps ? 'text-transform:uppercase;font-size:1.05rem;' : ''}${t.display.stretch ? `font-stretch:${t.display.stretch};` : ''}}
 .top-links{display:flex;align-items:center;gap:22px;font-size:.95rem}
 .top-links>a:not(.btn){text-decoration:none;opacity:.8;display:none}.top-links .btn{display:none}@media(min-width:900px){.top-links .btn{display:inline-flex}}
 .top-links>a:not(.btn):hover{opacity:1}

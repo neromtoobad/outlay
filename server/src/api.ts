@@ -10,6 +10,8 @@ import { DATA_DIR, DRY } from './config.ts';
 import { account, hasSeed } from './wallets.ts';
 import { bus, type SynclyEvent } from './bus.ts';
 import { CATALOG } from './services/index.ts';
+import { cleanDetails, detailsBrief, type BusinessDetails } from './details.ts';
+import { MAX_BYTES, allowUpload, readUpload, saveUpload } from './uploads.ts';
 import { autoAcceptDue, createQuote, decide, escrowPending, getOrder, noteForRevision, openEscrow, readJob, replay, retry, start, syncEscrow } from './orders.ts';
 import { escrowConfig, refreshBondFree } from './escrow.ts';
 import { MODE as CFO_MODE, POLICY as CFO_POLICY, freshSnapshot, startTreasury, teamShortfall } from './cfo/treasury.ts';
@@ -49,16 +51,45 @@ app.get('/api/escrow', (c) => c.json(escrowConfig()));
 
 app.post('/api/quote', async (c) => {
   const b = await c.req.json().catch(() => ({}));
-  const service = String(b.service ?? ''), brief = String(b.brief ?? ''), email = String(b.email ?? '');
+  const service = String(b.service ?? ''), email = String(b.email ?? '');
+  let brief = String(b.brief ?? '');
+  let details: BusinessDetails | undefined;
+  if (b.details) {
+    try { details = cleanDetails(b.details); } catch (e: any) { return c.json({ error: e.message }, 400); }
+    brief = `${detailsBrief(details, service)}${brief.trim() ? `\n\n${brief.trim()}` : ''}`;
+  }
   if (brief.trim().length < 12) return c.json({ error: 'Tell us a bit more: at least a sentence.' }, 400);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return c.json({ error: 'A valid email is needed so we can deliver.' }, 400);
   try {
     const unfunded = await teamShortfall(service);
     if (unfunded) return c.json({ error: unfunded }, 409);
-    return c.json(createQuote({ service, brief, email }));
+    return c.json(createQuote({ service, brief, email, details }));
   } catch (e: any) {
     return c.json({ error: e.message }, 400);
   }
+});
+
+// Photos and logos for an order: re-encoded on our server (which strips camera metadata) before storing.
+app.post('/api/uploads', async (c) => {
+  const who = c.req.header('x-forwarded-for')?.split(',')[0].trim() || 'local';
+  const body = await c.req.parseBody({ all: true }).catch(() => ({} as Record<string, unknown>));
+  const files = ([] as unknown[]).concat(body.file ?? []).filter((f): f is File => typeof f === 'object' && f !== null && 'arrayBuffer' in (f as object)).slice(0, 8);
+  if (!files.length) return c.json({ error: 'No image received.' }, 400);
+  if (!allowUpload(who, files.length)) return c.json({ error: 'Too many uploads from here in the last hour. Try again later.' }, 429);
+  const out = [];
+  for (const f of files) {
+    if (f.size > MAX_BYTES) return c.json({ error: `${f.name} is over 12 MB.` }, 400);
+    try { out.push(await saveUpload(Buffer.from(await f.arrayBuffer()))); } catch (e: any) { return c.json({ error: `${f.name}: ${e.message}` }, 400); }
+  }
+  return c.json({ uploads: out });
+});
+app.get('/api/uploads/:id', (c) => {
+  const buf = readUpload(c.req.param('id'));
+  if (!buf) return c.text('not found', 404);
+  c.header('content-type', 'image/jpeg');
+  c.header('cache-control', 'public, max-age=31536000, immutable');
+  c.header('x-content-type-options', 'nosniff');
+  return c.body(buf);
 });
 
 /** The public shape of an order: runs expanded, email masked, live job progress attached. */

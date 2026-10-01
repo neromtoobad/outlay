@@ -17,13 +17,16 @@ import { download, ffmpeg, image } from '../media.ts';
 import { screenshots } from '../browser.ts';
 import { zip } from '../zip.ts';
 import { MAIL_BUDGET_USD, MAIL_HOST, PUBLIC_URL } from '../mail.ts';
-import { norm, parseHours, type Facts, type Item, type Kind, type Photo, type Review } from '../site/facts.ts';
+import { norm, parseHours, parseMenu, type Facts, type Item, type Kind, type Photo, type Review } from '../site/facts.ts';
 import { prepPhoto } from '../site/photos.ts';
 import { brandCandidates } from '../site/color.ts';
 import { CATALOGUE, LIMITS, RECIPES, defaultPlan, validatePlan, type Plan } from '../site/plan.ts';
 import { copyIssues } from '../site/checks.ts';
 import { renderSite } from '../site/engine.ts';
-import { THEMES, themeMenu } from '../site/themes.ts';
+import { THEMES, themeMenu, type ThemeId } from '../site/themes.ts';
+import { readUpload } from '../uploads.ts';
+import type { BusinessDetails } from '../details.ts';
+import { e164 } from '../site/facts.ts';
 
 type Spec = { business: string; kind: Kind; category: string; offer: string; area?: string; city?: string; country: string; phone?: string; whatsapp?: string; email?: string; instagram?: string; website?: string; look?: string; mapsQuery: string };
 
@@ -45,13 +48,21 @@ export const website = {
   priceUsd: 15,
   policy: { budgetUsd: 2.2 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.blockrunArc, HOSTS.orthogonal, HOSTS.apex, AISA, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
-  async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {
+  async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);
     const sources: string[] = [`Owner's brief: ${brief}`];
     try {
-      // 1. The brief
-      job.log('researcher', 'parse', 'the business, its kind, and how customers reach it');
-      const spec = parseJson<Spec>(
+      // 1. The brief: the order form's details when there are some, otherwise read from the text
+      const d = opts.details;
+      const fromMaps = (u?: string) => { try { return u ? decodeURIComponent(new URL(u).pathname.match(/\/place\/([^/]+)/)?.[1] ?? '').replace(/\+/g, ' ') || undefined : undefined; } catch { return undefined; } };
+      job.log('researcher', 'parse', d ? 'the business details from the order form' : 'the business, its kind, and how customers reach it');
+      const spec = d ? {
+        business: d.name, kind: d.kind, category: '', offer: d.offer, area: d.area, city: d.city,
+        country: (() => { const n = e164(d.whatsapp ?? d.phone, 'NG'); return !n || n.startsWith('234') ? 'NG' : n.startsWith('233') ? 'GH' : n.startsWith('254') ? 'KE' : n.startsWith('27') ? 'ZA' : n.startsWith('44') ? 'GB' : n.startsWith('1') ? 'US' : 'NG'; })(),
+        phone: d.phone ?? d.whatsapp, whatsapp: d.whatsapp ?? d.phone, email: d.email, instagram: d.instagram, website: d.website,
+        look: [d.style && d.style !== 'auto' ? `the ${d.style} theme` : '', d.notes ?? ''].filter(Boolean).join('; ') || undefined,
+        mapsQuery: fromMaps(d.maps) ?? [d.name, d.area, d.city].filter(Boolean).join(' '),
+      } as Spec : parseJson<Spec>(
         await llm(job, 'researcher', [
           { role: 'system', content: `Parse a request for a small-business website. Reply JSON only: {"business": name exactly as given, "kind": one of ${KINDS.join('|')}, "category": short category like "Caterer" or "Hair salon", "offer": what they sell in one plain sentence, "area": neighbourhood or null, "city": city or null, "country": ISO-2 code (default "NG"), "phone": as given or null, "whatsapp": as given or null, "email": or null, "instagram": handle or null, "website": existing site URL or null, "look": any look they asked for or null, "mapsQuery": a Google Maps search that finds this exact business ("name area city")}` },
           { role: 'user', content: brief },
@@ -91,6 +102,9 @@ export const website = {
         } catch (e: any) { job.log('reader', 'skip', `site unreadable (${String(e?.message ?? e).slice(0, 50)})`); }
       }
       const raw: { buf: Buffer; caption: string }[] = [];
+      for (const id of d?.photos ?? []) { const b = readUpload(id); if (b) raw.push({ buf: b, caption: 'Uploaded by the owner' }); }
+      if (d?.photos?.length) job.log('reader', 'photos', `${raw.length} photo${raw.length === 1 ? '' : 's'} the owner uploaded`);
+      const logoBuf = d?.logo ? readUpload(d.logo) : undefined;
       const ig = handle(spec.instagram);
       if (ig) {
         try {
@@ -105,7 +119,7 @@ export const website = {
             if (!url) continue;
             try { raw.push({ buf: DRY ? (await image(job, 'illustrator', { prompt: `photo ${raw.length}`, reason: 'demo photo' })).buf : await download(url, 10), caption: String(p.caption?.text ?? '').slice(0, 120) }); }
             catch { /* expired or blocked image; skip it */ }
-            if (raw.length >= 12) break;
+            if (raw.length >= 14) break;
           }
         } catch (e: any) { job.log('reader', 'skip', `Instagram unavailable (${String(e?.message ?? e).slice(0, 50)})`); }
       }
@@ -124,7 +138,11 @@ export const website = {
       const srcNorm = norm(sourceText).replace(/\s/g, '');
       const inSources = (s?: string | null) => !!s && srcNorm.includes(norm(s).replace(/\s/g, '').replace(/^₦/, '')) ;
       const items: Item[] = [];
+      // the owner's own price list comes first, read in code; the model's finds fill in the rest
+      for (const it of parseMenu(d?.menu)) items.push({ ...it, id: `i${items.length + 1}` });
+      const have = new Set(items.map((i) => norm(i.name)));
       for (const it of ex.items ?? []) {
+        if (it?.name && have.has(norm(it.name))) continue;
         if (!it?.name) continue;
         const words = norm(it.name).split(' ').filter((w) => w.length > 2);
         if (words.length && words.filter((w) => srcNorm.includes(w)).length < Math.ceil(words.length / 2)) continue; // name not in the sources
@@ -156,14 +174,17 @@ export const website = {
         const flyers = photos.filter((p) => p.kind === 'flyer').length;
         if (flyers) job.log('auditor', 'photos', `${flyers} flyer${flyers === 1 ? '' : 's'} set aside (text-heavy images are never used as photos)`);
       }
-      const candidates = await brandCandidates(files.filter((f, i) => photos[i] && !['flyer'].includes(photos[i].kind)).map((f, i) => ({ buf: f.buf, logo: photos[i]?.kind === 'logo' })));
+      let logoFile: string | undefined;
+      if (logoBuf) { const l = await prepPhoto(logoBuf, 320, 3); files.push({ name: 'logo.jpg', buf: l.buf }); logoFile = 'logo.jpg'; }
+      const candidates = d?.colour ? [d.colour] : await brandCandidates([...(logoBuf ? [{ buf: logoBuf, logo: true }] : []), ...files.filter((f, i) => photos[i] && !['flyer', 'logo'].includes(photos[i].kind)).map((f) => ({ buf: f.buf }))]);
 
       const facts: Facts = {
         name: spec.business, kind: spec.kind, category: spec.category || place?.category, offer: spec.offer,
         area: spec.area ?? undefined, city: spec.city ?? undefined, country: (spec.country || 'NG').toUpperCase(),
         address: place?.address, landmark: ex.landmark ?? undefined,
         phone: spec.phone ?? place?.phone, whatsapp: spec.whatsapp ?? spec.phone ?? undefined, email: spec.email ?? undefined,
-        instagram: ig ? `@${ig}` : undefined, website: spec.website ?? undefined,
+        instagram: ig ? `@${ig}` : undefined, tiktok: d?.tiktok, facebook: d?.facebook, website: spec.website ?? undefined, mapsUrl: d?.maps, logo: logoFile,
+        ...(d?.address ? { address: d.address } : {}),
         hoursText: place?.hours, hours: parseHours(place?.hours), rating: place?.rating, ratingCount: place?.ratingCount,
         items, reviews, delivery: ex.delivery ?? undefined, payments: ex.payments, sources: sourceText,
       };
@@ -189,13 +210,23 @@ Reply with JSON only: {"theme","brand","title","description","hero":{"variant","
         items: items.map((i) => ({ id: i.id, name: i.name, price: i.price ?? null, note: i.note ?? null, category: i.category ?? null })),
         reviews: reviews.map((r) => ({ id: r.id, text: r.text, rating: r.rating })),
       };
-      const user = `Facts:\n${JSON.stringify(factsForModel, null, 1)}\n\nPhotos:\n${usable.map((p) => `- ${p.id}: ${p.kind}, ${p.subject}, quality ${p.quality}, ${p.w}x${p.h}`).join('\n') || '(none usable: use the "type" hero and no gallery)'}\n\nBrand colour candidates (from their photos): ${candidates.join(', ') || 'none'}\n${spec.look ? `\nThe owner asked for: ${spec.look}` : ''}\nOwner's brief: ${brief}\n\nSource text, for tone and details:\n${sourceText.slice(0, 5000)}`;
+      const prefs = d ? [d.style && d.style !== 'auto' ? `Theme: the owner chose "${d.style}"; use it.` : '', d.colour ? `Brand colour: the owner chose ${d.colour}; use it.` : '', d.sections?.length ? `Sections: the owner wants ${d.sections.join(', ')} (plus strip and cta). Include each one the facts can support and no others.` : '', d.notes ? `Owner's notes: ${d.notes}` : '', d.story ? `About the business, in the owner's words: ${d.story}` : ''].filter(Boolean).join('\n') : '';
+      const user = `${prefs ? `The owner's preferences (follow them):\n${prefs}\n\n` : ''}Facts:\n${JSON.stringify(factsForModel, null, 1)}\n\nPhotos:\n${usable.map((p) => `- ${p.id}: ${p.kind}, ${p.subject}, quality ${p.quality}, ${p.w}x${p.h}`).join('\n') || '(none usable: use the "type" hero and no gallery)'}\n\nBrand colour candidates (from their photos): ${candidates.join(', ') || 'none'}\n${spec.look ? `\nThe owner asked for: ${spec.look}` : ''}\nOwner's brief: ${brief}\n\nSource text, for tone and details:\n${sourceText.slice(0, 5000)}`;
       const fallback = defaultPlan(facts, photos, candidates);
       const planWith = async (msgs: { role: 'system' | 'user' | 'assistant'; content: string }[], why: string) => parseJson<any>(await llm(job, 'illustrator', msgs, why, { model: MODELS.designer, fallback: MODELS.designerFallback, maxTokens: 5000, maxUsd: 0.4, json: true, dry: () => JSON.stringify(fallback) }), null);
       job.log('illustrator', 'plan', `choosing the theme, sections and photos, and writing the copy (${MODELS.designer.split('/')[1]})`);
       let rawPlan = await planWith([{ role: 'system', content: system }, { role: 'user', content: user }], 'plan the site');
       if (!rawPlan) { job.log('illustrator', 'fallback', 'the plan came back unreadable; using the default plan for this kind of business'); rawPlan = fallback; }
+      const prefer = (pl: Plan): Plan => {
+        if (!d) return pl;
+        const out = { ...pl };
+        if (d.style && d.style !== 'auto' && d.style in THEMES) out.theme = d.style as ThemeId;
+        if (d.colour) out.brand = d.colour;
+        if (d.sections?.length) out.sections = out.sections.filter((x) => x.kind === 'strip' || x.kind === 'cta' || d.sections!.includes(x.kind));
+        return out;
+      };
       let { plan, notes } = validatePlan(rawPlan, facts, photos, candidates);
+      plan = prefer(plan);
       let issues = copyIssues(plan, facts);
 
       // 7. Render, publish, look at it
@@ -231,6 +262,7 @@ Reply with JSON only: {"theme","brand","title","description","hero":{"variant","
           { role: 'user', content: `Fix every issue by changing the plan (theme, hero variant, photo choices, copy, section order or variants). Return the full corrected plan as JSON only.\n- ${[...issues, ...look.issues].join('\n- ')}` }], 'fix the plan');
         if (fixed) {
           ({ plan, notes } = validatePlan(fixed, facts, photos, candidates));
+          plan = prefer(plan);
           issues = copyIssues(plan, facts);
           rendered = renderSite(plan, facts, photos, { url });
           publish();

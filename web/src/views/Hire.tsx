@@ -6,8 +6,12 @@ import { motion, Reveal, Stagger, StaggerItem } from '@/components/motion.tsx';
 import { api, useApi, usd, ngn, Avatar, Sprite, Seal, ROLE_NAME, DEPT_TINT, useStored, type Service, type Quote } from '@/lib.tsx';
 import { connect, fundEscrow, hasWallet, short, txUrl, usdcBalance, walletError, type EscrowCfg } from '@/wallet.ts';
 import type { Address, Hex } from 'viem';
+import BusinessForm, { type Details } from './BusinessForm.tsx';
 
-type QuotedOrder = { id: string; status: string; quote: Quote; demo: boolean };
+// Services that take the structured business form instead of a one-line brief.
+const FORM_SERVICES = new Set(['website']);
+
+type QuotedOrder = { id: string; status: string; quote: Quote; demo: boolean; brief?: string };
 
 const EXAMPLES: Record<string, string[]> = {
   'local-business-finder': ['Every café and coffee shop in Lekki Phase 1 that has no website', 'Pharmacies in Yaba, Lagos with a phone number', 'Hair salons in Wuse 2, Abuja rated 4 stars or more'],
@@ -140,13 +144,16 @@ export default function Hire({ service }: { service: string }) {
   if (data && !s) return <main className="wrap section center"><h1 className="h1">We don't do that one (yet).</h1><p style={{ margin: '14px 0 24px' }}><Link href="/#services" className="btn secondary">See the services</Link></p></main>;
   if (!s) return <main className="wrap section"><div className="skel" style={{ height: 420 }} /></main>;
 
-  async function getQuote() {
+  async function getQuote(details?: Details) {
     setBusy(true); setErr(null); setOrder(null);
     try {
       localStorage.setItem('outlay:email', email);
-      setOrder(await api<QuotedOrder>('/api/quote', { method: 'POST', body: JSON.stringify({ service, brief, email }) }));
+      const o = await api<QuotedOrder>('/api/quote', { method: 'POST', body: JSON.stringify({ service, brief: details ? '' : brief, email, details }) });
+      if (details && o.brief) setBrief(o.brief);
+      setOrder(o);
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   }
+  const structured = FORM_SERVICES.has(service);
   async function begin(mode: 'promo' | 'simulated') {
     if (!order) return;
     setBusy(true); setErr(null);
@@ -186,6 +193,15 @@ export default function Hire({ service }: { service: string }) {
 
         <section className="sticky">
           {!order || order.status === 'declined' ? (
+            structured ? (
+            <div className="card pad formcard">
+              <h3>Tell us about your business</h3>
+              <p className="muted">Four short steps. We build from exactly this, your Google listing and your Instagram. You'll see the price before anything starts.</p>
+              <BusinessForm onSubmit={(d) => getQuote(d)} busy={busy} email={email} setEmail={setEmail} cta="Get my quote" />
+              {err && <div className="error" style={{ marginTop: 14 }}>{err}</div>}
+              {order?.status === 'declined' && <div className="error" style={{ marginTop: 14 }}>The CFO declined this job: {order.quote.reasons.at(-1)}</div>}
+            </div>
+            ) : (
             <div className="card pad formcard">
               <h3>Tell the team what you need</h3>
               <p className="muted">One or two sentences is enough. You'll see the exact price before anything starts.</p>
@@ -199,14 +215,15 @@ export default function Hire({ service }: { service: string }) {
                 </label>
                 {err && <div className="error">{err}</div>}
                 {order?.status === 'declined' && <div className="error">The CFO declined this job: it can't be done well at this price. {order.quote.reasons.at(-1)}</div>}
-                <button className="btn primary lg block" disabled={busy || brief.trim().length < 12 || !email.includes('@')} onClick={getQuote}>{busy ? 'The CFO is pricing it…' : 'Get my quote'}</button>
+                <button className="btn primary lg block" disabled={busy || brief.trim().length < 12 || !email.includes('@')} onClick={() => getQuote()}>{busy ? 'The CFO is pricing it…' : 'Get my quote'}</button>
                 <p className="muted center" style={{ fontSize: 13 }}>First job free · no card · refund + bond if you reject</p>
               </div>
             </div>
+            )
           ) : (
             <div className="form">
               <QuoteDoc s={s} order={order} />
-              <div className="note"><b>Your brief:</b> {brief}</div>
+              <div className="note" style={{ whiteSpace: 'pre-line' }}><b>Your brief:</b> {brief}</div>
               {err && <div className="error">{err}</div>}
               {q!.promo ? (
                 <button className="btn primary lg block" disabled={busy} onClick={() => begin('promo')}>Start my free job →</button>

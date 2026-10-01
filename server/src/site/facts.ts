@@ -28,7 +28,11 @@ export type Facts = {
   whatsapp?: string;
   email?: string;
   instagram?: string;
+  tiktok?: string;
+  facebook?: string;
   website?: string;
+  mapsUrl?: string;
+  logo?: string; // file name of their logo, shown in the header
   hours?: Hours;
   hoursText?: string;
   rating?: number;
@@ -140,3 +144,20 @@ export function showPrice(p: string, country = 'NG'): string {
 
 /** Normalised text for "does this appear in the sources?" checks. */
 export const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9₦]+/g, ' ').trim();
+
+/**
+ * The owner's own menu or price list, read line by line: "Beef suya (large) – ₦6,000", "Haircut: 3500",
+ * "Trays:" (a category heading). Their prices are taken exactly as written, with no model in between.
+ */
+export function parseMenu(text?: string): Omit<Item, 'id'>[] {
+  if (!text) return [];
+  const out: Omit<Item, 'id'>[] = [];
+  let category: string | undefined;
+  for (const line of text.split('\n').map((l) => l.trim()).filter(Boolean)) {
+    const m = line.match(/^(.*?)\s*(?:[-–—:|]|\.{2,}|\s)\s*((?:from\s+)?(?:₦|NGN|N|\$|£|€)?\s?\d[\d,]*(?:\.\d+)?\s?(?:k|K)?(?:\s*[-–]\s*(?:₦|N)?\s?\d[\d,]*(?:k|K)?)?)\s*$/);
+    if (m && m[1] && /[a-z]/i.test(m[1])) { out.push({ name: m[1].replace(/[-–—:|.\s]+$/, '').slice(0, 60), price: m[2].trim(), category, source: line }); continue; }
+    if (/:$/.test(line) && line.length <= 40) { category = line.replace(/:$/, '').trim(); continue; }
+    if (line.length <= 60 && /[a-z]/i.test(line)) out.push({ name: line.replace(/[-–—:|.\s]+$/, ''), category, source: line });
+  }
+  return out.slice(0, 30);
+}
