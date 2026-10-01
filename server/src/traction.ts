@@ -38,7 +38,7 @@ export function tractionReport() {
   const summary = { orders: orders.length, quotes: quotes.length, customers, delivered: delivered.length, accepted: accepted.length, paidJobs: escrowJobs.length, escrowIn, revenue, refunded, toolPayments: payments, toolSpend: spent, settled, cfoDecisions: cfoDone.length, cfoEscalated: log.filter((d) => d.status === 'escalated').length };
   const md = `# Traction
 
-Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC from Syncly's live books on Arc mainnet (chain 5042). Demo data is never included. Live copy: https://synclyhq.up.railway.app/api/traction.md
+Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC from Syncly's live books on Arc mainnet (chain 5042). Demo data is never included. Live copy: https://hiresyncly.site/api/traction.md
 
 | | |
 |---|---|
@@ -65,13 +65,13 @@ Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC from Sy
 
 | Created | Order | Service | Status | Paid | Brief |
 |---|---|---|---|---|---|
-${orders.map((o) => `| ${o.createdAt.slice(0, 16).replace('T', ' ')} | [${o.id}](https://synclyhq.up.railway.app/job/${o.id}) | ${NAME[o.service] ?? o.service} | ${o.status} | ${o.payment?.mode === 'promo' ? 'free first job' : o.escrow ? `${o.quote.priceUsd} USDC escrow ${tx(o.escrow.fundTx)}` : o.payment?.mode ?? ''} | ${cell(o.brief.slice(0, 70))} |`).join('\n')}
+${orders.map((o) => `| ${o.createdAt.slice(0, 16).replace('T', ' ')} | [${o.id}](https://hiresyncly.site/job/${o.id}) | ${NAME[o.service] ?? o.service} | ${o.status} | ${o.payment?.mode === 'promo' ? 'free first job' : o.escrow ? `${o.quote.priceUsd} USDC escrow ${tx(o.escrow.fundTx)}` : o.payment?.mode ?? ''} | ${cell(o.brief.slice(0, 70))} |`).join('\n')}
 
 ## The CFO's decisions
 
 ${cfoDone.length ? `| When (UTC) | Decision | Transaction |\n|---|---|---|\n${cfoDone.slice(0, 50).map((d) => `| ${d.at.slice(0, 16).replace('T', ' ')} | ${cell(d.summary)} | ${tx(d.tx)} |`).join('\n')}` : 'None yet.'}
 
-Every decision, with what the CFO saw and the rule it applied, is in the signed log at https://synclyhq.up.railway.app/api/cfo
+Every decision, with what the CFO saw and the rule it applied, is in the signed log at https://hiresyncly.site/api/cfo
 
 ## Every tool payment
 

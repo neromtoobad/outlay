@@ -40,7 +40,7 @@ Each entry is hashed with the one before it and signed by the CFO. This script r
 ```js
 // node verify-cfo.mjs   (npm i viem)
 import { keccak256, toBytes, recoverMessageAddress } from 'viem';
-const { decisions } = await (await fetch('https://synclyhq.up.railway.app/api/cfo')).json();
+const { decisions } = await (await fetch('https://hiresyncly.site/api/cfo')).json();
 let prev;
 for (const d of decisions.reverse()) {
   const { hash, sig, ...body } = d;
@@ -68,7 +68,7 @@ The second-to-last value is `specHash` and must match. The escrow id is keccak25
 ## Which keys the server runs
 
 ```bash
-curl -s https://synclyhq.up.railway.app/api/health
+curl -s https://hiresyncly.site/api/health
 ```
 
 `treasury` should be `{{deployer}}`, the address that deployed the contracts.

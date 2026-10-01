@@ -2,7 +2,7 @@
 
 **The first AI company with open books.** A team of AI agents does real paid work for small businesses. An AI CFO runs the company's money on Arc in USDC, inside limits a smart contract enforces, and every receipt, decision and transaction is public.
 
-**Live on Arc mainnet:** [synclyhq.up.railway.app](https://synclyhq.up.railway.app) · [the books and the CFO's desk](https://synclyhq.up.railway.app/books) · [the office, live](https://synclyhq.up.railway.app/live) · [traction](TRACTION.md) ([live copy](https://synclyhq.up.railway.app/api/traction.md))
+**Live on Arc mainnet:** [hiresyncly.site](https://hiresyncly.site) · [the books and the CFO's desk](https://hiresyncly.site/books) · [the office, live](https://hiresyncly.site/live) · [traction](TRACTION.md) ([live copy](https://hiresyncly.site/api/traction.md))
 
 Built for the [Tameion Agents Hackathon](https://tameion.thecanteenapp.com) (Canteen × Circle), Sep 27 – Oct 10, 2026. Everything here was built during the event: the `tameion-kickoff` tag marks the first commit.
 
@@ -32,10 +32,10 @@ The menu comes from research into what small businesses already pay freelancers 
 
 ## Try it (for judges)
 
-1. **Order a free job** at [/hire/local-business-finder](https://synclyhq.up.railway.app/hire/local-business-finder). Watch the team work on the job page; each tool payment appears as it happens.
-2. **Watch the office** at [/live](https://synclyhq.up.railway.app/live). The agents act out real events: the CFO stamps the quote and walks the brief to the whiteboard, and the Messenger carries the delivery out.
-3. **Check a receipt.** Job #1 ([ord_mulrvp33_0603](https://synclyhq.up.railway.app/job/ord_mulrvp33_0603)) found 9 restaurants with 5 x402 payments, each linked to its settlement on Arc ([0xb76f18…](https://arcscan.app/tx/0xb76f1819087eea9c3bbd9886384a44556450a6fa831a1575818165fa0355fe25), [0xc99ba1…](https://arcscan.app/tx/0xc99ba105332d26b54c73cc1ba1677e299c9dc632eb3f835e50309a40d41d4fbd)).
-4. **Read the CFO's desk** on [/books](https://synclyhq.up.railway.app/books): each agent's balance and allowance, this week's plan, and every decision with what the CFO saw. The raw log is at [/api/cfo](https://synclyhq.up.railway.app/api/cfo).
+1. **Order a free job** at [/hire/local-business-finder](https://hiresyncly.site/hire/local-business-finder). Watch the team work on the job page; each tool payment appears as it happens.
+2. **Watch the office** at [/live](https://hiresyncly.site/live). The agents act out real events: the CFO stamps the quote and walks the brief to the whiteboard, and the Messenger carries the delivery out.
+3. **Check a receipt.** Job #1 ([ord_mulrvp33_0603](https://hiresyncly.site/job/ord_mulrvp33_0603)) found 9 restaurants with 5 x402 payments, each linked to its settlement on Arc ([0xb76f18…](https://arcscan.app/tx/0xb76f1819087eea9c3bbd9886384a44556450a6fa831a1575818165fa0355fe25), [0xc99ba1…](https://arcscan.app/tx/0xc99ba105332d26b54c73cc1ba1677e299c9dc632eb3f835e50309a40d41d4fbd)).
+4. **Read the CFO's desk** on [/books](https://hiresyncly.site/books): each agent's balance and allowance, this week's plan, and every decision with what the CFO saw. The raw log is at [/api/cfo](https://hiresyncly.site/api/cfo).
 5. **Pay for a job** (needs about 3.05 USDC on Arc in a browser wallet). The page walks through the steps: connect the wallet, the CFO opens the escrow, then approve and fund. On the job page you then accept, revise or reject from the same wallet.
 
 ## On Arc mainnet (chain 5042)
@@ -100,7 +100,7 @@ It also prices every job ([`server/src/cfo/quote.ts`](server/src/cfo/quote.ts)).
 - Weekly allowances can't exceed the 3 USDC tool budget. The reserve can't go under its floor. Bonds outstanding must always be covered.
 - **No language model touches money.** Pricing, allocation and top-ups are computed. The Auditor model only flags the work, and the customer's wallet is the only thing that releases a payment.
 
-**The decision log** ([`server/src/cfo/log.ts`](server/src/cfo/log.ts)) is append-only. Each entry is hash-chained to the one before and signed by the CFO's key, and the vault transaction's `reason` field carries the hash of the decision. Anyone can replay the log from [/api/cfo](https://synclyhq.up.railway.app/api/cfo); `verify.ok` means every hash and signature checks out.
+**The decision log** ([`server/src/cfo/log.ts`](server/src/cfo/log.ts)) is append-only. Each entry is hash-chained to the one before and signed by the CFO's key, and the vault transaction's `reason` field carries the hash of the decision. Anyone can replay the log from [/api/cfo](https://hiresyncly.site/api/cfo); `verify.ok` means every hash and signature checks out.
 
 ## Controls against the failure modes in "Agents and Ledgers in 2026"
 
@@ -115,7 +115,7 @@ Canteen's [essay](https://thecanteenapp.com/analysis/2026/09/12/agents-and-ledge
 | Releasing money on a model's confidence | The customer's wallet accepts or rejects. The CFO's rules are deterministic, and models only produce the work and check it. |
 | An entry with no document behind it | Every ledger line points to its job. Each escrow seals the hash of the agreed terms (`specHash`) and of the delivery (`deliverableHash`) on-chain, so terms, delivery and payment can be matched. |
 
-**Why beancount:** the ledger is written in [beancount](https://github.com/beancount/beancount) format (download it from [/api/books.beancount](https://synclyhq.up.railway.app/api/books.beancount)). Precision is declared in the entry itself, not hidden in a column type, and a human can read what the agent wrote.
+**Why beancount:** the ledger is written in [beancount](https://github.com/beancount/beancount) format (download it from [/api/books.beancount](https://hiresyncly.site/api/books.beancount)). Precision is declared in the entry itself, not hidden in a column type, and a human can read what the agent wrote.
 
 ## Circle tools used
 

@@ -36,7 +36,7 @@ The Scout pulls this week's top reels and TikToks for your niche, your own recen
 
 ### Website
 
-The Scout finds your Google listing and real reviews, and the Reader reads your Instagram, whose photos become the gallery. The Designer, running Claude Opus 5, builds the site from those facts only. Code checks that every phone number and price on the page is in your sources, that it's mobile-ready and runs no outside scripts. A vision model reviews screenshots on a phone and a laptop, the Designer fixes what either found, and Lighthouse scores the live page. It's hosted at `synclyhq.up.railway.app/s/your-name`; the zip works on any host.
+The Scout finds your Google listing and real reviews, and the Reader reads your Instagram, whose photos become the gallery. The Designer, running Claude Opus 5, builds the site from those facts only. Code checks that every phone number and price on the page is in your sources, that it's mobile-ready and runs no outside scripts. A vision model reviews screenshots on a phone and a laptop, the Designer fixes what either found, and Lighthouse scores the live page. It's hosted at `hiresyncly.site/s/your-name`; the zip works on any host.
 
 ### Motion Ad
 

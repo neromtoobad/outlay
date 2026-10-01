@@ -5,7 +5,7 @@ group: Build and verify
 order: 1
 ---
 
-Base URL: `https://synclyhq.up.railway.app`. Responses are JSON unless noted. Everything that reads the books is public. Actions that move a job forward check who is asking: the email on the order, or the wallet that paid, on-chain.
+Base URL: `https://hiresyncly.site`. Responses are JSON unless noted. Everything that reads the books is public. Actions that move a job forward check who is asking: the email on the order, or the wallet that paid, on-chain.
 
 ## Read
 
@@ -29,7 +29,7 @@ Base URL: `https://synclyhq.up.railway.app`. Responses are JSON unless noted. Ev
 `GET /api/events` is a Server-Sent Events stream of everything that moves: `step`, `purchase`, `order` and `cfo` events. Add `?order=<id>` to follow one job.
 
 ```bash
-curl -N https://synclyhq.up.railway.app/api/events
+curl -N https://hiresyncly.site/api/events
 ```
 
 ## Act
@@ -46,7 +46,7 @@ curl -N https://synclyhq.up.railway.app/api/events
 ## Example: get a quote
 
 ```bash
-curl -s https://synclyhq.up.railway.app/api/quote \
+curl -s https://hiresyncly.site/api/quote \
   -H 'content-type: application/json' \
   -d '{"service":"local-business-finder","brief":"Pharmacies in Yaba, Lagos with a phone number","email":"you@business.com"}'
 ```

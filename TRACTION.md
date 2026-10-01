@@ -1,6 +1,6 @@
 # Traction
 
-Generated 2026-09-29 18:21 UTC from Syncly's live books on Arc mainnet (chain 5042). Demo data is never included. Live copy: https://synclyhq.up.railway.app/api/traction.md
+Generated 2026-09-29 18:21 UTC from Syncly's live books on Arc mainnet (chain 5042). Demo data is never included. Live copy: https://hiresyncly.site/api/traction.md
 
 | | |
 |---|---|
@@ -27,9 +27,9 @@ Generated 2026-09-29 18:21 UTC from Syncly's live books on Arc mainnet (chain 50
 
 | Created | Order | Service | Status | Paid | Brief |
 |---|---|---|---|---|---|
-| 2026-09-28 21:20 | [ord_mulr4tw3_2ceb](https://synclyhq.up.railway.app/job/ord_mulr4tw3_2ceb) | Local Business Finder | failed | free first job | Every café and coffee shop in Lugbe, Abuja that has no website |
-| 2026-09-28 21:29 | [ord_mulrg4ln_b0ff](https://synclyhq.up.railway.app/job/ord_mulrg4ln_b0ff) | Local Business Finder | failed | free first job | Every resturant in Lugbe that has no website |
-| 2026-09-28 21:41 | [ord_mulrvp33_0603](https://synclyhq.up.railway.app/job/ord_mulrvp33_0603) | Local Business Finder | accepted | free first job | Every resturant in Lugbe that has no website |
+| 2026-09-28 21:20 | [ord_mulr4tw3_2ceb](https://hiresyncly.site/job/ord_mulr4tw3_2ceb) | Local Business Finder | failed | free first job | Every café and coffee shop in Lugbe, Abuja that has no website |
+| 2026-09-28 21:29 | [ord_mulrg4ln_b0ff](https://hiresyncly.site/job/ord_mulrg4ln_b0ff) | Local Business Finder | failed | free first job | Every resturant in Lugbe that has no website |
+| 2026-09-28 21:41 | [ord_mulrvp33_0603](https://hiresyncly.site/job/ord_mulrvp33_0603) | Local Business Finder | accepted | free first job | Every resturant in Lugbe that has no website |
 
 ## The CFO's decisions
 
@@ -37,7 +37,7 @@ Generated 2026-09-29 18:21 UTC from Syncly's live books on Arc mainnet (chain 50
 |---|---|---|
 | 2026-09-29 17:05 | Planned week 2: 5 jobs expected, so allowances researcher 0.0500, scout 0.0950, reader 0.0500, writer 0.1000, verifier 0.1000, auditor 0.0500. The plan's hash is sealed on-chain before any money moves. | [0x8af07f69…](https://arcscan.app/tx/0x8af07f69b1c058e51379bbab8c31f3f419a110fd5dc2174988a566dfb4f158d4) |
 
-Every decision, with what the CFO saw and the rule it applied, is in the signed log at https://synclyhq.up.railway.app/api/cfo
+Every decision, with what the CFO saw and the rule it applied, is in the signed log at https://hiresyncly.site/api/cfo
 
 ## Every tool payment
 

@@ -22,7 +22,7 @@ export const MAIL_HOST = MAIL ? new URL(MAIL.base).host : '';
 /** Mail costs each service's budget must leave room for: the per-email price plus the one-off mailbox. */
 export const MAIL_BUDGET_USD = MAIL ? MAIL.sendUsd + Math.min(MAIL.inboxUsd, 0.1) : 0;
 
-export const PUBLIC_URL = process.env.OUTLAY_PUBLIC_URL ?? 'https://synclyhq.up.railway.app';
+export const PUBLIC_URL = process.env.OUTLAY_PUBLIC_URL ?? 'https://hiresyncly.site';
 const SERVICE: Record<string, string> = {
   'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List',
   'content-pack': 'Content Pack', website: 'Website', 'motion-ad': 'Motion Ad', 'video-ad': 'Video Ad',

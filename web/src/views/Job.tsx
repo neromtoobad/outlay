@@ -88,7 +88,7 @@ function Media({ id, files, deliverable }: { id: string; files: string[]; delive
       {site && (
         <div className="media__site">
           <div className="phone"><iframe src={site} title="Your new site" loading="lazy" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" /></div>
-          <div className="media__cap"><b>Live now</b><a href={site} target="_blank" rel="noreferrer">{`synclyhq.up.railway.app${site}`} ↗</a>{shots.length > 0 && <span className="muted">Laptop view below</span>}</div>
+          <div className="media__cap"><b>Live now</b><a href={site} target="_blank" rel="noreferrer">{`hiresyncly.site${site}`} ↗</a>{shots.length > 0 && <span className="muted">Laptop view below</span>}</div>
           {shots.filter((f) => f.startsWith('laptop')).map((f) => <img key={f} className="media__shot" src={url(f)} alt="The site on a laptop" loading="lazy" />)}
         </div>
       )}
