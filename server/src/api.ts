@@ -9,7 +9,7 @@ import { gunzipSync } from 'node:zlib';
 import { DATA_DIR, DRY } from './config.ts';
 import { account, hasSeed } from './wallets.ts';
 import { bus, type SynclyEvent } from './bus.ts';
-import { CATALOG } from './services/index.ts';
+import { CATALOG, findService } from './services/index.ts';
 import { cleanDetails, detailsBrief, type BusinessDetails } from './details.ts';
 import { MAX_BYTES, allowUpload, readUpload, saveUpload } from './uploads.ts';
 import { autoAcceptDue, createQuote, decide, escrowPending, getOrder, noteForRevision, openEscrow, readJob, replay, retry, start, syncEscrow } from './orders.ts';
@@ -96,7 +96,7 @@ app.get('/api/uploads/:id', (c) => {
 function view(id: string) {
   const o = getOrder(id)!;
   const runs = o.runs.map((r) => readJob(r)).filter(Boolean);
-  return { ...o, email: o.email.replace(/^(.).*(@.*)$/, '$1•••$2'), runs, live: liveJobs.get(o.id) ?? null, team: [...(CATALOG.find((x) => x.id === o.service)?.team ?? [])] };
+  return { ...o, email: o.email.replace(/^(.).*(@.*)$/, '$1•••$2'), runs, live: liveJobs.get(o.id) ?? null, team: [...(findService(o.service)?.team ?? [])] };
 }
 
 app.post('/api/orders/:id/start', async (c) => {

@@ -14,7 +14,7 @@ import { DATA_DIR, DRY } from './config.ts';
 import { publish } from './bus.ts';
 import { quote, type Quote } from './cfo/quote.ts';
 import type { BusinessDetails } from './details.ts';
-import { CATALOG, SERVICES } from './services/index.ts';
+import { CATALOG, SERVICES, findService } from './services/index.ts';
 import * as chain from './escrow.ts';
 import { emailDelivery } from './mail.ts';
 import { blacklisted } from './payees.ts';
@@ -66,7 +66,7 @@ export function saveOrder(o: Order) {
 
 /** What the office needs to animate an order change: who is on the team and what money moves. */
 export function orderEventData(o: Order, status: string = o.status) {
-  const team = CATALOG.find((c) => c.id === o.service)?.team ?? [];
+  const team = findService(o.service)?.team ?? [];
   return {
     status, service: o.service, team: [...team], promo: o.quote.promo, price: o.quote.priceUsd, bond: o.quote.bondUsd,
     refund: o.refund ?? null, by: o.decision?.by ?? null,
@@ -129,8 +129,10 @@ function bondPoolFree(): number {
   const open = listOrders().filter((o) => o.demo === DRY && o.payment?.mode !== 'promo' && ['queued', 'running', 'delivered', 'revision'].includes(o.status));
   return Math.max(0, 3 - open.reduce((s, o) => s + o.quote.bondUsd, 0));
 }
+/** Free jobs get 2 USDC of tools a week (a rolling 7 days, the CFO's planning period). */
 function promoLeft(): number {
-  const used = listOrders().filter((o) => o.demo === DRY && o.payment?.mode === 'promo' && o.status !== 'failed').reduce((s, o) => s + o.quote.estCostUsd, 0);
+  const since = Date.now() - 7 * 86400_000;
+  const used = listOrders().filter((o) => o.demo === DRY && o.payment?.mode === 'promo' && o.status !== 'failed' && Date.parse(o.payment.at) > since).reduce((s, o) => s + o.quote.estCostUsd, 0);
   return Math.max(0, 2 - used);
 }
 
@@ -138,8 +140,9 @@ export function createQuote(input: { service: string; brief: string; email: stri
   const item = CATALOG.find((c) => c.id === input.service);
   if (!item || !item.live) throw new Error('unknown or not-yet-live service');
   const email = input.email.trim().toLowerCase();
-  // demo orders, and free jobs we failed to deliver, never use up a customer's free first job
-  const firstJob = !listOrders().some((o) => o.demo === DRY && o.email === email && o.payment && o.status !== 'failed');
+  // One free job per email, on the services marked freeFirst (the Website). Demo orders, and free jobs we
+  // failed to deliver, never use it up.
+  const firstJob = 'freeFirst' in item && item.freeFirst && !listOrders().some((o) => o.demo === DRY && o.email === email && o.payment?.mode === 'promo' && o.status !== 'failed');
   const q = quote({
     service: item.id, priceUsd: item.priceUsd, listedCostUsd: item.listedCostUsd, history: historyFor(item.id),
     bondPoolFreeUsd: bondPoolFree(), firstJobForCustomer: firstJob, promoLeftUsd: promoLeft(), deliverHours: 1,
@@ -232,7 +235,7 @@ export function autoAcceptDue(windowMs = 48 * 3600_000) {
 
 /** The terms the customer pays against. Their hash is sealed on-chain when the escrow opens. */
 function specFor(o: Order, customer: Address) {
-  const item = CATALOG.find((c) => c.id === o.service)!;
+  const item = findService(o.service)!;
   return JSON.stringify({
     order: o.id, service: item.name, brief: o.brief, customer, priceUsdc: o.quote.priceUsd, bondUsdc: o.quote.bondUsd,
     deliverHours: o.quote.deliverHours, acceptWindowHours: 48, oneFreeRevision: true, youGet: item.youGet,

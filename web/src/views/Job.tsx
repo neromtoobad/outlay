@@ -83,6 +83,14 @@ function Media({ id, files, deliverable }: { id: string; files: string[]; delive
   const shots = files.filter((f) => /^(phone|laptop)\.jpg$/.test(f));
   const images = files.filter((f) => isImage(f) && !shots.includes(f) && f !== poster);
   if (!site && !videos.length && !images.length) return null;
+  // a job that is mostly pictures (ad creatives, product shots) shows them before its videos
+  const picturesFirst = images.length >= 4;
+  const videoList = videos.map((f) => (
+    <figure key={f} className={`media__video ${/1x1/.test(f) ? 'sq' : ''}`}>
+      <video src={url(f)} poster={poster ? url(poster) : undefined} controls playsInline loop preload="metadata" />
+      <figcaption><span className="mono">{f}</span><a href={`${url(f)}?download`}>Download ↓</a></figcaption>
+    </figure>
+  ));
   return (
     <div className="media">
       {site && (
@@ -92,12 +100,7 @@ function Media({ id, files, deliverable }: { id: string; files: string[]; delive
           {shots.filter((f) => f.startsWith('laptop')).map((f) => <img key={f} className="media__shot" src={url(f)} alt="The site on a laptop" loading="lazy" />)}
         </div>
       )}
-      {videos.map((f) => (
-        <figure key={f} className={`media__video ${/1x1/.test(f) ? 'sq' : ''}`}>
-          <video src={url(f)} poster={poster ? url(poster) : undefined} controls playsInline loop preload="metadata" />
-          <figcaption><span className="mono">{f}</span><a href={`${url(f)}?download`}>Download ↓</a></figcaption>
-        </figure>
-      ))}
+      {!picturesFirst && videoList}
       {images.length > 0 && (
         <div className="media__grid">
           {images.map((f) => (
@@ -105,6 +108,7 @@ function Media({ id, files, deliverable }: { id: string; files: string[]; delive
           ))}
         </div>
       )}
+      {picturesFirst && videoList}
     </div>
   );
 }

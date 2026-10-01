@@ -34,7 +34,8 @@ const firstUrl = (d: any): string | undefined =>
   d?.data?.[0]?.url ?? (d?.data?.[0]?.b64_json ? `data:image/png;base64,${d.data[0].b64_json}` : undefined)
   ?? d?.video_url ?? d?.url ?? d?.output?.url ?? d?.result?.url ?? d?.video?.url ?? d?.audio_url ?? d?.data?.url;
 
-export const dataUri = (buf: Buffer, mime = 'image/png') => `data:${mime};base64,${buf.toString('base64')}`;
+/** A data URI, typed from the file's first bytes (uploads are JPEG, generated images PNG). */
+export const dataUri = (buf: Buffer, mime = buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : 'image/png') => `data:${mime};base64,${buf.toString('base64')}`;
 
 // ---------- dry-mode stand-ins, so a demo run produces real files to look at
 

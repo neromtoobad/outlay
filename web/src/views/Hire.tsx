@@ -9,22 +9,10 @@ import type { Address, Hex } from 'viem';
 import BusinessForm, { type Details } from './BusinessForm.tsx';
 
 // Services that take the structured business form instead of a one-line brief.
-const FORM_SERVICES = new Set(['website', 'content-pack', 'motion-ad', 'video-ad', 'ai-answer-audit']);
+const FORM_SERVICES = new Set(['website', 'content-pack', 'motion-ad', 'ad-launch', 'product-photos', 'get-found', 'buy-smart']);
 
 type QuotedOrder = { id: string; status: string; quote: Quote; demo: boolean; brief?: string };
 
-const EXAMPLES: Record<string, string[]> = {
-  'local-business-finder': ['Every café and coffee shop in Lekki Phase 1 that has no website', 'Pharmacies in Yaba, Lagos with a phone number', 'Hair salons in Wuse 2, Abuja rated 4 stars or more'],
-  'lead-list': ['25 fitness studios and gyms in Lekki and Ikoyi for my smoothie delivery business', 'Boutique hotels in Victoria Island for our laundry service', 'Private schools in Ikeja for our school-bus app'],
-  'research-brief': ['Competitors and pricing for a small bakery in Lekki that wants to add cake delivery', 'Is there demand for solar inverter rentals in Ibadan?', 'How do Lagos co-working spaces price day passes?'],
-  'content-pack': ['Content for Tolu’s Small Chops in Lagos. Instagram @tolussmallchops, competitor @chopsbyada', 'A week of TikTok and Instagram posts for my skincare brand in Abuja, @glowbyada', 'Posts for my barbershop in Yaba that bring in weekday customers'],
-  website: ['A website for Tolu’s Small Chops in Surulere, Lagos. WhatsApp 0803 555 0142, Instagram @tolussmallchops', 'A site for my law practice in Ikeja: property and company law, call 0809 000 0000', 'Replace my old Wix site mybakery.com with something modern and mobile-first'],
-  'motion-ad': ['A 16 second vertical ad for my small chops trays: ₦25,000 for 20 guests, order on WhatsApp 0803 555 0142', 'A square motion ad for my laundry pickup app: book in 30 seconds, pickup in 2 hours', 'A landscape launch video for my school-fees savings plan, calm and trustworthy'],
-  'ai-answer-audit': ['Mama Put Kitchen, a restaurant in Yaba, Lagos. Website mamaputkitchen.ng', 'Glow Skin Clinic in Wuse 2, Abuja: what do ChatGPT and Gemini say about us?', 'Our dental practice, SmileCare Lekki. Are we recommended when people ask for a dentist in Lekki?'],
-  'best-price': ['Two Samsung Galaxy A16 phones, new, delivered to Lekki, Lagos. Budget ₦400k', '20 bags of Dangote cement delivered to Ikeja', 'A 5kVA inverter and two 220Ah batteries, new, delivered to Wuse, Abuja'],
-  'vendor-check': ['I’m about to pay ₦850,000 upfront to Gadget Plug NG for 5 iPhones. Instagram @gadgetplug_ng, phone 0803 123 4567', 'Our flour supplier says their bank account changed. New account name: Adeyemi Foods Ltd, phone 0812 000 0000', 'Is this cargo agent legit before I send $1,200? China2Lagos Shipping, china2lagos.com, WhatsApp +86 138 0000 0000'],
-  'video-ad': ['An ad for my shea butter body cream, ₦8,500, order on WhatsApp 0812 000 0000. Photo: https://…', 'Video ad for our weekend brunch at Café Nuru, Lekki, book on Instagram @cafenuru', 'An ad for my Ankara tote bags from @toteswithtolu, DM to order'],
-};
 
 function QuoteDoc({ s, order }: { s: Service; order: QuotedOrder }) {
   const q = order.quote;
@@ -141,7 +129,7 @@ export default function Hire({ service }: { service: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [order, setOrder] = useState<QuotedOrder | null>(null);
 
-  if (data && !s) return <main className="wrap section center"><h1 className="h1">We don't do that one (yet).</h1><p style={{ margin: '14px 0 24px' }}><Link href="/#services" className="btn secondary">See the services</Link></p></main>;
+  if (data && !s) return <main className="wrap section center"><h1 className="h1">We don't do that one.</h1><p className="lede" style={{ marginTop: 12 }}>Syncly now does 7 things for businesses, and does them properly.</p><p style={{ margin: '14px 0 24px' }}><Link href="/#services" className="btn secondary">See the services</Link></p></main>;
   if (!s) return <main className="wrap section"><div className="skel" style={{ height: 420 }} /></main>;
 
   async function getQuote(details?: Details) {
@@ -162,7 +150,7 @@ export default function Hire({ service }: { service: string }) {
       router.push(`/job/${order.id}`);
     } catch (e: any) { setErr(e.message); setBusy(false); }
   }
-  const examples = EXAMPLES[s.id] ?? (s.example ? [s.example] : []);
+  const examples = s.example ? [s.example] : [];
   const q = order?.quote;
   const others = data!.services.filter((x) => x.live && x.id !== s.id);
 
@@ -216,7 +204,7 @@ export default function Hire({ service }: { service: string }) {
                 {err && <div className="error">{err}</div>}
                 {order?.status === 'declined' && <div className="error">The CFO declined this job: it can't be done well at this price. {order.quote.reasons.at(-1)}</div>}
                 <button className="btn primary lg block" disabled={busy || brief.trim().length < 12 || !email.includes('@')} onClick={() => getQuote()}>{busy ? 'The CFO is pricing it…' : 'Get my quote'}</button>
-                <p className="muted center" style={{ fontSize: 13 }}>First job free · no card · refund + bond if you reject</p>
+                <p className="muted center" style={{ fontSize: 13 }}>You see the price first · no card · refund + bond if you reject</p>
               </div>
             </div>
             )
@@ -235,7 +223,7 @@ export default function Hire({ service }: { service: string }) {
                   <p className="muted center" style={{ fontSize: 13 }}>Demo mode simulates the escrow payment. On the live site this funds the job's escrow on Arc.</p>
                 </>
               ) : (
-                <p className="note">Paid jobs through escrow on Arc are being switched on. Your first job is free in the meantime.</p>
+                <p className="note">Paid jobs through escrow on Arc are being switched on. Your first website is free in the meantime.</p>
               )}
               <button className="btn ghost sm" style={{ justifySelf: 'center' }} onClick={() => setOrder(null)}>Change the brief</button>
             </div>

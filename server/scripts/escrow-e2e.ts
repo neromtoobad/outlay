@@ -20,7 +20,7 @@ const until = async (id: string, ok: (o: any) => boolean, label: string) => { fo
 const bal = async (cfg: any) => Number(await pub.readContract({ address: cfg.usdc, abi: ERC20, functionName: 'balanceOf', args: [ME] })) / 1e6;
 
 const cfg = await get('/api/escrow');
-const q = await post('/api/quote', { service: 'local-business-finder', brief: `Scenario ${scenario}: tailors in Ikeja, Lagos`, email: 'tester@example.com' });
+const q = await post('/api/quote', { service: 'buy-smart', brief: `Scenario ${scenario}: 2 chest freezers, 300 litres, delivered to Surulere, Lagos`, email: 'tester@example.com' });
 if (q.quote.promo) throw new Error('expected a paid quote');
 const o1 = await post(`/api/orders/${q.id}/escrow`, { customer: ME });
 const e = o1.escrow;

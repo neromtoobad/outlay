@@ -23,6 +23,62 @@ type Copy = { overlay: string; endTitle: string; endLine: string; hooks: string[
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 const card = (inner: string, css: string) => `<!doctype html><html><head><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Geist:wght@500;600&display=block" rel="stylesheet"><style>html,body{margin:0;width:1080px;height:1920px;background:transparent}*{box-sizing:border-box}${css}</style></head><body>${inner}</body></html>`;
 
+// ---------- shared with Ad Launch
+
+/** Their real product photo: one they uploaded, a link they gave, or their latest Instagram post. */
+export async function productPhoto(job: Job, o: { upload?: string; url?: string; instagram?: string }): Promise<Buffer | undefined> {
+  let photo: Buffer | undefined = o.upload ? readUpload(o.upload) : undefined;
+  if (photo) job.log('scout', 'photo', 'using the product photo they uploaded');
+  if (!photo && o.url) {
+    try { photo = await download(o.url, 12); job.log('scout', 'photo', 'using the product photo they sent'); }
+    catch (e: any) { job.log('scout', 'skip', `couldn't fetch their photo (${String(e?.message ?? e).slice(0, 50)})`); }
+  }
+  const ig = o.instagram?.replace(/^@/, '').replace(/\/.*$/, '');
+  if (!photo && ig) {
+    try {
+      job.log('scout', 'photo', `their latest product photo from @${ig}`);
+      const d = await aisa<any>(job, 'instagram/user/posts', { query: { handle: ig, trim: true } }, { agent: 'scout', vendor: 'Instagram posts (AIsa)', reason: `a product photo from @${ig}`, dry: () => ({ items: [{ display_uri: 'dry://photo' }] }) });
+      const p = (d?.items ?? []).find((x: any) => x.display_uri || x.image_versions2?.candidates?.[0]?.url);
+      if (p) photo = DRY ? (await image(job, 'illustrator', { prompt: 'their photo', reason: 'demo photo' })).buf : await download(p.display_uri ?? p.image_versions2.candidates[0].url, 12);
+    } catch (e: any) { job.log('scout', 'skip', `Instagram unavailable (${String(e?.message ?? e).slice(0, 50)})`); }
+  }
+  return photo;
+}
+
+/** The ad's accent colour: their brand colour when given, else one read from the palette words. */
+export function accentFor(colour: string | undefined, words = ''): { accent: string; onAccent: string } {
+  const brand = colour ? palette(colour) : undefined;
+  const accent = brand?.brand ?? (/red/i.test(words) ? '#B3261E' : /green/i.test(words) ? '#1F7A3A' : /blue/i.test(words) ? '#1D4ED8' : /gold|yellow/i.test(words) ? '#B7791F' : '#13271C');
+  return { accent, onAccent: brand?.onBrand ?? '#ffffff' };
+}
+
+/** Typeset the hook and the end card, add music, and cut an 8 s ad in 9:16 and 1:1, all on our server. */
+export async function cutAd(job: Job, o: { clip: Buffer; overlay: string; endTitle: string; endLine: string; cta: string; accent: string; onAccent: string; logo?: Buffer; mood: string }): Promise<{ vertical: Buffer; square: Buffer; music: boolean }> {
+  const { accent, onAccent, logo } = o;
+  job.log('producer', 'edit', 'headline overlay, end card and music');
+  const overlay = await htmlToPng(card(`<div class="t">${esc(o.overlay)}</div>`, `.t{position:absolute;left:72px;right:72px;top:210px;font:800 112px/0.98 'Bricolage Grotesque';color:#fff;letter-spacing:-0.03em;text-shadow:0 4px 40px rgba(0,0,0,.45)}`), 1080, 1920);
+  const end = await htmlToPng(card(`<div class="c">${logo ? `<img class="logo" src="data:image/jpeg;base64,${logo.toString('base64')}" alt="">` : ''}<div class="n">${esc(o.endTitle)}</div><div class="l">${esc(o.endLine)}</div><div class="b">${esc(o.cta)}</div></div>`,
+    `body{background:${accent}}.c{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:96px;color:${onAccent}}.logo{width:180px;height:180px;border-radius:50%;object-fit:cover;background:#fff;margin-bottom:56px}.n{font:800 118px/0.95 'Bricolage Grotesque';letter-spacing:-0.035em}.l{font:600 50px/1.2 Geist;margin-top:36px;opacity:.9}.b{margin-top:80px;align-self:flex-start;background:${onAccent};color:${accent};font:600 44px/1 Geist;padding:34px 44px;border-radius:999px}`), 1080, 1920);
+  let track: Buffer | undefined;
+  try { track = await music(job, 'producer', { prompt: `Short upbeat instrumental for a ${o.mood} social ad, modern Afrobeats-influenced groove, clean mix, strong start, ends on a button`, seconds: 10, reason: 'music for the ad' }); }
+  catch (e: any) { job.log('producer', 'skip', `music unavailable (${String(e?.message ?? e).slice(0, 50)}); the ad will be silent`); }
+  const inputs: Record<string, Buffer> = { 'clip.mp4': o.clip, 'overlay.png': overlay, 'end.png': end, ...(track ? { 'music.mp3': track } : {}) };
+  const vertical = await ffmpeg(inputs, (f, out) => [
+    '-i', f['clip.mp4'], '-loop', '1', '-t', '5', '-i', f['overlay.png'], '-loop', '1', '-t', '3.5', '-i', f['end.png'], ...(track ? ['-i', f['music.mp3']] : []),
+    '-filter_complex',
+    '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,trim=0:5,setpts=PTS-STARTPTS[v0];' +
+    '[1:v]format=rgba,fade=t=in:st=0.35:d=0.45:alpha=1,fade=t=out:st=4.3:d=0.4:alpha=1[o];[v0][o]overlay=0:0:format=auto[a];' +
+    '[2:v]scale=1080:1920,setsar=1,fps=30,format=yuv420p[e];[a]format=yuv420p[a2];[a2][e]xfade=transition=fade:duration=0.5:offset=4.5[v]' +
+    (track ? ';[3:a]atrim=0:8,afade=t=out:st=7.2:d=0.8,loudnorm=I=-14:TP=-1.5[au]' : ''),
+    '-map', '[v]', ...(track ? ['-map', '[au]'] : []), '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-pix_fmt', 'yuv420p', ...(track ? ['-c:a', 'aac', '-b:a', '160k'] : []), '-movflags', '+faststart', '-t', '8', out,
+  ]);
+  const square = await ffmpeg({ 'v.mp4': vertical }, (f, out) => ['-i', f['v.mp4'], '-vf', 'crop=1080:1080:0:420', '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out]);
+  return { vertical, square, music: !!track };
+}
+
+/** The opening, the middle and the end card, for the vision check. */
+export const adFrames = (vertical: Buffer) => Promise.all([0.8, 3, 7].map((t) => ffmpeg({ 'v.mp4': vertical }, (f, out) => ['-ss', String(t), '-i', f['v.mp4'], '-frames:v', '1', '-vf', 'scale=540:-1', '-q:v', '5', out], 'jpg')));
+
 export const videoAd = {
   id: 'video-ad',
   name: 'Video Ad',
@@ -55,21 +111,7 @@ export const videoAd = {
       }
 
       // 1. Their real product photo: one they uploaded, a link they gave, or their latest Instagram post
-      let photo: Buffer | undefined = d?.photos?.length ? readUpload(d.photos[0]) : undefined;
-      if (photo) job.log('scout', 'photo', 'using the product photo they uploaded');
-      if (!photo && spec.photo) {
-        try { photo = await download(spec.photo, 12); job.log('scout', 'photo', 'using the product photo they sent'); }
-        catch (e: any) { job.log('scout', 'skip', `couldn't fetch their photo (${String(e?.message ?? e).slice(0, 50)})`); }
-      }
-      const ig = spec.instagram?.replace(/^@/, '').replace(/\/.*$/, '');
-      if (!photo && ig) {
-        try {
-          job.log('scout', 'photo', `their latest product photo from @${ig}`);
-          const d = await aisa<any>(job, 'instagram/user/posts', { query: { handle: ig, trim: true } }, { agent: 'scout', vendor: 'Instagram posts (AIsa)', reason: `a product photo from @${ig}`, dry: () => ({ items: [{ display_uri: 'dry://photo' }] }) });
-          const p = (d?.items ?? []).find((x: any) => x.display_uri || x.image_versions2?.candidates?.[0]?.url);
-          if (p) photo = DRY ? (await image(job, 'illustrator', { prompt: 'their photo', reason: 'demo photo' })).buf : await download(p.display_uri ?? p.image_versions2.candidates[0].url, 12);
-        } catch (e: any) { job.log('scout', 'skip', `Instagram unavailable (${String(e?.message ?? e).slice(0, 50)})`); }
-      }
+      const photo = await productPhoto(job, { upload: d?.photos?.[0], url: spec.photo, instagram: spec.instagram });
 
       // 2. The key visual (9:16), staged from their photo or generated
       const visualPrompt = `A vertical 9:16 advertising photograph of ${spec.product} for ${spec.business}, set in ${spec.scene}. ${spec.mood}, premium commercial lighting, shallow depth of field, the product sharp and centred in the middle third, calm space at the top and bottom for text. ${spec.palette ? `Colour accents: ${spec.palette}.` : ''} Photorealistic. No text, no letters, no logos, no watermark.`;
@@ -96,31 +138,12 @@ export const videoAd = {
       ], 'write the ad copy', { maxTokens: 700, json: true, dry: () => JSON.stringify({ overlay: 'Party sorted.', endTitle: 'Tolu’s Small Chops', endLine: 'Trays for 20 guests · ₦25,000', hooks: ['Your guests will ask who catered.', 'Small chops that arrive hot.', 'The tray that ends the party debate.'], primary: ['Puff-puff, samosa and spring rolls, delivered hot for your next party. Order on WhatsApp 0803 555 0142.', 'Hosting this weekend? Trays for 20 guests at ₦25,000. Order on WhatsApp 0803 555 0142.'], headline: ['Party trays from ₦25,000', 'Small chops, delivered hot'] }) }), { overlay: spec.offer, endTitle: spec.business, endLine: spec.offer, hooks: [], primary: [], headline: [] });
 
       // 5. Typeset and cut (headless Chrome + ffmpeg on our server)
-      const brand = d?.colour ? palette(d.colour) : undefined;
-      const accent = brand?.brand ?? (/red/i.test(spec.palette) ? '#B3261E' : /green/i.test(spec.palette) ? '#1F7A3A' : /blue/i.test(spec.palette) ? '#1D4ED8' : /gold|yellow/i.test(spec.palette) ? '#B7791F' : '#13271C');
-      const onAccent = brand?.onBrand ?? '#ffffff';
-      const logo = d?.logo ? readUpload(d.logo) : undefined;
-      job.log('producer', 'edit', 'headline overlay, end card and music');
-      const overlay = await htmlToPng(card(`<div class="t">${esc(copy.overlay)}</div>`, `.t{position:absolute;left:72px;right:72px;top:210px;font:800 112px/0.98 'Bricolage Grotesque';color:#fff;letter-spacing:-0.03em;text-shadow:0 4px 40px rgba(0,0,0,.45)}`), 1080, 1920);
-      const end = await htmlToPng(card(`<div class="c">${logo ? `<img class="logo" src="data:image/jpeg;base64,${logo.toString('base64')}" alt="">` : ''}<div class="n">${esc(copy.endTitle)}</div><div class="l">${esc(copy.endLine)}</div><div class="b">${esc(spec.cta)}</div></div>`,
-        `body{background:${accent}}.c{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;padding:96px;color:${onAccent}}.logo{width:180px;height:180px;border-radius:50%;object-fit:cover;background:#fff;margin-bottom:56px}.n{font:800 118px/0.95 'Bricolage Grotesque';letter-spacing:-0.035em}.l{font:600 50px/1.2 Geist;margin-top:36px;opacity:.9}.b{margin-top:80px;align-self:flex-start;background:${onAccent};color:${accent};font:600 44px/1 Geist;padding:34px 44px;border-radius:999px}`), 1080, 1920);
-      let track: Buffer | undefined;
-      try { track = await music(job, 'producer', { prompt: `Short upbeat instrumental for a ${spec.mood} social ad, modern Afrobeats-influenced groove, clean mix, strong start, ends on a button`, seconds: 10, reason: 'music for the ad' }); }
-      catch (e: any) { job.log('producer', 'skip', `music unavailable (${String(e?.message ?? e).slice(0, 50)}); the ad will be silent`); }
-      const inputs: Record<string, Buffer> = { 'clip.mp4': clip, 'overlay.png': overlay, 'end.png': end, ...(track ? { 'music.mp3': track } : {}) };
-      const vertical = await ffmpeg(inputs, (f, out) => [
-        '-i', f['clip.mp4'], '-loop', '1', '-t', '5', '-i', f['overlay.png'], '-loop', '1', '-t', '3.5', '-i', f['end.png'], ...(track ? ['-i', f['music.mp3']] : []),
-        '-filter_complex',
-        '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30,trim=0:5,setpts=PTS-STARTPTS[v0];' +
-        '[1:v]format=rgba,fade=t=in:st=0.35:d=0.45:alpha=1,fade=t=out:st=4.3:d=0.4:alpha=1[o];[v0][o]overlay=0:0:format=auto[a];' +
-        '[2:v]scale=1080:1920,setsar=1,fps=30,format=yuv420p[e];[a]format=yuv420p[a2];[a2][e]xfade=transition=fade:duration=0.5:offset=4.5[v]' +
-        (track ? ';[3:a]atrim=0:8,afade=t=out:st=7.2:d=0.8,loudnorm=I=-14:TP=-1.5[au]' : ''),
-        '-map', '[v]', ...(track ? ['-map', '[au]'] : []), '-c:v', 'libx264', '-preset', 'medium', '-crf', '19', '-pix_fmt', 'yuv420p', ...(track ? ['-c:a', 'aac', '-b:a', '160k'] : []), '-movflags', '+faststart', '-t', '8', out,
-      ]);
-      const square = await ffmpeg({ 'v.mp4': vertical }, (f, out) => ['-i', f['v.mp4'], '-vf', 'crop=1080:1080:0:420', '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out]);
+      const { accent, onAccent } = accentFor(d?.colour, spec.palette);
+      const cut = await cutAd(job, { clip, overlay: copy.overlay, endTitle: copy.endTitle, endLine: copy.endLine, cta: spec.cta, accent, onAccent, logo: d?.logo ? readUpload(d.logo) : undefined, mood: spec.mood });
+      const { vertical, square } = cut, track = cut.music;
 
       // 6. QA
-      const frames = await Promise.all([0.8, 3, 7].map((t) => ffmpeg({ 'v.mp4': vertical }, (f, out) => ['-ss', String(t), '-i', f['v.mp4'], '-frames:v', '1', '-vf', 'scale=540:-1', '-q:v', '5', out], 'jpg')));
+      const frames = await adFrames(vertical);
       job.log('auditor', 'look', `checking the opening, the middle and the end card with ${MODELS.vision.split('/')[1]}`);
       const v = parseJson<{ issues: string[] }>(await llm(job, 'auditor', [
         { role: 'system', content: 'You check three frames (opening, middle, end card) of a vertical video ad for a small business. List concrete problems only: the product hard to see or distorted, garbled AI-made letters or fake logos in the picture, overlay text unreadable or cut off, the end card missing the call to action, anything that looks broken. Reply JSON only: {"issues": [short strings]} (empty if it is ready to run).' },

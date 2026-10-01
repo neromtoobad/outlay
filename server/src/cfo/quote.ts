@@ -31,7 +31,7 @@ export type Quote = {
   reasons: string[];
 };
 
-export const POLICY = { priorA: 4, priorB: 1, minBps: 1000, maxBps: 3000, minExpectedProfit: 0.5, promoMaxCost: 0.5 };
+export const POLICY = { priorA: 4, priorB: 1, minBps: 1000, maxBps: 3000, minExpectedProfit: 0.5, promoMaxCost: 1.5 };
 
 const median = (xs: number[]) => {
   if (!xs.length) return NaN;

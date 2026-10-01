@@ -3,7 +3,9 @@
 // deal, Gemini names two competitors and can't answer the basics, Claude mostly declines, and Perplexity
 // says it "may be permanently closed" while citing a "best restaurants in Yaba" blog. The analyst fixture
 // has one paraphrased quote and one competitor that isn't in the answer (QA must drop both), and one maker
-// verdict the auditor overturns (the two-key rule must leave it out of the score).
+// verdict the auditor overturns (the two-key rule must leave it out of the score). The owner's own question
+// ("Do you cater for parties?") gets a made-up ₦150,000 package from Perplexity. The Business Profile
+// also carries what Get Found checks: unclaimed, no description, 6 photos, delivery switched off on Google.
 
 export const spec = {
   name: 'Mama Put Kitchen', website: 'mamaputkitchen.ng', area: 'Yaba', city: 'Lagos', country: 'Nigeria', countryIso: 'NG',
@@ -31,7 +33,11 @@ export const gbp = () => [{
     type: 'google_business_info', title: 'Mama Put Kitchen', category: 'Nigerian restaurant', additional_categories: ['Restaurant', 'Caterer'],
     cid: '1234567890123456789', address: '23 Herbert Macaulay Way, Yaba, Lagos 101245', phone: '+234 803 456 7812',
     url: 'https://mamaputkitchen.ng/', domain: 'mamaputkitchen.ng', is_claimed: false,
+    latitude: 6.5095412, longitude: 3.3710845, description: null, total_photos: 6, logo: null, main_image: 'https://lh5.googleusercontent.com/p/AF1QipMamaPutKitchenYaba',
+    // Get Found reads these: Google says "no delivery" while the website says Chowdeck and Glovo deliver
+    attributes: { available_attributes: { service_options: ['has_takeout', 'serves_dine_in'], payments: ['pay_debit_card'] }, unavailable_attributes: { service_options: ['has_delivery'] } },
     rating: { rating_type: 'Max5', value: 4.3, votes_count: 212, rating_max: 5 },
+    rating_distribution: { 1: 14, 2: 9, 3: 17, 4: 48, 5: 124 }, price_level: 'inexpensive', last_updated_time: '2026-09-29 08:11:42 +00:00',
     place_topics: { jollof: 38, amala: 21, portion: 15, 'small chops': 12, delivery: 9 },
     people_also_search: [
       { cid: '11', title: 'Yakoyo Restaurant', rating: { value: 4.1, votes_count: 980 } },
@@ -100,6 +106,7 @@ const ANSWERS: Record<string, Record<string, [string, A[]]>> = {
       [guide]],
     recommend: ['Here are a few well-reviewed restaurants in Yaba, Lagos:\n\n- **Yakoyo Restaurant** – traditional Yoruba dishes.\n- **Amala Shitta** – just over in Surulere, worth the short trip.\n- **The Place Yaba** – good for quick lunches.',
       [trip]],
+    custom: ['Yes. Mama Put Kitchen in Yaba cooks **party jollof for events from 20 guests**, and you can ask them for a quote. You can reach them on 0803 456 7812.', [{ title: 'Menu & prices – Mama Put Kitchen', url: menu }]],
   },
   gemini: {
     hours: ['Mama Put Kitchen in Yaba is open from 8 AM to 9 PM, Monday through Saturday, and from 12 PM to 8 PM on Sundays.', [vertex('mamaputkitchen.ng', `${home}/`)]],
@@ -108,6 +115,7 @@ const ANSWERS: Record<string, Record<string, [string, A[]]>> = {
     best: ['Top-rated restaurants in Yaba include **Yakoyo Restaurant**, known for its amala, and **Amala Shitta**, a local favourite for traditional Yoruba dishes.', [vertex('tripadvisor.com', trip.url)]],
     service: ['You can get good jollof rice near Yaba at **The Place Yaba** or at **Yakoyo Restaurant**, both close to the University of Lagos.', [vertex('lagosfoodguide.ng', guide.url)]],
     recommend: ['Popular choices in Yaba are **Yakoyo Restaurant** and **Amala Shitta**. Both have strong Google reviews.', [vertex('tripadvisor.com', trip.url)]],
+    custom: ["I couldn't find details about catering from Mama Put Kitchen in Yaba. It's best to contact the restaurant directly to ask about party orders.", []],
   },
   claude: {
     hours: ["I don't have reliable, current information about Mama Put Kitchen's opening hours in Yaba. I'd suggest checking their Google Maps listing or their website, mamaputkitchen.ng, before visiting.", []],
@@ -116,6 +124,7 @@ const ANSWERS: Record<string, Record<string, [string, A[]]>> = {
     best: ['Well-regarded options in Yaba include **The Place Yaba** for quick rice dishes and **Yakoyo Restaurant** for amala and traditional Yoruba food.', [trip]],
     service: ['**Mama Put Kitchen** on Herbert Macaulay Way is often mentioned for jollof rice and small chops. **The Place Yaba** is another reliable choice nearby.', [guide]],
     recommend: ["I don't have enough reliable, current local information to recommend specific restaurants in Yaba. Google Maps reviews are the best way to compare options near you.", []],
+    custom: ['Their website says they do party jollof for events from 20 guests, and asks you to get in touch for a quote.', [{ title: 'Menu & prices – Mama Put Kitchen', url: menu }]],
   },
   perplexity: {
     hours: ['Mama Put Kitchen in Yaba opens **8:00 AM – 9:00 PM, Monday to Saturday**[1]. On Sundays it is listed as open 12:00 PM – 8:00 PM[2].',
@@ -126,6 +135,7 @@ const ANSWERS: Record<string, Record<string, [string, A[]]>> = {
     best: ['According to the *Best Restaurants in Yaba (2026)* guide[1], top picks are **Yakoyo Restaurant**, **The Place Yaba** and **Jollof Joint Sabo**[1][2].', [guide, trip]],
     service: ['Good jollof near Yaba: **Mama Put Kitchen**[1], known for smoky party jollof, and **The Place Yaba**[2].', [guide, { title: 'Menu & prices – Mama Put Kitchen', url: menu }]],
     recommend: ['Well-reviewed restaurants in Yaba include **Yakoyo Restaurant**, **Amala Shitta** and **The Place Yaba**[1].', [guide]],
+    custom: ['Mama Put Kitchen offers **event catering packages starting at ₦150,000 for 50 guests**[1], including jollof rice, small chops and drinks.', [{ title: 'Mama Put Kitchen Yaba – NigeriaGalleria', url: 'https://www.nigeriagalleria.com/Lagos/Restaurants/Mama-Put-Kitchen-Yaba.html' }]],
   },
 };
 
@@ -177,6 +187,13 @@ const J: Record<string, Record<string, { named?: boolean; name_quote?: string; f
     gemini: { named: false, competitors: ['Yakoyo Restaurant', 'Amala Shitta'] },
     claude: { named: false, competitors: [] },
     perplexity: { named: false, competitors: ['Yakoyo Restaurant', 'Amala Shitta', 'The Place Yaba'] },
+  },
+  // the owner's own question from the order form (fixture: "Do you cater for parties?")
+  custom: {
+    chatgpt: { facts: [f('service', 'party jollof for events from 20 guests', 'Caters events from 20 guests', 'correct', 'Website: party jollof for events from 20 guests'), f('phone', '0803 456 7812', 'Phone', 'correct', '+234 803 456 7812')] },
+    gemini: { missing: ['other'] },
+    claude: { facts: [f('service', 'party jollof for events from 20 guests', 'Caters events from 20 guests', 'correct', 'Website: party jollof for events from 20 guests, ask for a quote')] },
+    perplexity: { facts: [f('price', 'event catering packages starting at ₦150,000 for 50 guests', 'Catering packages from ₦150,000 for 50 guests', 'made_up', 'Website: party jollof from 20 guests, price on request; no packages listed')] },
   },
 };
 

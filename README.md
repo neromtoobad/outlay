@@ -8,24 +8,21 @@ Built for the [Tameion Agents Hackathon](https://tameion.thecanteenapp.com) (Can
 
 ## What it does
 
-A business describes a job in a sentence: *"every restaurant in Lugbe, Abuja that has no website"*. The CFO prices it, a team of agents does it, and the customer decides whether to pay.
+A business fills in a short form about itself and the job: *"party trays for 20 guests, ₦25,000, orders on WhatsApp, ₦5,000 a day for ads"*. The CFO prices it, a team of agents does it, and the customer decides whether to pay.
 
 | Service | Price | What you get |
 |---|---|---|
-| AI Answer Audit | 15 USDC | What ChatGPT, Gemini, Claude and Perplexity tell customers about the business, every wrong fact quoted, who they recommend instead, and a fix list |
+| Website | 15 USDC | A designed site from the Google listing, Instagram and the owner's photos, hosted at a link the same day, plus the files |
 | Content Pack | 8 USDC | The content styles working in the niche this week (backed by real posts and their numbers), then 7 posts and 3 images |
-| Website | 15 USDC | A designed one-page site from the Google listing and Instagram, hosted at a link the same day, plus the files |
+| Ad Launch | 20 USDC | 3 ad angles from ads that have run 30+ days, feed and Story creatives, an 8 s video, copy, and a 7-day plan for the budget; diagnoses the ads they already ran |
 | Motion Ad | 12 USDC | A 12–24 s motion video with an original soundtrack, rendered on our own server |
-| Video Ad | 15 USDC | An 8 s ad from the customer's product photo (9:16 and 1:1), with ad copy |
-| Best Price Finder | 3 USDC | Where to buy for the lowest total price, each offer re-checked on the seller's page |
-| Check Before You Pay | 4 USDC | A rule-based red/amber/green risk verdict on a supplier before paying them, every signal cited |
-| Local Business Finder | 3 USDC | Every business of a type in an area, with phone, website and rating, as a spreadsheet |
-| Lead List | 5 USDC | Up to 25 verified business emails, each with a personalised first line |
-| Research Brief | 3 USDC | Competitors, market and pricing, with every claim cited |
+| Product Photo Studio | 6 USDC | Phone photos turned into studio, lifestyle and white-background shots, each checked against the original so the product doesn't change |
+| Get Found | 15 USDC | Google Maps rank street by street against competitors, profile gaps, what ChatGPT, Gemini, Claude and Perplexity say, a fix list, a profile description and review replies |
+| Buy Smart | 5 USDC | The cheapest trustworthy offers, delivered, and a red/amber/green check on the sellers before paying |
 
-The menu comes from research into what small businesses already pay freelancers and software for, and what a search or a chatbot can't do: jobs that need fresh data from many paid sources at once, checking against the truth, or real production.
+The menu comes from research into what small businesses already pay agencies and freelancers for, and what a search or a chatbot can't do: jobs that need fresh data from many paid sources at once, checking against the truth, or real production.
 
-- **The first job is free** when its tools cost under 0.50 USDC. After that, the customer pays into escrow on Arc from their own wallet.
+- **The first website is free** (one per email, when its tools cost under 1.50 USDC, from a promo budget of 2 USDC a week). After that, the customer pays into escrow on Arc from their own wallet.
 - **Nothing is paid unless the customer accepts.** Only the paying wallet can accept, ask for one free revision, or reject. A rejection refunds the price plus a bond the CFO put up.
 - **The agents buy their own tools.** Each has its own wallet and pays per call (x402 nanopayments through Circle Gateway) for AI models, search, page reading and email checks. Every call is on the job's public receipt, linked to the Arc transaction that settled it.
 - **The CFO runs the money.** It plans each agent's weekly budget, puts revenue to work, and tops up agents that run low. Anything above its limits goes to a human to co-sign on-chain.
@@ -164,4 +161,4 @@ Live mode needs the agents' mnemonic (`OUTLAY_MNEMONIC`) and `deployments/arc.js
   - **USYC:** it needs an allowlist, and mainnet has a $100k minimum.
   - **Paymaster:** it isn't deployed on Arc.
 - **Email delivery** is built (the Messenger pays AgentMail by x402), but it is switched off until the Messenger's balance is funded.
-- **Paying customers need a browser wallet with USDC on Arc.** Free first jobs need nothing.
+- **Paying customers need a browser wallet with USDC on Arc.** The free first website needs nothing.

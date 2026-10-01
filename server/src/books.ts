@@ -7,7 +7,7 @@ import { DRY } from './config.ts';
 import { readVault } from './escrow.ts';
 import { listOrders, readJob, type Order } from './orders.ts';
 import { toolPurchase, jobFunded, jobAccepted, jobRejected, pnl, toBeancount, type Entry } from './ledger.ts';
-import { CATALOG } from './services/index.ts';
+import { findService } from './services/index.ts';
 
 const dayOf = (iso: string) => iso.slice(0, 10);
 
@@ -50,7 +50,7 @@ export async function books() {
   // Unit economics per service (delivered runs)
   const perService: Record<string, { jobs: number; avgCost: number; price: number; accepted: number; decided: number; free: number }> = {};
   for (const o of orders) {
-    const s = (perService[o.service] ??= { jobs: 0, avgCost: 0, price: CATALOG.find((c) => c.id === o.service)?.priceUsd ?? 0, accepted: 0, decided: 0, free: 0 });
+    const s = (perService[o.service] ??= { jobs: 0, avgCost: 0, price: findService(o.service)?.priceUsd ?? 0, accepted: 0, decided: 0, free: 0 });
     const cost = o.runs.reduce((t, r) => t + (readJob(r)?.spentUsd ?? 0), 0);
     if (o.runs.length) { s.avgCost = (s.avgCost * s.jobs + cost) / (s.jobs + 1); s.jobs++; }
     if (o.payment?.mode === 'promo') s.free++;

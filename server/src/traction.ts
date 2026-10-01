@@ -5,7 +5,7 @@ import { listOrders, readJob } from './orders.ts';
 import { DEP } from './escrow.ts';
 import { decisions } from './cfo/log.ts';
 
-const NAME: Record<string, string> = { 'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List' };
+const NAME: Record<string, string> = { website: 'Website', 'content-pack': 'Content Pack', 'motion-ad': 'Motion Ad', 'ad-launch': 'Ad Launch', 'product-photos': 'Product Photo Studio', 'get-found': 'Get Found', 'buy-smart': 'Buy Smart', 'video-ad': 'Video Ad', 'ai-answer-audit': 'AI Answer Audit', 'best-price': 'Best Price Finder', 'vendor-check': 'Check Before You Pay', 'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List' };
 const tx = (h?: string) => (h ? `[${h.slice(0, 10)}…](https://arcscan.app/tx/${h})` : '');
 const addr = (a: string) => `[\`${a}\`](https://arcscan.app/address/${a})`;
 const cell = (s: string) => s.replace(/\|/g, '/').replace(/\n/g, ' ');

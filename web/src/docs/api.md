@@ -37,7 +37,7 @@ curl -N https://hiresyncly.site/api/events
 | Endpoint | Body | Notes |
 |---|---|---|
 | `POST /api/quote` | `{ service, brief, email }` | Returns an order with the CFO's quote |
-| `POST /api/orders/:id/start` | `{ mode: "promo" }` | Starts a free first job |
+| `POST /api/orders/:id/start` | `{ mode: "promo" }` | Starts a free first website |
 | `POST /api/orders/:id/escrow` | `{ customer }` | The CFO opens the escrow for this wallet (it must hold the price) |
 | `POST /api/orders/:id/sync` | `{ tx?, note?, email? }` | After your wallet acts on the escrow, the server reads the chain and follows it. A revision note is sent here first, with the order's email. |
 | `POST /api/orders/:id/retry` | `{ email }` | Try a failed free job again |
@@ -48,7 +48,7 @@ curl -N https://hiresyncly.site/api/events
 ```bash
 curl -s https://hiresyncly.site/api/quote \
   -H 'content-type: application/json' \
-  -d '{"service":"local-business-finder","brief":"Pharmacies in Yaba, Lagos with a phone number","email":"you@business.com"}'
+  -d '{"service":"website","brief":"A website for Tolu’s Small Chops in Surulere, Lagos. WhatsApp 0803 555 0142, Instagram @tolussmallchops","email":"you@business.com"}'
 ```
 
 The response includes `quote.priceUsd`, `quote.bondUsd`, `quote.promo` and `quote.reasons`, the CFO's working.

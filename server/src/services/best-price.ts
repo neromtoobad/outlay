@@ -4,7 +4,8 @@
 // from accessories, look-alikes, list pages and guides → Analyst prices everything in the customer's
 // currency (live rate from Google) with delivery → Reader re-opens the top offers' pages (APEX fetch; Exa's
 // copy for pages that need a browser) and code checks the price is really on the page → rules flag scam
-// risks → Auditor (other model family) vets the picks → report + CSV of every offer.
+// risks → Auditor (other model family) vets the picks → report + CSV of every offer. The core (shopFrom +
+// findPrices) runs inside other jobs too: Buy Smart prices its items with it.
 import { Job } from '../job.ts';
 import { MODELS } from '../config.ts';
 import { buy } from '../x402.ts';
@@ -13,18 +14,18 @@ import { ortho } from '../sellers.ts';
 import { MAIL_BUDGET_USD, MAIL_HOST } from '../mail.ts';
 import * as F from './best-price.fixtures.ts';
 
-type Item = { name: string; query: string; qty: number; condition: 'new' | 'used' | 'any'; mustHave: string[]; imageUrl?: string; identify?: boolean };
-type Spec = { items: Item[]; city: string; country: string; gl: string; currency: string; budget?: Money | null; marketplaces: string[] };
-type Money = { amount: number; currency: string };
-type Tier = 'retailer' | 'marketplace' | 'classifieds' | 'unknown';
-type Cond = 'new' | 'used' | 'refurbished' | 'unknown';
-type Offer = {
+export type Item = { name: string; query: string; qty: number; condition: 'new' | 'used' | 'any'; mustHave: string[]; imageUrl?: string; identify?: boolean };
+export type Spec = { items: Item[]; city: string; country: string; gl: string; currency: string; budget?: Money | null; marketplaces: string[] };
+export type Money = { amount: number; currency: string };
+export type Tier = 'retailer' | 'marketplace' | 'classifieds' | 'unknown';
+export type Cond = 'new' | 'used' | 'refurbished' | 'unknown';
+export type Offer = {
   id: string; item: number; via: string; seller: string; host: string; title: string; link: string; snippet: string;
   listed?: Money; deliveryListed?: Money | 'free'; unit?: number; delivery?: number; total?: number; // unit/delivery/total: customer's currency
   match: string; condition: Cond; rating?: number; ratingCount?: number; store?: string; sellerScore?: string;
   tier: Tier; abroad: boolean; checked: string; inStock?: boolean; notes: string[]; risk?: string; rejected?: string; excerpt?: string;
 };
-type Page = { text: string; via: 'live' | 'copy' };
+export type Page = { text: string; via: 'live' | 'copy' };
 type Stats = { n: number; min?: number; med?: number; max?: number };
 
 // ---------- markets and sellers
@@ -50,15 +51,15 @@ const RETAILERS = /\bslot\b|pointek|3c ?hub|\bkara\b|ogabassey|fouani|walmart|be
 const BRAND_HOST = /(^|\.)(samsung|apple|hp|dell|lenovo|mi|oraimo|lg|sony|nokia|hisense|tecno-mobile|infinixmobility|itel-life)\.com$/i;
 const NAMES: [RegExp, string][] = [[/jumia/, 'Jumia'], [/konga/, 'Konga'], [/jiji/, 'Jiji'], [/slot\.ng/, 'Slot'], [/kara\.com/, 'Kara'], [/pointek/, 'Pointek'], [/3chub/, '3CHub'], [/amazon/, 'Amazon'], [/aliexpress/, 'AliExpress'], [/temu/, 'Temu'], [/ebay/, 'eBay'], [/walmart/, 'Walmart'], [/takealot/, 'Takealot'], [/kilimall/, 'Kilimall']];
 
-const hostOf = (u: string) => { try { return new URL(u).host.toLowerCase().replace(/^www\./, ''); } catch { return ''; } };
-const isGoogle = (u: string) => /(^|\.)google\.[a-z.]+$/.test(hostOf(u));
-const nameOf = (host: string) => NAMES.find(([re]) => re.test(host))?.[1] ?? host;
-const tierOf = (seller: string, host: string): Tier => {
+export const hostOf = (u: string) => { try { return new URL(u).host.toLowerCase().replace(/^www\./, ''); } catch { return ''; } };
+export const isGoogle = (u: string) => /(^|\.)google\.[a-z.]+$/.test(hostOf(u));
+export const nameOf = (host: string) => NAMES.find(([re]) => re.test(host))?.[1] ?? host;
+export const tierOf = (seller: string, host: string): Tier => {
   const s = `${seller} ${isGoogle(`https://${host}`) ? '' : host}`;
   return CLASSIFIEDS.test(s) ? 'classifieds' : MARKETPLACES.test(s) ? 'marketplace' : RETAILERS.test(s) || BRAND_HOST.test(host) ? 'retailer' : 'unknown';
 };
 /** "Slot Systems Limited" on Google Shopping and slot.ng are the same seller; a marketplace store counts on its own. */
-const sellerKey = (o: Offer) => {
+export const sellerKey = (o: Offer) => {
   const byHost = isGoogle(o.link) ? undefined : NAMES.find(([re]) => re.test(o.host))?.[1];
   const byName = o.seller.toLowerCase().replace(/\.com(\.\w+)?|\b(nigeria|limited|ltd|plc|systems|online|store|shop|official)\b|[^a-z0-9 ]/g, '').trim().split(/\s+/)[0];
   return (o.store ?? byHost ?? (byName || o.seller)).toLowerCase();
@@ -77,8 +78,8 @@ const CODES = 'NGN|USD|GBP|EUR|KES|GHS|ZAR|EGP|INR|AED|CAD|AUD|XOF|UGX|TZS|RWF|M
 const NUM = String.raw`\d{1,3}(?:[,.]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?`;
 const MONEY = new RegExp(String.raw`(US\s?\$|C\$|A\$|GH[₵¢]|K[Ss]h|Rs\.?|E£|₦|£|€|₹|\$|\b(?:${CODES})\b|\bN(?=\d)|\bR(?=\s?\d))\s?(${NUM})([kK]\b)?|(${NUM})\s?(\b(?:${CODES})\b)`, 'g');
 const DOLLAR = new Set(['USD', 'CAD', 'AUD', 'NZD', 'SGD', 'HKD']);
-const SYMBOL: Record<string, string> = { NGN: '₦', USD: '$', GBP: '£', EUR: '€', GHS: 'GH₵', KES: 'KSh ', ZAR: 'R', INR: '₹', EGP: 'E£', AED: 'AED ' };
-const WHOLE = new Set(['NGN', 'KES', 'INR', 'EGP', 'UGX', 'TZS', 'XOF', 'RWF', 'JPY']);
+export const SYMBOL: Record<string, string> = { NGN: '₦', USD: '$', GBP: '£', EUR: '€', GHS: 'GH₵', KES: 'KSh ', ZAR: 'R', INR: '₹', EGP: 'E£', AED: 'AED ' };
+export const WHOLE = new Set(['NGN', 'KES', 'INR', 'EGP', 'UGX', 'TZS', 'XOF', 'RWF', 'JPY']);
 const SIGN: [RegExp, string][] = [[/^US\s?\$$/, 'USD'], [/^C\$$/, 'CAD'], [/^A\$$/, 'AUD'], [/^₦$/, 'NGN'], [/^GH[₵¢]$/, 'GHS'], [/^K[Ss]h$/, 'KES'], [/^£$/, 'GBP'], [/^€$/, 'EUR'], [/^(₹|Rs\.?)$/, 'INR'], [/^E£$/, 'EGP']];
 
 function num(raw: string): number | undefined {
@@ -96,7 +97,7 @@ function curOf(sym: string, local: string): string | undefined {
   if (sym === '$') return DOLLAR.has(local) ? local : 'USD';
   return SIGN.find(([re]) => re.test(sym))?.[1];
 }
-function moneyAll(s: string, local: string): Money[] {
+export function moneyAll(s: string, local: string): Money[] {
   const out: Money[] = [];
   for (const m of String(s ?? '').matchAll(MONEY)) {
     const currency = curOf((m[1] ?? m[5] ?? '').trim(), local);
@@ -105,10 +106,10 @@ function moneyAll(s: string, local: string): Money[] {
   }
   return out;
 }
-const money = (s: unknown, local: string): Money | undefined => moneyAll(String(s ?? ''), local)[0];
-const fmt = (n: number | undefined, cur: string) => n === undefined ? '—'
+export const money = (s: unknown, local: string): Money | undefined => moneyAll(String(s ?? ''), local)[0];
+export const fmt = (n: number | undefined, cur: string) => n === undefined ? '—'
   : `${SYMBOL[cur] ?? `${cur} `}${n.toLocaleString('en-US', WHOLE.has(cur) || n >= 100000 ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const fmtM = (m?: Money) => (m ? fmt(m.amount, m.currency) : '—');
+export const fmtM = (m?: Money) => (m ? fmt(m.amount, m.currency) : '—');
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : undefined; };
 
 // ---------- sorting offers
@@ -184,9 +185,9 @@ function stats(offers: Offer[], i: number, it: Item): Stats {
 }
 const tooCheap = (o: Offer, st: Stats) => st.n >= 3 && o.unit !== undefined && o.unit < 0.5 * st.med!;
 const eligible = (o: Offer, it: Item, st: Stats) => o.match === 'exact' && o.total !== undefined && condOk(o, it) && o.inStock !== false && !o.rejected && !tooCheap(o, st);
-const confirmed = (o: Offer) => o.checked.startsWith('yes');
+export const confirmed = (o: Offer) => o.checked.startsWith('yes');
 /** A seller we know, no warning signs, a landed cost we can state, and a page that didn't contradict the listing. */
-const trusted = (o: Offer) => (o.tier === 'retailer' || o.tier === 'marketplace') && !o.risk && !(o.abroad && o.delivery === undefined) && !o.checked.startsWith('no:');
+export const trusted = (o: Offer) => (o.tier === 'retailer' || o.tier === 'marketplace') && !o.risk && !(o.abroad && o.delivery === undefined) && !o.checked.startsWith('no:');
 const safe = (o: Offer) => confirmed(o) && trusted(o);
 function rank(offers: Offer[], i: number, it: Item) {
   const st = stats(offers, i, it);
@@ -310,14 +311,14 @@ function applyPage(o: Offer, page: Page | undefined, f: any, local: string) {
 
 // ---------- report
 
-const cell = (s: unknown) => String(s ?? '').replace(/\|/g, '\\|').replace(/[\n\r]+/g, ' ');
-const short = (s: string, n = 60) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
-const linkMd = (text: string, url: string) => `[${short(text).replace(/[[\]]/g, '')}](${url})`;
-const csvCell = (v: unknown) => { const s = v === undefined || v === null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-const who = (o: Offer) => (o.store && o.store.toLowerCase() !== o.seller.toLowerCase() ? `${o.seller} (${o.store})` : o.seller);
+export const cell = (s: unknown) => String(s ?? '').replace(/\|/g, '\\|').replace(/[\n\r]+/g, ' ');
+export const short = (s: string, n = 60) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+export const linkMd = (text: string, url: string) => `[${short(text).replace(/[[\]]/g, '')}](${url})`;
+export const csvCell = (v: unknown) => { const s = v === undefined || v === null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+export const who = (o: Offer) => (o.store && o.store.toLowerCase() !== o.seller.toLowerCase() ? `${o.seller} (${o.store})` : o.seller);
 const score = (o: Offer) => (o.sellerScore ? (/seller/i.test(o.sellerScore) ? o.sellerScore : `seller rating ${o.sellerScore}`) : '');
 const condLabel = (c: Cond) => (c === 'unknown' ? 'not stated' : c);
-const trust = (o: Offer) => o.tier === 'marketplace' ? `marketplace${o.sellerScore ? `, ${score(o)}` : ''}`
+export const trust = (o: Offer) => o.tier === 'marketplace' ? `marketplace${o.sellerScore ? `, ${score(o)}` : ''}`
   : o.tier === 'retailer' ? 'known retailer' : o.tier === 'classifieds' ? 'classified ad' : 'unknown seller';
 
 function whyBest(o: Offer, it: Item, r: ReturnType<typeof rank>, cur: string): string {
@@ -348,7 +349,297 @@ function whyRunner(o: Offer, best: Offer, cur: string): string {
     o.inStock ? 'in stock' : '', trust(o), o.delivery === undefined ? 'delivery fee not stated' : ''].filter(Boolean).join('; ') + '.';
 }
 
-// ---------- the service
+// ---------- the core: runs inside any job (Best Price Finder, Buy Smart)
+
+/** The parse prompt for a shopping request. Buy Smart extends it with the sellers. */
+export const SHOP_PARSE = 'You parse a shopping request for a price-comparison team. Reply JSON only: {"items": [{"name": short product name, "query": Google Shopping query: brand + model + any spec the customer insisted on (no words like cheap/best/buy), "qty": number (default 1), "condition": "new"|"used"|"any" (default "new"; "tokunbo"/"UK used" = used), "mustHave": [specs the customer insisted on, e.g. "128GB", "5G"], "imageUrl": product image URL if given else null, "identify": true only if the customer gave a photo but no clear product name}] (1-5 items), "city": delivery area and city, "country": country, "gl": 2-letter country code, "currency": ISO 4217 code of the customer\'s currency, "budget": {"amount": number, "currency": ISO code} or null (total for the whole order; "400k" = 400000), "marketplaces": [3-5 domains of the biggest online shops in that country]}. If no country is named, infer it from the city or currency.';
+export const EMPTY_SPEC: Spec = { items: [], city: '', country: '', gl: 'us', currency: 'USD', budget: null, marketplaces: [] };
+
+/** A parsed request, cleaned: up to 5 items, the market to search, the customer's currency and budget. */
+export type Shop = { items: Item[]; gl: string; cur: string; locals: string[]; intl: string[]; where: string; city: string; country: string; budget?: Money };
+
+export function shopFrom(raw: Spec): Shop {
+  const items: Item[] = (Array.isArray(raw.items) ? raw.items : []).filter((it: any) => it?.name || it?.query).slice(0, 5).map((it: any) => ({
+    name: String(it.name ?? it.query).slice(0, 80), query: String(it.query ?? it.name).slice(0, 100),
+    qty: Math.min(100, Math.max(1, Math.round(Number(it.qty) || 1))), condition: ['new', 'used', 'any'].includes(it.condition) ? it.condition : 'new',
+    mustHave: Array.isArray(it.mustHave) ? it.mustHave.map(String).slice(0, 4) : [],
+    imageUrl: /^https?:\/\//.test(String(it.imageUrl ?? '')) ? String(it.imageUrl) : undefined, identify: !!it.identify,
+  }));
+  if (!items.length) throw new Error('could not tell from the brief what to price');
+  const gl = /^[a-z]{2}$/i.test(String(raw.gl)) ? String(raw.gl).toLowerCase() : 'us';
+  const market = MARKETS[gl];
+  const cur = market?.cur ?? (/^[A-Z]{3}$/.test(String(raw.currency)) ? String(raw.currency) : 'USD');
+  const locals = market?.sites ?? (raw.marketplaces ?? []).map((d) => String(d).toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '')).filter((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d)).slice(0, 5);
+  const intl = INTL.filter((d) => !locals.includes(d) && HOME[d] !== gl);
+  const where = [raw.city, raw.country].filter(Boolean).join(', ');
+  const budget = raw.budget && Number(raw.budget.amount) > 0 ? { amount: Number(raw.budget.amount), currency: /^[A-Z]{3}$/.test(String(raw.budget.currency)) ? String(raw.budget.currency) : cur } : undefined;
+  return { items, gl, cur, locals, intl, where, city: raw.city || '', country: raw.country || '', budget };
+}
+
+export type Ranked = ReturnType<typeof rank>;
+export type Prices = {
+  shop: Shop; found: Offer[]; exact: Offer[]; results: Ranked[]; toCheck: Offer[]; pages: Map<string, Page>;
+  fx: Map<string, number>; fxNotes: string[]; date: string; basket?: number; budgetLocal?: number;
+  bugs: string[]; notes: string[]; hardFail: boolean; auditRan: boolean;
+  qa: { verdict: 'pass' | 'revise'; notes: string; model: string };
+  /** The report in parts, so another service can re-arrange them; `full` is Best Price Finder's report. */
+  md: { title: string; intro: string; basket: string; table: string; items: { heading: string; body: string }[]; warnings: string[]; method: string; full: string };
+  csv: string;
+};
+export const itemLabel = (it: Item) => `${it.name}${it.qty > 1 ? ` × ${it.qty}` : ''}`;
+
+/** Search, sort, price, open the pages, audit, rank and write up. Throws only when there is nothing to compare. */
+export async function findPrices(job: Job, shop: Shop): Promise<Prices> {
+  const { items, gl, cur, locals, intl, where, budget } = shop;
+  const abroadOf = (host: string) => FROM_CHINA.test(host) || Object.entries(HOME).some(([d, c]) => (host === d || host.endsWith(`.${d}`)) && c !== gl);
+  job.log('researcher', 'spec', `${items.map((it) => `${it.qty} × ${it.name} (${it.condition})`).join('; ')} → ${where || gl.toUpperCase()}, prices in ${cur}${budget ? `, budget ${fmtM(budget)}` : ''}`);
+
+  // 2. Search: Google Shopping in-country, the local marketplaces, imports, and the open web (local stores)
+  let found: Offer[] = [];
+  const tryCall = async <T>(label: string, f: () => Promise<T>): Promise<T | undefined> => {
+    try { return await f(); } catch (e: any) { job.log('scout', 'skip', `${label} failed (${String(e?.message ?? e).slice(0, 60)}); moving on`); return undefined; }
+  };
+  // Only parsing the brief is essential; the other model steps have a rules-based fallback
+  let auditRan = true;
+  const soft = async (agent: 'researcher' | 'reader' | 'auditor', label: string, then: string, f: () => Promise<string>) => {
+    try { return await f(); } catch (e: any) {
+      if (agent === 'auditor') auditRan = false;
+      job.log(agent, 'skip', `${label} failed (${String(e?.message ?? e).slice(0, 60)}); ${then}`);
+      return '';
+    }
+  };
+  for (const [i, it] of items.entries()) {
+    if (it.imageUrl) {
+      job.log('scout', 'lens', `Google Lens on the photo of "${it.name}"`);
+      const d = await tryCall('Lens', () => ortho<any>(job, 'serper/lens', { body: { url: it.imageUrl, gl } }, {
+        agent: 'scout', vendor: 'Serper Lens (Orthogonal)', reason: `identify item ${i + 1} from its photo`, expectUsd: 0.006, maxUsd: 0.01, dry: () => F.lens(it.query),
+      }));
+      const hits: any[] = (d?.organic ?? d?.visual_matches ?? d?.visualMatches ?? []).filter((h: any) => h?.title && h?.link);
+      if (it.identify && hits[0]) { it.query = String(hits[0].title).split(/\s[|\-–:]\s/)[0].split(/\s+/).slice(0, 8).join(' '); job.log('analyst', 'identify', `the photo looks like "${it.query}"`); }
+      found.push(...hits.slice(0, 10).map((h) => offerFrom(i, 'lens', h, cur)));
+    }
+    job.log('scout', 'search', `"${it.query}": Google Shopping (${gl.toUpperCase()}), ${locals.length} local marketplaces, imports, open web`);
+    const shopRes = await tryCall('Google Shopping', () => ortho<any>(job, 'serper/shopping', { body: { q: it.query, gl, num: 20 } }, {
+      agent: 'scout', vendor: 'Serper Shopping (Orthogonal)', reason: `Google Shopping ${gl.toUpperCase()}: "${it.query}"`, expectUsd: 0.004, maxUsd: 0.008, dry: () => F.shopping(it.query),
+    }));
+    const shopHits: any[] = shopRes?.shopping ?? [];
+    if (shopRes && !shopHits.length) job.log('scout', 'note', `Google Shopping has no listings for "${it.query}" in ${gl.toUpperCase()}; relying on the marketplaces`);
+    found.push(...shopHits.map((h) => offerFrom(i, 'shopping', h, cur)));
+    const searches: [string, 'local' | 'intl' | 'general', string][] = [
+      ...(locals.length ? [[`${it.query} price ${locals.map((d) => `site:${d}`).join(' OR ')}`, 'local', 'local marketplaces'] as [string, 'local', string]] : []),
+      ...(intl.length ? [[`${it.query} price ${intl.map((d) => `site:${d}`).join(' OR ')}`, 'intl', 'imports'] as [string, 'intl', string]] : []),
+      [`${it.query} price in ${shop.city || shop.country || gl.toUpperCase()}`, 'general', 'local stores on the open web'],
+    ];
+    for (const [q, kind, label] of searches) {
+      const d = await tryCall(`search (${label})`, () => google(job, q, gl, `Google: "${it.query}" on ${label}`, () => F.google(q, it.query, kind)));
+      found.push(...(d?.organic ?? []).map((h: any) => offerFrom(i, `google ${kind}`, h, cur)));
+    }
+  }
+  found = dedupe(found.filter((o) => o.title && o.host));
+  found.forEach((o, k) => { o.id = `o${k + 1}`; o.abroad = abroadOf(o.host); });
+  if (!found.length) throw new Error('no search came back with offers; nothing to compare');
+
+  // 3. Sort real offers from accessories, look-alikes, list pages and guides
+  job.log('researcher', 'sort', `${found.length} listings: which are the item itself, which are accessories, used, list pages or look-alikes`);
+  const block = items.map((it, i) => `ITEM ${i + 1}: ${it.name} (search "${it.query}"; wanted: ${it.condition}${it.mustHave.length ? `; must have ${it.mustHave.join(', ')}` : ''})\n` +
+    found.filter((o) => o.item === i).map((o) => `${o.id} | ${o.seller} | ${o.title} | ${fmtM(o.listed)} | ${isGoogle(o.link) ? 'google shopping' : `${o.host}${o.link.split(o.host)[1]?.slice(0, 50) ?? ''}`} | ${o.snippet.slice(0, 90)}`).join('\n')).join('\n\n');
+  const sorted = parseJson<{ c: Record<string, string> }>(
+    await soft('researcher', 'sorting', 'sorting by rules instead', () => llm(job, 'researcher', [
+      { role: 'system', content: 'You sort search results for a price comparison. For every id give a 2-letter code. First letter, what it is: E = an offer for exactly the item asked for (same brand and model; colour does not matter; storage/size only matters if the customer specified it), V = same product line but another model or spec than asked (e.g. 5G vs 4G, Pro vs base), A = accessory or spare part (case, charger, screen), B = bundle or several units for one price, L = a category/search page or a list of many ads rather than one offer, G = price guide, review or article (not a seller), F = fake, replica, clone, copy or dummy, O = a different product. Second letter, condition: N = new, U = used (incl. UK used, tokunbo, swap, pre-owned, open box), R = refurbished/renewed, ? = not stated. Reply JSON only: {"c": {"<id>": "<code>"}}.' },
+      { role: 'user', content: block },
+    ], `sort ${found.length} listings into offers and noise`, {
+      model: MODELS.fast, maxTokens: 400 + found.length * 12, json: true,
+      dry: () => JSON.stringify({ c: Object.fromEntries(found.map((o) => [o.id, `${Object.entries(CODE).find(([, v]) => v === guess(o, items[o.item]))![0]}${o.condition === 'used' ? 'U' : o.condition === 'refurbished' ? 'R' : o.condition === 'new' ? 'N' : '?'}`])) }),
+    })),
+    { c: {} },
+  );
+  for (const o of found) {
+    const c = String(sorted.c?.[o.id] ?? '').toUpperCase(), rule = guess(o, items[o.item]);
+    o.match = ['list', 'guide', 'fake'].includes(rule) ? rule : CODE[c[0]] ?? rule;
+    if (o.condition === 'unknown' || (o.condition === 'new' && CONDS[c[1]] && CONDS[c[1]] !== 'new')) o.condition = CONDS[c[1]] ?? o.condition;
+  }
+  const exact = found.filter((o) => o.match === 'exact');
+  job.log('analyst', 'sorted', `${exact.length} offers for the items themselves; set aside ${found.length - exact.length} (accessories, other models, list pages, guides, fakes)`);
+
+  // 4. One currency: live rates from Google for anything not priced in the customer's currency
+  const fx = new Map<string, number>([[cur, 1]]);
+  const fxNotes: string[] = [];
+  const foreign = [...new Set([...exact.flatMap((o) => [o.listed?.currency, typeof o.deliveryListed === 'object' ? o.deliveryListed.currency : undefined]), budget?.currency])]
+    .filter((c): c is string => !!c && c !== cur).slice(0, 3);
+  for (const c of foreign) {
+    const d = await tryCall(`rate ${c}→${cur}`, () => google(job, `1 ${c} to ${cur}`, gl, `exchange rate ${c} → ${cur}`, () => F.fx(c, cur)));
+    const box = `${d?.answerBox?.answer ?? d?.answerBox?.snippet ?? ''}`.replace(/,/g, '');
+    const alt = (d?.organic ?? []).map((h: any) => String(h.snippet ?? '').replace(/,/g, '').match(new RegExp(`1\\s*${c}\\s*=\\s*(\\d+(?:\\.\\d+)?)`, 'i'))?.[1]).find(Boolean);
+    const rate = Number(box.match(/\d+(?:\.\d+)?/)?.[0] ?? alt);
+    const shown = `1 ${c} = ${SYMBOL[cur] ?? `${cur} `}${rate.toLocaleString('en-US', rate < 10 ? { maximumSignificantDigits: 4 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (rate > 0) { fx.set(c, rate); fxNotes.push(shown); job.log('analyst', 'fx', `${shown} (Google)`); }
+    else job.log('analyst', 'skip', `no ${c}→${cur} rate found; ${c} offers are listed but not ranked`);
+  }
+  const reprice = () => found.forEach((o) => price(o, items[o.item], fx));
+  reprice();
+
+  // 5. Open the top offers' pages (plus the suspiciously cheap ones) and check what they really say
+  const per = Math.min(8, Math.floor(28 / items.length));
+  const toCheck = [...new Set(items.flatMap((it, i) => {
+    const r = rank(found, i, it);
+    const cheapest = found.filter((o) => o.item === i && o.match === 'exact' && condOk(o, it) && tooCheap(o, r.st)).sort((a, b) => a.unit! - b.unit!).slice(0, 2);
+    return [...r.ranked.slice(0, per), ...cheapest];
+  }))];
+  const needLink = toCheck.filter((o) => isGoogle(o.link)).slice(0, 6);
+  if (needLink.length) job.log('scout', 'resolve', `${needLink.length} Google Shopping results link to Google, not the store; finding the store's own page`);
+  for (const o of needLink) {
+    const site = [...locals, ...intl].find((d) => o.seller.toLowerCase().includes(d.split('.')[0]));
+    const q = site ? `${o.title} site:${site}` : `${o.title} ${o.seller}`;
+    const d = await tryCall(`link for ${o.seller}`, () => google(job, q, gl, `find ${o.seller}'s own page for the offer`, () => F.resolve(o.title, site)));
+    const hit = (d?.organic ?? []).find((h: any) => { const host = hostOf(h.link); return host && !isGoogle(h.link) && (site ? host.endsWith(site) : !GUIDE.test(host) && overlap(o.title, h.title) >= 0.5); });
+    if (hit && !found.some((x) => x !== o && x.link === canon(hit.link))) { o.link = canon(hit.link); o.host = hostOf(hit.link); o.tier = tierOf(o.seller, o.host); o.abroad = abroadOf(o.host); }
+  }
+  const urls = [...new Set(toCheck.filter((o) => !isGoogle(o.link)).map((o) => o.link))];
+  job.log('reader', 'open', `${urls.length} offer pages: is the price there, is it in stock, what does delivery cost`);
+  const pages = await openPages(job, urls);
+  const readable = toCheck.filter((o) => pages.has(o.link));
+  const facts = readable.length ? parseJson<{ p: Record<string, any> }>(
+    await soft('reader', 'reading the pages', 'checking listed prices against the page text only', () => llm(job, 'reader', [
+      { role: 'system', content: 'For each page excerpt, report what the page says about THIS offer (not other products on the page). Copy prices exactly as written, with the currency sign. Reply JSON only: {"p": {"<id>": {"price": main selling price now, or null, "inStock": true|false|null, "delivery": delivery/shipping fee as written (e.g. "₦1,500") or "free", or null, "seller": seller or store name as written, or null, "sellerScore": seller rating/score as written (e.g. "94% Seller Score", "4.6/5 (1,208 ratings)"), or null, "condition": "new"|"used"|"refurbished"|null, "risk": a warning sign such as payment by bank transfer only, WhatsApp-only orders or no refunds, in under 15 words, or null}}}' },
+      { role: 'user', content: readable.map((o) => `[${o.id}] ${o.title} (listed at ${fmtM(o.listed)} by ${o.seller})\n${excerpt(pages.get(o.link)!.text)}`).join('\n\n') },
+    ], `read ${readable.length} offer pages`, { model: MODELS.fast, maxTokens: 300 + readable.length * 90, json: true, dry: () => F.facts(readable.map((o) => ({ id: o.id, text: pages.get(o.link)!.text }))) })),
+    { p: {} },
+  ) : { p: {} };
+  for (const o of toCheck) applyPage(o, pages.get(o.link), facts.p?.[o.id], cur);
+  reprice();
+  const ok = toCheck.filter(confirmed).length, moved = toCheck.filter((o) => o.checked.includes('updated')).length, gone = toCheck.filter((o) => o.inStock === false).length;
+  job.log('reader', 'checked', `${ok} of ${toCheck.length} prices confirmed on the page (${moved} changed since the listing), ${gone} out of stock`);
+
+  // 6. Independent check of what we'd recommend, by a different model family
+  const review = [...new Set(items.flatMap((it, i) => { const r = rank(found, i, it); return [...r.ranked.slice(0, 4), r.best, r.runner].filter((o): o is Offer => !!o); }))];
+  job.log('auditor', 'audit', `${review.length} top offers checked against what the customer asked for, with ${MODELS.auditor}`);
+  const audit = parseJson<{ verdict: 'pass' | 'revise'; reject: { id: string; reason: string }[]; issues: string[] }>(
+    await soft('auditor', 'the independent check', 'delivering on the rules alone and saying so', () => llm(job, 'auditor', [
+      { role: 'system', content: 'You are an independent auditor for a price comparison. For each candidate offer decide whether it really is the product the customer asked for, in the condition they asked for, as a single-unit offer from a seller. Reject a candidate only for a concrete reason visible in its title or page text: another model or spec than asked, an accessory or part, used/refurbished/swap/tokunbo when the customer asked for new, a counterfeit/copy/clone, a bundle or wrong quantity, or not a seller\'s offer. Reply JSON only: {"verdict": "pass"|"revise", "reject": [{"id": string, "reason": under 15 words}], "issues": [short strings about anything else that looks wrong, not already covered by a rejection]}.' },
+      { role: 'user', content: items.map((it, i) => `ITEM ${i + 1}: ${it.qty} × ${it.name}, wanted ${it.condition}${it.mustHave.length ? `, must have ${it.mustHave.join(', ')}` : ''}\n` +
+        review.filter((o) => o.item === i).map((o) => `${o.id} | ${who(o)} | ${o.title} | ${fmtM(o.listed)} each | condition ${o.condition} | ${o.checked}\n   page: ${(o.excerpt ?? o.snippet).slice(0, 400)}`).join('\n')).join('\n\n') },
+    ], 'independent check of the recommended offers', { model: MODELS.auditor, maxTokens: 700, json: true, dry: () => F.audit(review.map((o) => ({ id: o.id, title: o.title, excerpt: o.excerpt ?? '', wanted: items[o.item].condition }))) })),
+    { verdict: 'pass', reject: [], issues: [] },
+  );
+  for (const x of Array.isArray(audit.reject) ? audit.reject : []) {
+    const o = review.find((r) => r.id === x?.id);
+    if (o) { o.rejected = String(x.reason ?? 'not the item asked for').slice(0, 100); job.log('auditor', 'reject', `${who(o)} "${short(o.title, 50)}": ${o.rejected}`); }
+  }
+
+  // 7. Final ranking + deterministic QA
+  job.log('analyst', 'rank', 'delivered totals, price spread, scam and trust flags');
+  const results = items.map((it, i) => rank(found, i, it));
+  const bugs: string[] = [], notes: string[] = [];
+  results.forEach((r, i) => {
+    const it = items[i], b = r.best;
+    if (!b) { notes.push(`no offer we could price and trust for ${it.name}`); return; }
+    if (b.match !== 'exact' || !condOk(b, it) || b.inStock === false || b.rejected || tooCheap(b, r.st)) bugs.push(`best pick for ${it.name} breaks the ranking rules`);
+    if (Math.abs(b.total! - (b.unit! * it.qty + (b.delivery ?? 0))) > 0.01) bugs.push(`${it.name}: delivered total does not add up`);
+    if (r.ranked.some((o) => safe(o) && r.key(o) < r.key(b))) bugs.push(`${it.name}: a cheaper safe offer was passed over`);
+    if (!confirmed(b)) notes.push(`${it.name}: the best pick's price could not be confirmed on its page`);
+    if (r.st.n < 3) notes.push(`${it.name}: only ${r.st.n} comparable offers, so the scam check has little to compare against`);
+  });
+  if (new Set(found.map((o) => o.link)).size !== found.length) bugs.push('duplicate offers in the list');
+  notes.push(...(Array.isArray(audit.issues) ? audit.issues.map((x) => `auditor: ${String(x).slice(0, 160)}`) : []));
+  if (!auditRan) notes.push('the independent auditor could not run, so only the rules checked the picks');
+  const hardFail = bugs.length > 0 || results.every((r) => !r.best);
+  job.log('auditor', 'check', hardFail ? [...bugs, ...notes].join('; ') : `pass${notes.length ? ` (note: ${notes.join('; ')})` : ''}`);
+  const qa = { verdict: hardFail ? 'revise' as const : 'pass' as const, notes: [...bugs, ...notes, ...found.filter((o) => o.rejected).map((o) => `removed ${who(o)}: ${o.rejected}`)].join(' | '), model: auditRan ? `${MODELS.auditor} + deterministic rules` : 'deterministic rules' };
+
+  // 8. Report + CSV
+  job.log('writer', 'report', 'best pick and runner-up per item, ranked tables, warnings, method');
+  const date = new Date().toISOString().slice(0, 10);
+  const label = itemLabel;
+  const basket = results.every((r) => r.best) ? results.reduce((s, r) => s + r.best!.total!, 0) : undefined;
+  const budgetLocal = budget && fx.has(budget.currency) ? budget.amount * fx.get(budget.currency)! : undefined;
+  const title = `# Best prices: ${items.map(label).join(', ')}`;
+  const intro = `Delivered to ${where || gl.toUpperCase()} · all prices in ${cur} · checked ${date}`;
+  let basketLine = '';
+  if (basket !== undefined) {
+    basketLine = `**Cheapest trustworthy basket: ${fmt(basket, cur)}** including the delivery fees we could find.`;
+    const yours = budget && budget.currency !== cur ? `${fmtM(budget)} (${fmt(budgetLocal, cur)})` : fmtM(budget);
+    if (budgetLocal !== undefined) basketLine += basket <= budgetLocal ? ` Within your ${yours} budget, with ${fmt(budgetLocal - basket, cur)} to spare.` : ` That is ${fmt(basket - budgetLocal, cur)} over your ${yours} budget.`;
+  }
+  const table = `| Item | Best pick | Delivered total | Runner-up | Delivered total |\n|---|---|---|---|---|\n` + results.map((r, i) =>
+    `| ${cell(label(items[i]))} | ${r.best ? cell(who(r.best)) : 'none found'} | ${fmt(r.best?.total, cur)} | ${r.runner ? cell(who(r.runner)) : '—'} | ${fmt(r.runner?.total, cur)} |`).join('\n') + '\n';
+
+  const sections = results.map((r, i) => {
+    const it = items[i], b = r.best;
+    let body = '';
+    if (b) {
+      body += `**Best pick: ${who(b)}, ${fmt(b.total, cur)} delivered** (${fmt(b.unit, cur)} each${b.delivery !== undefined ? ` + ${b.delivery ? fmt(b.delivery, cur) : 'free'} delivery` : ', delivery not stated'}). ${linkMd('Open the offer', b.link)}\n\nWhy: ${whyBest(b, it, r, cur)}\n\n`;
+      if (r.runner) body += `**Runner-up: ${who(r.runner)}, ${fmt(r.runner.total, cur)} delivered** (${fmt(r.runner.unit, cur)} each${r.runner.delivery !== undefined ? ` + ${r.runner.delivery ? fmt(r.runner.delivery, cur) : 'free'} delivery` : ', delivery not stated'}). ${linkMd('Open the offer', r.runner.link)}\n\nWhy: ${whyRunner(r.runner, b, cur)}\n\n`;
+    } else body += `We found no ${it.condition === 'any' ? '' : `${it.condition} `}offer we could price and trust for this item. The offers we did see are in \`offers.csv\`.\n\n`;
+    const sp = r.spread, dropped = r.st.n - sp.n;
+    if (sp.n) body += `Price spread across ${sp.n} ${it.condition === 'new' ? 'new (or unstated condition) ' : ''}offer${sp.n === 1 ? '' : 's'}, each: cheapest ${fmt(sp.min, cur)} · median ${fmt(sp.med, cur)} · most expensive ${fmt(sp.max, cur)}${dropped ? ` (not counting ${dropped} flagged as too good to be true)` : ''}.\n\n`;
+    const others = found.filter((o) => o.item === i && o.match === 'exact' && !r.ranked.includes(o)).sort((a, b) => (a.unit ?? Infinity) - (b.unit ?? Infinity));
+    const rows = [...r.ranked, ...others].slice(0, 12);
+    body += `| # | Seller | Listing | Each | Delivery | Total (× ${it.qty}) | Condition | Seller type | Checked on page | Flags |\n|---|---|---|---|---|---|---|---|---|---|\n` +
+      rows.map((o) => `| ${r.ranked.includes(o) ? r.ranked.indexOf(o) + 1 : '—'} | ${cell(who(o))} | ${linkMd(cell(short(o.title)), o.link)} | ${fmt(o.unit, cur)}${o.listed && o.listed.currency !== cur ? ` (${fmtM(o.listed)})` : ''} | ${o.delivery === undefined ? '?' : o.delivery ? fmt(o.delivery, cur) : 'free'} | ${fmt(o.total, cur)} | ${condLabel(o.condition)} | ${cell(trust(o))} | ${cell(o.checked)} | ${cell(flagsOf(o, it, r.st, cur).join('; '))} |`).join('\n') + '\n';
+    const more = r.ranked.length + others.length - rows.length;
+    if (more > 0) body += `\n${more} more offers in \`offers.csv\`.\n`;
+    return { heading: `${i + 1}. ${label(it)} (${it.condition})`, body };
+  });
+
+  const warn: string[] = [];
+  const cls = new Set<string>(), imp = new Set<string>();
+  let impNoShip = false;
+  results.forEach((r, i) => {
+    const it = items[i], mine = found.filter((o) => o.item === i && o.match === 'exact'), tag = items.length > 1 ? `${it.name}: ` : '';
+    for (const o of mine.filter((o) => tooCheap(o, r.st) || o.risk)) {
+      warn.push(`**Scam risk, ${it.name}: ${who(o)} at ${fmt(o.unit, cur)} each.** ${[tooCheap(o, r.st) && `That is ${Math.round((1 - o.unit! / r.st.med!) * 100)}% below the median`, o.tier === 'unknown' && 'the seller is unknown', o.risk && `warning sign on its page: ${o.risk.replace(/\.$/, '')}`].filter(Boolean).join('; ')}. Don't pay before you have the item in hand.`);
+    }
+    for (const o of mine.filter((o) => o.rejected)) warn.push(`${tag}the auditor removed ${who(o)} (${fmt(o.unit, cur)}, "${short(o.title, 50)}"): ${o.rejected}.`);
+    for (const o of mine.filter((o) => o.checked.includes('updated'))) warn.push(`${tag}${who(o)}: ${o.notes.find((n) => n.startsWith('listing said')) ?? 'price changed'}. We used the page price.`);
+    const oos = mine.filter((o) => o.inStock === false);
+    if (oos.length) warn.push(`${tag}out of stock, so not ranked: ${oos.map((o) => `${who(o)} (${fmt(o.unit, cur)})`).join(', ')}.`);
+    const notNew = mine.filter((o) => !condOk(o, it));
+    const low = [...notNew].sort((a, b) => (a.unit ?? Infinity) - (b.unit ?? Infinity))[0];
+    if (low) warn.push(`${notNew.length} used or refurbished offer${notNew.length > 1 ? 's' : ''} for ${it.name} left out of the ranking because you asked for new (cheapest: ${who(low)} at ${fmt(low.unit, cur)}).`);
+    for (const o of mine) {
+      if (o.tier === 'classifieds' && condOk(o, it)) cls.add(nameOf(o.host));
+      if (o.abroad) { imp.add(nameOf(o.host)); impNoShip ||= o.delivery === undefined; }
+    }
+  });
+  if (cls.size) warn.push(`${[...cls].join(', ')} listings are classified ads: meet in a public place, inspect the item and pay only on collection.`);
+  if (imp.size) warn.push(`${[...imp].join(' and ')} ship${imp.size === 1 ? 's' : ''} from abroad: the prices exclude import duty${impNoShip ? ' (and shipping, where the page does not state it)' : ''}, and delivery can take weeks.`);
+  const noDelivery = results.map((r) => r.best).filter((b): b is Offer => !!b && b.delivery === undefined);
+  if (noDelivery.length) warn.push(`Delivery fee not stated for ${noDelivery.map(who).join(', ')}: ask for the fee to ${shop.city || 'your address'} before paying.`);
+  if (notes.length) warn.push(...notes.filter((n) => !warn.some((w) => w.includes(n))).map((n) => `${n[0].toUpperCase()}${n.slice(1)}.`));
+  const warnings = warn.length ? warn.map((w) => `- ${w.replace(/^(\*\*)?([a-z])/, (_, b, c) => `${b ?? ''}${c.toUpperCase()}`)}`) : ['- None beyond the usual: prices move, so confirm at checkout.'];
+
+  const via = (v: string) => found.filter((o) => o.via.startsWith(v)).length;
+  const copies = toCheck.filter((o) => o.checked.includes("Exa's copy")).length;
+  const method =
+    `- **Searched** Google Shopping for ${shop.country || gl.toUpperCase()} (${via('shopping')} listings), Google on ${locals.join(', ') || 'local shops'} (${via('google local')})${intl.length ? `, on ${intl.join(', ')} for imports (${via('google intl')})` : ''} and the open web for local stores (${via('google general')})${via('lens') ? `, and Google Lens on your photo (${via('lens')})` : ''}. After removing duplicates: ${found.length} listings, of which ${exact.length} were offers for the items themselves; the rest were accessories, other models, list pages, price guides or fakes.\n` +
+    `- **One currency.** ${fxNotes.length ? `Converted at ${fxNotes.join(', ')} (Google, ${date}).` : `Every ranked price was already in ${cur}.`} Delivered total = price × quantity + one delivery fee per order.${results.some((r) => r.ranked.some((o) => o.delivery === undefined && !o.abroad)) ? ` Offers that don't state delivery are ranked as if they charged the typical fee of the others (${[...new Set(results.map((r) => fmt(r.typical, cur)))].join(' / ')}), so hiding the fee can't win.` : ''}\n` +
+    `- **Opened the pages** of the ${toCheck.length} best-placed and suspiciously cheap offers${copies ? ` (${copies} through Exa's copy because ${copies === 1 ? 'the page needs' : 'those pages need'} a browser)` : ''}. "Checked on page" means the same amount appears in the page text: ${ok} confirmed, ${moved} changed price since the listing, ${gone} out of stock. Delivery fees are what the page shows for its default location and can differ for your address.\n` +
+    `- **Scam and trust rules.** Too good to be true = under 50% of the median for the same item and condition (needs at least 3 prices). Unknown seller = not a marketplace or retailer we recognise and fewer than 20 ratings. Classified ads (e.g. Jiji) are never the recommended pick when a checked shop offer exists. Seller scores are copied from the page only when the number is on it.\n` +
+    (auditRan ? `- **Independent check.** ${MODELS.auditor} (a different model family from the one that sorted the listings) reviewed the top offers against your request${found.some((o) => o.rejected) ? ` and removed ${found.filter((o) => o.rejected).length}` : ' and found nothing to remove'}.\n`
+      : `- **Independent check.** The auditor model was unavailable for this job, so the picks rest on the rules above.\n`) +
+    `- Prices and stock change quickly: confirm at checkout. Every offer we saw is in \`offers.csv\`.\n`;
+
+  const full = `${title}\n\n${intro}\n\n${basketLine ? `${basketLine}\n\n` : ''}${table}` +
+    sections.map((s) => `\n## ${s.heading}\n\n${s.body}`).join('') +
+    `\n## Warnings\n\n${warnings.join('\n')}\n` +
+    `\n## How we checked\n\n${method}`;
+
+  const header = ['item', 'seller', 'title', 'price', 'currency', `unit_${cur}`, `delivery_${cur}`, `total_${cur}`, 'condition', 'rating', 'link', 'checked_on_page', 'flags', 'match', 'seller_type'];
+  const order = (o: Offer) => { const r = results[o.item], k = r.ranked.indexOf(o); return o.item * 1e6 + (k >= 0 ? k : 1000 + (o.match === 'exact' ? 0 : 1000)); };
+  const csv = [header.join(','), ...[...found].sort((a, b) => order(a) - order(b) || (a.unit ?? Infinity) - (b.unit ?? Infinity)).map((o) => {
+    const it = items[o.item], round = (n?: number) => (n === undefined ? '' : WHOLE.has(cur) ? Math.round(n) : n.toFixed(2));
+    return [label(it), who(o), o.title, o.listed?.amount, o.listed?.currency, round(o.unit), o.delivery === undefined ? '' : round(o.delivery), round(o.total), condLabel(o.condition),
+      [o.rating ? `${o.rating}/5${o.ratingCount ? ` (${o.ratingCount} reviews)` : ''}` : '', score(o)].filter(Boolean).join('; '),
+      o.link, o.checked, o.match === 'exact' ? flagsOf(o, it, results[o.item].st, cur).join('; ') : '', o.match, trust(o)].map(csvCell).join(',');
+  })].join('\n') + '\n';
+
+  return {
+    shop, found, exact, results, toCheck, pages, fx, fxNotes, date, basket, budgetLocal, bugs, notes, hardFail, auditRan, qa,
+    md: { title, intro, basket: basketLine, table, items: sections, warnings, method, full }, csv,
+  };
+}
+
+// ---------- the service (retired from the menu; old orders can still be revised)
 
 export const bestPrice = {
   id: 'best-price',
@@ -363,263 +654,18 @@ export const bestPrice = {
       job.log('researcher', 'parse', 'items, quantity, condition, delivery city, budget');
       const raw = parseJson<Spec>(
         await llm(job, 'researcher', [
-          { role: 'system', content: 'You parse a shopping request for a price-comparison team. Reply JSON only: {"items": [{"name": short product name, "query": Google Shopping query: brand + model + any spec the customer insisted on (no words like cheap/best/buy), "qty": number (default 1), "condition": "new"|"used"|"any" (default "new"; "tokunbo"/"UK used" = used), "mustHave": [specs the customer insisted on, e.g. "128GB", "5G"], "imageUrl": product image URL if given else null, "identify": true only if the customer gave a photo but no clear product name}] (1-5 items), "city": delivery area and city, "country": country, "gl": 2-letter country code, "currency": ISO 4217 code of the customer\'s currency, "budget": {"amount": number, "currency": ISO code} or null (total for the whole order; "400k" = 400000), "marketplaces": [3-5 domains of the biggest online shops in that country]}. If no country is named, infer it from the city or currency.' },
+          { role: 'system', content: SHOP_PARSE },
           { role: 'user', content: brief },
         ], 'parse the shopping request', { model: MODELS.fast, maxTokens: 600, json: true, dry: F.parse }),
-        { items: [], city: '', country: '', gl: 'us', currency: 'USD', budget: null, marketplaces: [] },
+        { ...EMPTY_SPEC },
       );
-      const items: Item[] = (Array.isArray(raw.items) ? raw.items : []).filter((it: any) => it?.name || it?.query).slice(0, 5).map((it: any) => ({
-        name: String(it.name ?? it.query).slice(0, 80), query: String(it.query ?? it.name).slice(0, 100),
-        qty: Math.min(100, Math.max(1, Math.round(Number(it.qty) || 1))), condition: ['new', 'used', 'any'].includes(it.condition) ? it.condition : 'new',
-        mustHave: Array.isArray(it.mustHave) ? it.mustHave.map(String).slice(0, 4) : [],
-        imageUrl: /^https?:\/\//.test(String(it.imageUrl ?? '')) ? String(it.imageUrl) : undefined, identify: !!it.identify,
-      }));
-      if (!items.length) throw new Error('could not tell from the brief what to price');
-      const gl = /^[a-z]{2}$/i.test(String(raw.gl)) ? String(raw.gl).toLowerCase() : 'us';
-      const market = MARKETS[gl];
-      const cur = market?.cur ?? (/^[A-Z]{3}$/.test(String(raw.currency)) ? String(raw.currency) : 'USD');
-      const locals = market?.sites ?? (raw.marketplaces ?? []).map((d) => String(d).toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '')).filter((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d)).slice(0, 5);
-      const intl = INTL.filter((d) => !locals.includes(d) && HOME[d] !== gl);
-      const where = [raw.city, raw.country].filter(Boolean).join(', ');
-      const budget = raw.budget && Number(raw.budget.amount) > 0 ? { amount: Number(raw.budget.amount), currency: /^[A-Z]{3}$/.test(String(raw.budget.currency)) ? String(raw.budget.currency) : cur } : undefined;
-      const abroadOf = (host: string) => FROM_CHINA.test(host) || Object.entries(HOME).some(([d, c]) => (host === d || host.endsWith(`.${d}`)) && c !== gl);
-      job.log('researcher', 'spec', `${items.map((it) => `${it.qty} × ${it.name} (${it.condition})`).join('; ')} → ${where || gl.toUpperCase()}, prices in ${cur}${budget ? `, budget ${fmtM(budget)}` : ''}`);
-
-      // 2. Search: Google Shopping in-country, the local marketplaces, imports, and the open web (local stores)
-      let found: Offer[] = [];
-      const tryCall = async <T>(label: string, f: () => Promise<T>): Promise<T | undefined> => {
-        try { return await f(); } catch (e: any) { job.log('scout', 'skip', `${label} failed (${String(e?.message ?? e).slice(0, 60)}); moving on`); return undefined; }
-      };
-      // Only parsing the brief is essential; the other model steps have a rules-based fallback
-      let auditRan = true;
-      const soft = async (agent: 'researcher' | 'reader' | 'auditor', label: string, then: string, f: () => Promise<string>) => {
-        try { return await f(); } catch (e: any) {
-          if (agent === 'auditor') auditRan = false;
-          job.log(agent, 'skip', `${label} failed (${String(e?.message ?? e).slice(0, 60)}); ${then}`);
-          return '';
-        }
-      };
-      for (const [i, it] of items.entries()) {
-        if (it.imageUrl) {
-          job.log('scout', 'lens', `Google Lens on the photo of "${it.name}"`);
-          const d = await tryCall('Lens', () => ortho<any>(job, 'serper/lens', { body: { url: it.imageUrl, gl } }, {
-            agent: 'scout', vendor: 'Serper Lens (Orthogonal)', reason: `identify item ${i + 1} from its photo`, expectUsd: 0.006, maxUsd: 0.01, dry: () => F.lens(it.query),
-          }));
-          const hits: any[] = (d?.organic ?? d?.visual_matches ?? d?.visualMatches ?? []).filter((h: any) => h?.title && h?.link);
-          if (it.identify && hits[0]) { it.query = String(hits[0].title).split(/\s[|\-–:]\s/)[0].split(/\s+/).slice(0, 8).join(' '); job.log('analyst', 'identify', `the photo looks like "${it.query}"`); }
-          found.push(...hits.slice(0, 10).map((h) => offerFrom(i, 'lens', h, cur)));
-        }
-        job.log('scout', 'search', `"${it.query}": Google Shopping (${gl.toUpperCase()}), ${locals.length} local marketplaces, imports, open web`);
-        const shop = await tryCall('Google Shopping', () => ortho<any>(job, 'serper/shopping', { body: { q: it.query, gl, num: 20 } }, {
-          agent: 'scout', vendor: 'Serper Shopping (Orthogonal)', reason: `Google Shopping ${gl.toUpperCase()}: "${it.query}"`, expectUsd: 0.004, maxUsd: 0.008, dry: () => F.shopping(it.query),
-        }));
-        const shopHits: any[] = shop?.shopping ?? [];
-        if (shop && !shopHits.length) job.log('scout', 'note', `Google Shopping has no listings for "${it.query}" in ${gl.toUpperCase()}; relying on the marketplaces`);
-        found.push(...shopHits.map((h) => offerFrom(i, 'shopping', h, cur)));
-        const searches: [string, 'local' | 'intl' | 'general', string][] = [
-          ...(locals.length ? [[`${it.query} price ${locals.map((d) => `site:${d}`).join(' OR ')}`, 'local', 'local marketplaces'] as [string, 'local', string]] : []),
-          ...(intl.length ? [[`${it.query} price ${intl.map((d) => `site:${d}`).join(' OR ')}`, 'intl', 'imports'] as [string, 'intl', string]] : []),
-          [`${it.query} price in ${raw.city || raw.country || gl.toUpperCase()}`, 'general', 'local stores on the open web'],
-        ];
-        for (const [q, kind, label] of searches) {
-          const d = await tryCall(`search (${label})`, () => google(job, q, gl, `Google: "${it.query}" on ${label}`, () => F.google(q, it.query, kind)));
-          found.push(...(d?.organic ?? []).map((h: any) => offerFrom(i, `google ${kind}`, h, cur)));
-        }
-      }
-      found = dedupe(found.filter((o) => o.title && o.host));
-      found.forEach((o, k) => { o.id = `o${k + 1}`; o.abroad = abroadOf(o.host); });
-      if (!found.length) throw new Error('no search came back with offers; nothing to compare');
-
-      // 3. Sort real offers from accessories, look-alikes, list pages and guides
-      job.log('researcher', 'sort', `${found.length} listings: which are the item itself, which are accessories, used, list pages or look-alikes`);
-      const block = items.map((it, i) => `ITEM ${i + 1}: ${it.name} (search "${it.query}"; wanted: ${it.condition}${it.mustHave.length ? `; must have ${it.mustHave.join(', ')}` : ''})\n` +
-        found.filter((o) => o.item === i).map((o) => `${o.id} | ${o.seller} | ${o.title} | ${fmtM(o.listed)} | ${isGoogle(o.link) ? 'google shopping' : `${o.host}${o.link.split(o.host)[1]?.slice(0, 50) ?? ''}`} | ${o.snippet.slice(0, 90)}`).join('\n')).join('\n\n');
-      const sorted = parseJson<{ c: Record<string, string> }>(
-        await soft('researcher', 'sorting', 'sorting by rules instead', () => llm(job, 'researcher', [
-          { role: 'system', content: 'You sort search results for a price comparison. For every id give a 2-letter code. First letter, what it is: E = an offer for exactly the item asked for (same brand and model; colour does not matter; storage/size only matters if the customer specified it), V = same product line but another model or spec than asked (e.g. 5G vs 4G, Pro vs base), A = accessory or spare part (case, charger, screen), B = bundle or several units for one price, L = a category/search page or a list of many ads rather than one offer, G = price guide, review or article (not a seller), F = fake, replica, clone, copy or dummy, O = a different product. Second letter, condition: N = new, U = used (incl. UK used, tokunbo, swap, pre-owned, open box), R = refurbished/renewed, ? = not stated. Reply JSON only: {"c": {"<id>": "<code>"}}.' },
-          { role: 'user', content: block },
-        ], `sort ${found.length} listings into offers and noise`, {
-          model: MODELS.fast, maxTokens: 400 + found.length * 12, json: true,
-          dry: () => JSON.stringify({ c: Object.fromEntries(found.map((o) => [o.id, `${Object.entries(CODE).find(([, v]) => v === guess(o, items[o.item]))![0]}${o.condition === 'used' ? 'U' : o.condition === 'refurbished' ? 'R' : o.condition === 'new' ? 'N' : '?'}`])) }),
-        })),
-        { c: {} },
-      );
-      for (const o of found) {
-        const c = String(sorted.c?.[o.id] ?? '').toUpperCase(), rule = guess(o, items[o.item]);
-        o.match = ['list', 'guide', 'fake'].includes(rule) ? rule : CODE[c[0]] ?? rule;
-        if (o.condition === 'unknown' || (o.condition === 'new' && CONDS[c[1]] && CONDS[c[1]] !== 'new')) o.condition = CONDS[c[1]] ?? o.condition;
-      }
-      const exact = found.filter((o) => o.match === 'exact');
-      job.log('analyst', 'sorted', `${exact.length} offers for the items themselves; set aside ${found.length - exact.length} (accessories, other models, list pages, guides, fakes)`);
-
-      // 4. One currency: live rates from Google for anything not priced in the customer's currency
-      const fx = new Map<string, number>([[cur, 1]]);
-      const fxNotes: string[] = [];
-      const foreign = [...new Set([...exact.flatMap((o) => [o.listed?.currency, typeof o.deliveryListed === 'object' ? o.deliveryListed.currency : undefined]), budget?.currency])]
-        .filter((c): c is string => !!c && c !== cur).slice(0, 3);
-      for (const c of foreign) {
-        const d = await tryCall(`rate ${c}→${cur}`, () => google(job, `1 ${c} to ${cur}`, gl, `exchange rate ${c} → ${cur}`, () => F.fx(c, cur)));
-        const box = `${d?.answerBox?.answer ?? d?.answerBox?.snippet ?? ''}`.replace(/,/g, '');
-        const alt = (d?.organic ?? []).map((h: any) => String(h.snippet ?? '').replace(/,/g, '').match(new RegExp(`1\\s*${c}\\s*=\\s*(\\d+(?:\\.\\d+)?)`, 'i'))?.[1]).find(Boolean);
-        const rate = Number(box.match(/\d+(?:\.\d+)?/)?.[0] ?? alt);
-        const shown = `1 ${c} = ${SYMBOL[cur] ?? `${cur} `}${rate.toLocaleString('en-US', rate < 10 ? { maximumSignificantDigits: 4 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        if (rate > 0) { fx.set(c, rate); fxNotes.push(shown); job.log('analyst', 'fx', `${shown} (Google)`); }
-        else job.log('analyst', 'skip', `no ${c}→${cur} rate found; ${c} offers are listed but not ranked`);
-      }
-      const reprice = () => found.forEach((o) => price(o, items[o.item], fx));
-      reprice();
-
-      // 5. Open the top offers' pages (plus the suspiciously cheap ones) and check what they really say
-      const per = Math.min(8, Math.floor(28 / items.length));
-      const toCheck = [...new Set(items.flatMap((it, i) => {
-        const r = rank(found, i, it);
-        const cheapest = found.filter((o) => o.item === i && o.match === 'exact' && condOk(o, it) && tooCheap(o, r.st)).sort((a, b) => a.unit! - b.unit!).slice(0, 2);
-        return [...r.ranked.slice(0, per), ...cheapest];
-      }))];
-      const needLink = toCheck.filter((o) => isGoogle(o.link)).slice(0, 6);
-      if (needLink.length) job.log('scout', 'resolve', `${needLink.length} Google Shopping results link to Google, not the store; finding the store's own page`);
-      for (const o of needLink) {
-        const site = [...locals, ...intl].find((d) => o.seller.toLowerCase().includes(d.split('.')[0]));
-        const q = site ? `${o.title} site:${site}` : `${o.title} ${o.seller}`;
-        const d = await tryCall(`link for ${o.seller}`, () => google(job, q, gl, `find ${o.seller}'s own page for the offer`, () => F.resolve(o.title, site)));
-        const hit = (d?.organic ?? []).find((h: any) => { const host = hostOf(h.link); return host && !isGoogle(h.link) && (site ? host.endsWith(site) : !GUIDE.test(host) && overlap(o.title, h.title) >= 0.5); });
-        if (hit && !found.some((x) => x !== o && x.link === canon(hit.link))) { o.link = canon(hit.link); o.host = hostOf(hit.link); o.tier = tierOf(o.seller, o.host); o.abroad = abroadOf(o.host); }
-      }
-      const urls = [...new Set(toCheck.filter((o) => !isGoogle(o.link)).map((o) => o.link))];
-      job.log('reader', 'open', `${urls.length} offer pages: is the price there, is it in stock, what does delivery cost`);
-      const pages = await openPages(job, urls);
-      const readable = toCheck.filter((o) => pages.has(o.link));
-      const facts = readable.length ? parseJson<{ p: Record<string, any> }>(
-        await soft('reader', 'reading the pages', 'checking listed prices against the page text only', () => llm(job, 'reader', [
-          { role: 'system', content: 'For each page excerpt, report what the page says about THIS offer (not other products on the page). Copy prices exactly as written, with the currency sign. Reply JSON only: {"p": {"<id>": {"price": main selling price now, or null, "inStock": true|false|null, "delivery": delivery/shipping fee as written (e.g. "₦1,500") or "free", or null, "seller": seller or store name as written, or null, "sellerScore": seller rating/score as written (e.g. "94% Seller Score", "4.6/5 (1,208 ratings)"), or null, "condition": "new"|"used"|"refurbished"|null, "risk": a warning sign such as payment by bank transfer only, WhatsApp-only orders or no refunds, in under 15 words, or null}}}' },
-          { role: 'user', content: readable.map((o) => `[${o.id}] ${o.title} (listed at ${fmtM(o.listed)} by ${o.seller})\n${excerpt(pages.get(o.link)!.text)}`).join('\n\n') },
-        ], `read ${readable.length} offer pages`, { model: MODELS.fast, maxTokens: 300 + readable.length * 90, json: true, dry: () => F.facts(readable.map((o) => ({ id: o.id, text: pages.get(o.link)!.text }))) })),
-        { p: {} },
-      ) : { p: {} };
-      for (const o of toCheck) applyPage(o, pages.get(o.link), facts.p?.[o.id], cur);
-      reprice();
-      const ok = toCheck.filter(confirmed).length, moved = toCheck.filter((o) => o.checked.includes('updated')).length, gone = toCheck.filter((o) => o.inStock === false).length;
-      job.log('reader', 'checked', `${ok} of ${toCheck.length} prices confirmed on the page (${moved} changed since the listing), ${gone} out of stock`);
-
-      // 6. Independent check of what we'd recommend, by a different model family
-      const review = [...new Set(items.flatMap((it, i) => { const r = rank(found, i, it); return [...r.ranked.slice(0, 4), r.best, r.runner].filter((o): o is Offer => !!o); }))];
-      job.log('auditor', 'audit', `${review.length} top offers checked against what the customer asked for, with ${MODELS.auditor}`);
-      const audit = parseJson<{ verdict: 'pass' | 'revise'; reject: { id: string; reason: string }[]; issues: string[] }>(
-        await soft('auditor', 'the independent check', 'delivering on the rules alone and saying so', () => llm(job, 'auditor', [
-          { role: 'system', content: 'You are an independent auditor for a price comparison. For each candidate offer decide whether it really is the product the customer asked for, in the condition they asked for, as a single-unit offer from a seller. Reject a candidate only for a concrete reason visible in its title or page text: another model or spec than asked, an accessory or part, used/refurbished/swap/tokunbo when the customer asked for new, a counterfeit/copy/clone, a bundle or wrong quantity, or not a seller\'s offer. Reply JSON only: {"verdict": "pass"|"revise", "reject": [{"id": string, "reason": under 15 words}], "issues": [short strings about anything else that looks wrong, not already covered by a rejection]}.' },
-          { role: 'user', content: items.map((it, i) => `ITEM ${i + 1}: ${it.qty} × ${it.name}, wanted ${it.condition}${it.mustHave.length ? `, must have ${it.mustHave.join(', ')}` : ''}\n` +
-            review.filter((o) => o.item === i).map((o) => `${o.id} | ${who(o)} | ${o.title} | ${fmtM(o.listed)} each | condition ${o.condition} | ${o.checked}\n   page: ${(o.excerpt ?? o.snippet).slice(0, 400)}`).join('\n')).join('\n\n') },
-        ], 'independent check of the recommended offers', { model: MODELS.auditor, maxTokens: 700, json: true, dry: () => F.audit(review.map((o) => ({ id: o.id, title: o.title, excerpt: o.excerpt ?? '', wanted: items[o.item].condition }))) })),
-        { verdict: 'pass', reject: [], issues: [] },
-      );
-      for (const x of Array.isArray(audit.reject) ? audit.reject : []) {
-        const o = review.find((r) => r.id === x?.id);
-        if (o) { o.rejected = String(x.reason ?? 'not the item asked for').slice(0, 100); job.log('auditor', 'reject', `${who(o)} "${short(o.title, 50)}": ${o.rejected}`); }
-      }
-
-      // 7. Final ranking + deterministic QA
-      job.log('analyst', 'rank', 'delivered totals, price spread, scam and trust flags');
-      const results = items.map((it, i) => rank(found, i, it));
-      const bugs: string[] = [], notes: string[] = [];
-      results.forEach((r, i) => {
-        const it = items[i], b = r.best;
-        if (!b) { notes.push(`no offer we could price and trust for ${it.name}`); return; }
-        if (b.match !== 'exact' || !condOk(b, it) || b.inStock === false || b.rejected || tooCheap(b, r.st)) bugs.push(`best pick for ${it.name} breaks the ranking rules`);
-        if (Math.abs(b.total! - (b.unit! * it.qty + (b.delivery ?? 0))) > 0.01) bugs.push(`${it.name}: delivered total does not add up`);
-        if (r.ranked.some((o) => safe(o) && r.key(o) < r.key(b))) bugs.push(`${it.name}: a cheaper safe offer was passed over`);
-        if (!confirmed(b)) notes.push(`${it.name}: the best pick's price could not be confirmed on its page`);
-        if (r.st.n < 3) notes.push(`${it.name}: only ${r.st.n} comparable offers, so the scam check has little to compare against`);
-      });
-      if (new Set(found.map((o) => o.link)).size !== found.length) bugs.push('duplicate offers in the list');
-      notes.push(...(Array.isArray(audit.issues) ? audit.issues.map((x) => `auditor: ${String(x).slice(0, 160)}`) : []));
-      if (!auditRan) notes.push('the independent auditor could not run, so only the rules checked the picks');
-      const hardFail = bugs.length > 0 || results.every((r) => !r.best);
-      job.log('auditor', 'check', hardFail ? [...bugs, ...notes].join('; ') : `pass${notes.length ? ` (note: ${notes.join('; ')})` : ''}`);
-      job.qa = { verdict: hardFail ? 'revise' : 'pass', notes: [...bugs, ...notes, ...found.filter((o) => o.rejected).map((o) => `removed ${who(o)}: ${o.rejected}`)].join(' | '), model: auditRan ? `${MODELS.auditor} + deterministic rules` : 'deterministic rules' };
-
-      // 8. Report + CSV
-      job.log('writer', 'report', 'best pick and runner-up per item, ranked tables, warnings, method');
-      const date = new Date().toISOString().slice(0, 10);
-      const label = (it: Item) => `${it.name}${it.qty > 1 ? ` × ${it.qty}` : ''}`;
-      const basket = results.every((r) => r.best) ? results.reduce((s, r) => s + r.best!.total!, 0) : undefined;
-      const budgetLocal = budget && fx.has(budget.currency) ? budget.amount * fx.get(budget.currency)! : undefined;
-      let md = `# Best prices: ${items.map(label).join(', ')}\n\nDelivered to ${where || gl.toUpperCase()} · all prices in ${cur} · checked ${date}\n\n`;
-      if (basket !== undefined) {
-        md += `**Cheapest trustworthy basket: ${fmt(basket, cur)}** including the delivery fees we could find.`;
-        const yours = budget && budget.currency !== cur ? `${fmtM(budget)} (${fmt(budgetLocal, cur)})` : fmtM(budget);
-        if (budgetLocal !== undefined) md += basket <= budgetLocal ? ` Within your ${yours} budget, with ${fmt(budgetLocal - basket, cur)} to spare.` : ` That is ${fmt(basket - budgetLocal, cur)} over your ${yours} budget.`;
-        md += '\n\n';
-      }
-      md += `| Item | Best pick | Delivered total | Runner-up | Delivered total |\n|---|---|---|---|---|\n` + results.map((r, i) =>
-        `| ${cell(label(items[i]))} | ${r.best ? cell(who(r.best)) : 'none found'} | ${fmt(r.best?.total, cur)} | ${r.runner ? cell(who(r.runner)) : '—'} | ${fmt(r.runner?.total, cur)} |`).join('\n') + '\n';
-
-      results.forEach((r, i) => {
-        const it = items[i], b = r.best;
-        md += `\n## ${i + 1}. ${label(it)} (${it.condition})\n\n`;
-        if (b) {
-          md += `**Best pick: ${who(b)}, ${fmt(b.total, cur)} delivered** (${fmt(b.unit, cur)} each${b.delivery !== undefined ? ` + ${b.delivery ? fmt(b.delivery, cur) : 'free'} delivery` : ', delivery not stated'}). ${linkMd('Open the offer', b.link)}\n\nWhy: ${whyBest(b, it, r, cur)}\n\n`;
-          if (r.runner) md += `**Runner-up: ${who(r.runner)}, ${fmt(r.runner.total, cur)} delivered** (${fmt(r.runner.unit, cur)} each${r.runner.delivery !== undefined ? ` + ${r.runner.delivery ? fmt(r.runner.delivery, cur) : 'free'} delivery` : ', delivery not stated'}). ${linkMd('Open the offer', r.runner.link)}\n\nWhy: ${whyRunner(r.runner, b, cur)}\n\n`;
-        } else md += `We found no ${it.condition === 'any' ? '' : `${it.condition} `}offer we could price and trust for this item. The offers we did see are in \`offers.csv\`.\n\n`;
-        const sp = r.spread, dropped = r.st.n - sp.n;
-        if (sp.n) md += `Price spread across ${sp.n} ${it.condition === 'new' ? 'new (or unstated condition) ' : ''}offer${sp.n === 1 ? '' : 's'}, each: cheapest ${fmt(sp.min, cur)} · median ${fmt(sp.med, cur)} · most expensive ${fmt(sp.max, cur)}${dropped ? ` (not counting ${dropped} flagged as too good to be true)` : ''}.\n\n`;
-        const others = found.filter((o) => o.item === i && o.match === 'exact' && !r.ranked.includes(o)).sort((a, b) => (a.unit ?? Infinity) - (b.unit ?? Infinity));
-        const rows = [...r.ranked, ...others].slice(0, 12);
-        md += `| # | Seller | Listing | Each | Delivery | Total (× ${it.qty}) | Condition | Seller type | Checked on page | Flags |\n|---|---|---|---|---|---|---|---|---|---|\n` +
-          rows.map((o) => `| ${r.ranked.includes(o) ? r.ranked.indexOf(o) + 1 : '—'} | ${cell(who(o))} | ${linkMd(cell(short(o.title)), o.link)} | ${fmt(o.unit, cur)}${o.listed && o.listed.currency !== cur ? ` (${fmtM(o.listed)})` : ''} | ${o.delivery === undefined ? '?' : o.delivery ? fmt(o.delivery, cur) : 'free'} | ${fmt(o.total, cur)} | ${condLabel(o.condition)} | ${cell(trust(o))} | ${cell(o.checked)} | ${cell(flagsOf(o, it, r.st, cur).join('; '))} |`).join('\n') + '\n';
-        const more = r.ranked.length + others.length - rows.length;
-        if (more > 0) md += `\n${more} more offers in \`offers.csv\`.\n`;
-      });
-
-      const warn: string[] = [];
-      const cls = new Set<string>(), imp = new Set<string>();
-      let impNoShip = false;
-      results.forEach((r, i) => {
-        const it = items[i], mine = found.filter((o) => o.item === i && o.match === 'exact'), tag = items.length > 1 ? `${it.name}: ` : '';
-        for (const o of mine.filter((o) => tooCheap(o, r.st) || o.risk)) {
-          warn.push(`**Scam risk, ${it.name}: ${who(o)} at ${fmt(o.unit, cur)} each.** ${[tooCheap(o, r.st) && `That is ${Math.round((1 - o.unit! / r.st.med!) * 100)}% below the median`, o.tier === 'unknown' && 'the seller is unknown', o.risk && `warning sign on its page: ${o.risk.replace(/\.$/, '')}`].filter(Boolean).join('; ')}. Don't pay before you have the item in hand.`);
-        }
-        for (const o of mine.filter((o) => o.rejected)) warn.push(`${tag}the auditor removed ${who(o)} (${fmt(o.unit, cur)}, "${short(o.title, 50)}"): ${o.rejected}.`);
-        for (const o of mine.filter((o) => o.checked.includes('updated'))) warn.push(`${tag}${who(o)}: ${o.notes.find((n) => n.startsWith('listing said')) ?? 'price changed'}. We used the page price.`);
-        const oos = mine.filter((o) => o.inStock === false);
-        if (oos.length) warn.push(`${tag}out of stock, so not ranked: ${oos.map((o) => `${who(o)} (${fmt(o.unit, cur)})`).join(', ')}.`);
-        const notNew = mine.filter((o) => !condOk(o, it));
-        const low = [...notNew].sort((a, b) => (a.unit ?? Infinity) - (b.unit ?? Infinity))[0];
-        if (low) warn.push(`${notNew.length} used or refurbished offer${notNew.length > 1 ? 's' : ''} for ${it.name} left out of the ranking because you asked for new (cheapest: ${who(low)} at ${fmt(low.unit, cur)}).`);
-        for (const o of mine) {
-          if (o.tier === 'classifieds' && condOk(o, it)) cls.add(nameOf(o.host));
-          if (o.abroad) { imp.add(nameOf(o.host)); impNoShip ||= o.delivery === undefined; }
-        }
-      });
-      if (cls.size) warn.push(`${[...cls].join(', ')} listings are classified ads: meet in a public place, inspect the item and pay only on collection.`);
-      if (imp.size) warn.push(`${[...imp].join(' and ')} ship${imp.size === 1 ? 's' : ''} from abroad: the prices exclude import duty${impNoShip ? ' (and shipping, where the page does not state it)' : ''}, and delivery can take weeks.`);
-      const noDelivery = results.map((r) => r.best).filter((b): b is Offer => !!b && b.delivery === undefined);
-      if (noDelivery.length) warn.push(`Delivery fee not stated for ${noDelivery.map(who).join(', ')}: ask for the fee to ${raw.city || 'your address'} before paying.`);
-      if (notes.length) warn.push(...notes.filter((n) => !warn.some((w) => w.includes(n))).map((n) => `${n[0].toUpperCase()}${n.slice(1)}.`));
-      md += `\n## Warnings\n\n${warn.length ? warn.map((w) => `- ${w.replace(/^(\*\*)?([a-z])/, (_, b, c) => `${b ?? ''}${c.toUpperCase()}`)}`).join('\n') : '- None beyond the usual: prices move, so confirm at checkout.'}\n`;
-
-      const via = (v: string) => found.filter((o) => o.via.startsWith(v)).length;
-      const copies = toCheck.filter((o) => o.checked.includes("Exa's copy")).length;
-      md += `\n## How we checked\n\n` +
-        `- **Searched** Google Shopping for ${raw.country || gl.toUpperCase()} (${via('shopping')} listings), Google on ${locals.join(', ') || 'local shops'} (${via('google local')})${intl.length ? `, on ${intl.join(', ')} for imports (${via('google intl')})` : ''} and the open web for local stores (${via('google general')})${via('lens') ? `, and Google Lens on your photo (${via('lens')})` : ''}. After removing duplicates: ${found.length} listings, of which ${exact.length} were offers for the items themselves; the rest were accessories, other models, list pages, price guides or fakes.\n` +
-        `- **One currency.** ${fxNotes.length ? `Converted at ${fxNotes.join(', ')} (Google, ${date}).` : `Every ranked price was already in ${cur}.`} Delivered total = price × quantity + one delivery fee per order.${results.some((r) => r.ranked.some((o) => o.delivery === undefined && !o.abroad)) ? ` Offers that don't state delivery are ranked as if they charged the typical fee of the others (${[...new Set(results.map((r) => fmt(r.typical, cur)))].join(' / ')}), so hiding the fee can't win.` : ''}\n` +
-        `- **Opened the pages** of the ${toCheck.length} best-placed and suspiciously cheap offers${copies ? ` (${copies} through Exa's copy because ${copies === 1 ? 'the page needs' : 'those pages need'} a browser)` : ''}. "Checked on page" means the same amount appears in the page text: ${ok} confirmed, ${moved} changed price since the listing, ${gone} out of stock. Delivery fees are what the page shows for its default location and can differ for your address.\n` +
-        `- **Scam and trust rules.** Too good to be true = under 50% of the median for the same item and condition (needs at least 3 prices). Unknown seller = not a marketplace or retailer we recognise and fewer than 20 ratings. Classified ads (e.g. Jiji) are never the recommended pick when a checked shop offer exists. Seller scores are copied from the page only when the number is on it.\n` +
-        (auditRan ? `- **Independent check.** ${MODELS.auditor} (a different model family from the one that sorted the listings) reviewed the top offers against your request${found.some((o) => o.rejected) ? ` and removed ${found.filter((o) => o.rejected).length}` : ' and found nothing to remove'}.\n`
-          : `- **Independent check.** The auditor model was unavailable for this job, so the picks rest on the rules above.\n`) +
-        `- Prices and stock change quickly: confirm at checkout. Every offer we saw is in \`offers.csv\`.\n`;
-      job.deliverable = md;
-
-      const header = ['item', 'seller', 'title', 'price', 'currency', `unit_${cur}`, `delivery_${cur}`, `total_${cur}`, 'condition', 'rating', 'link', 'checked_on_page', 'flags', 'match', 'seller_type'];
-      const order = (o: Offer) => { const r = results[o.item], k = r.ranked.indexOf(o); return o.item * 1e6 + (k >= 0 ? k : 1000 + (o.match === 'exact' ? 0 : 1000)); };
-      const csv = [header.join(','), ...[...found].sort((a, b) => order(a) - order(b) || (a.unit ?? Infinity) - (b.unit ?? Infinity)).map((o) => {
-        const it = items[o.item], round = (n?: number) => (n === undefined ? '' : WHOLE.has(cur) ? Math.round(n) : n.toFixed(2));
-        return [label(it), who(o), o.title, o.listed?.amount, o.listed?.currency, round(o.unit), o.delivery === undefined ? '' : round(o.delivery), round(o.total), condLabel(o.condition),
-          [o.rating ? `${o.rating}/5${o.ratingCount ? ` (${o.ratingCount} reviews)` : ''}` : '', score(o)].filter(Boolean).join('; '),
-          o.link, o.checked, o.match === 'exact' ? flagsOf(o, it, results[o.item].st, cur).join('; ') : '', o.match, trust(o)].map(csvCell).join(',');
-      })].join('\n');
-      job.files.push({ name: 'offers.csv', content: csv + '\n' });
-      job.status = hardFail ? 'failed' : 'delivered';
-      if (hardFail) job.error = `QA failed: ${[...bugs, ...notes].join('; ')}`;
+      // 2-8. Search, sort, price, check the pages, audit, rank, write up
+      const p = await findPrices(job, shopFrom(raw));
+      job.qa = p.qa;
+      job.deliverable = p.md.full;
+      job.files.push({ name: 'offers.csv', content: p.csv });
+      job.status = p.hardFail ? 'failed' : 'delivered';
+      if (p.hardFail) job.error = `QA failed: ${[...p.bugs, ...p.notes].join('; ')}`;
     } catch (e: any) {
       job.status = 'failed';
       job.error = String(e?.message ?? e);

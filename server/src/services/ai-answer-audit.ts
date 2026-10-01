@@ -5,6 +5,9 @@
 // → Analyst checks every statement against the record → deterministic QA: every quote and competitor must
 // appear word for word in the saved answer → Auditor (other model family) re-judges every statement blind;
 // a statement counts as wrong only when both agree → Writer summarises; the fix list is rules, not an LLM.
+// The pieces are exported so Get Found runs the same audit inside its own job: readSpec, gatherTruth,
+// addOwnerFacts, then auditAnswers (structured results + markdown sections). This service is a thin
+// wrapper over them; it is off the menu, but old orders can still be revised.
 import type { BusinessDetails } from '../details.ts';
 import { parseMenu } from '../site/facts.ts';
 import { Job } from '../job.ts';
@@ -16,23 +19,27 @@ import { MAIL_BUDGET_USD, MAIL_HOST } from '../mail.ts';
 import type { Role } from '../wallets.ts';
 import * as fx from './ai-answer-audit.fixtures.ts';
 
-type Spec = { name: string; website: string; area: string; city: string; country: string; countryIso: string; category: string; categoryPlural: string; service: string; priceItem: string };
-type Kind = 'hours' | 'status' | 'price' | 'best' | 'service' | 'recommend' | 'custom';
+export type Spec = { name: string; website: string; area: string; city: string; country: string; countryIso: string; category: string; categoryPlural: string; service: string; priceItem: string };
+export type Kind = 'hours' | 'status' | 'price' | 'best' | 'service' | 'recommend' | 'custom';
 type Prompt = { kind: Kind; type: 'direct' | 'discovery'; text: string; expects: string[] };
 type Cite = { title: string; url: string };
 type Verdict = 'correct' | 'wrong' | 'made_up' | 'unverifiable';
 type Fact = { id: string; field: string; quote: string; claim: string; verdict: Verdict; truth: string; final?: Verdict | 'disputed'; auditNote?: string };
 type EngineId = 'chatgpt' | 'gemini' | 'claude' | 'perplexity';
-type Answer = {
+export type Answer = {
   id: string; engine: EngineId; label: string; model: string; webSearch?: boolean; prompt: Prompt; text: string; cites: Cite[]; error?: string;
   named?: boolean; rank?: [number, number]; facts: Fact[]; missing: string[]; competitors: string[];
 };
 type SiteFact = { field: string; value: string; quote: string; url: string };
-type Truth = {
+export type Truth = {
   listing: boolean; name?: string; category?: string; address?: string; phones: string[]; website?: string; hours?: string[]; status?: string;
   rating?: number; reviews?: number; claimed?: boolean; alsoSearch: string[]; topics: string[];
   domain?: string; social?: boolean; siteRead: boolean; siteFacts: SiteFact[]; conflicts: (SiteFact & { google: string })[];
+  // where the listing is, and the raw records, for services that build on the audit (Get Found)
+  cid?: string; lat?: number; lng?: number; place?: any; profile?: any;
 };
+/** What a Google Maps link tells us before any paid call: the place's cid, its pin and its name. */
+export type MapsHints = { cid?: string; lat?: number; lng?: number; name?: string };
 type Engine = { id: EngineId; label: string; path: string; models: string[]; body: (s: Spec, geo: boolean) => Record<string, unknown> };
 
 const CLAUDE_COUNTRIES = 'AR AT AU BE BR CA CH CL CN DE DK ES FI FR GB HK ID IN IT JP KR MX MY NL NO NZ PH PL PT RU SA SE TR TW US ZA'.split(' ');
@@ -55,20 +62,20 @@ const noGeo = new Set<EngineId>();
 
 // ---------- text helpers
 
-const csvCell = (v: unknown) => {
+export const csvCell = (v: unknown) => {
   const s = v === undefined || v === null ? '' : String(v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
-const cell = (s: unknown) => String(s ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ').trim();
-const hostOf = (u?: string) => {
+export const cell = (s: unknown) => String(s ?? '').replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ').trim();
+export const hostOf = (u?: string) => {
   try { return u ? new URL(u.startsWith('http') ? u : `https://${u}`).host.replace(/^www\./, '') : ''; } catch { return ''; }
 };
-const uniq = <T>(xs: T[]) => [...new Set(xs)];
-const plain = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-const GENERIC = ['the', 'and', 'ltd', 'limited', 'branch', 'inc', 'llc', 'plc', 'co', 'nig'];
-const words = (s: string, drop: string[] = []) => new Set(plain(s).split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !drop.includes(w)));
+export const uniq = <T>(xs: T[]) => [...new Set(xs)];
+export const plain = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export const GENERIC = ['the', 'and', 'ltd', 'limited', 'branch', 'inc', 'llc', 'plc', 'co', 'nig'];
+export const words = (s: string, drop: string[] = []) => new Set(plain(s).split(/[^a-z0-9]+/).filter((w) => w.length > 1 && !drop.includes(w)));
 /** Jaccard overlap of two business names, ignoring location words and legal suffixes. */
-function nameScore(a: string, b: string, drop: string[] = GENERIC): number {
+export function nameScore(a: string, b: string, drop: string[] = GENERIC): number {
   const A = words(a, drop), B = words(b, drop);
   if (!A.size || !B.size) return 0;
   const inter = [...A].filter((w) => B.has(w)).length;
@@ -94,13 +101,13 @@ function locate(text: string, quote: string): string | undefined {
   return k < 0 ? undefined : text.slice(at[k], at[k + q.length - 1] + 1);
 }
 const MONTHS = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
-const today = () => { const d = new Date(); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
-const place = (s: Spec) => (s.area && s.city && !plain(s.area).includes(plain(s.city)) ? `${s.area}, ${s.city}` : s.area || s.city);
-const errMsg = (e: any) => String(e?.message ?? e);
-const nOf = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+export const today = () => { const d = new Date(); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+export const place = (s: Spec) => (s.area && s.city && !plain(s.area).includes(plain(s.city)) ? `${s.area}, ${s.city}` : s.area || s.city);
+export const errMsg = (e: any) => String(e?.message ?? e);
+export const nOf = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const FIELD: Record<string, string> = { deals: 'deal', offer: 'deal', offers: 'deal', discount: 'deal', discounts: 'deal', promotion: 'deal', prices: 'price', opening_hours: 'hours', phone_number: 'phone', open: 'status' };
 const field = (f: unknown) => { const k = String(f ?? 'other').toLowerCase().trim(); return FIELD[k] ?? k; };
-const ASKED: Record<string, string> = { hours: 'opening hours', status: 'open or closed', address: 'address', phone: 'phone number', price: 'prices', deal: 'deals' };
+const ASKED: Record<string, string> = { hours: 'opening hours', status: 'open or closed', address: 'address', phone: 'phone number', price: 'prices', deal: 'deals', other: 'an answer to your question' };
 const asked = (ms: string[]) => ms.map((m) => ASKED[m] ?? m).join(', ');
 /** A quote for display: QA checks the raw span, but a span can straddle a **bold** boundary. */
 const shown = (q: string) => q.replace(/\*\*|__|[*`]/g, '').replace(/\s+/g, ' ').trim();
@@ -123,7 +130,7 @@ function hoursFrom(gbp: any, maps: any): string[] | undefined {
   return typeof oh === 'string' ? [oh] : undefined;
 }
 /** "Monday: 8 AM–9 PM", … → "Mon–Sat 8 AM–9 PM; Sun 12 PM–8 PM" */
-function shortHours(h?: string[]): string {
+export function shortHours(h?: string[]): string {
   if (!h?.length) return 'not listed';
   const rows = h.map((x) => { const i = x.indexOf(': '); return [i < 0 ? '' : x.slice(0, 3), x.slice(i + 2)]; });
   if (rows.some(([d]) => !d)) return h.join('; ');
@@ -153,7 +160,12 @@ async function readSite(job: Job, urls: string[], reason: string): Promise<Page[
   return (data?.pages ?? data?.results ?? data?.data ?? []).map((p: any) => ({ url: p.finalUrl ?? p.url, title: p.title ?? p.url, text: String(p.text ?? p.body ?? p.content ?? '').slice(0, 8000) }));
 }
 
-async function gatherTruth(job: Job, spec: Spec): Promise<Truth> {
+/**
+ * The truth: the Google listing (Serper Maps, then the full Business Profile) and the business's own site.
+ * `hints` come from a Google Maps link the owner gave: a cid pins the listing even when the name differs,
+ * and a pin centres the Maps search on it.
+ */
+export async function gatherTruth(job: Job, spec: Spec, hints: MapsHints = {}): Promise<Truth> {
   const t: Truth = { listing: false, phones: [], alsoSearch: [], topics: [], siteRead: false, siteFacts: [], conflicts: [] };
   const drop = [...GENERIC, ...words(spec.area), ...words(spec.city)];
   const wantDomain = hostOf(spec.website);
@@ -163,19 +175,28 @@ async function gatherTruth(job: Job, spec: Spec): Promise<Truth> {
   const q = [spec.name, spec.area, spec.city].filter(Boolean).join(' ');
   try {
     job.log('scout', 'maps', `Google Maps: "${q}"`);
-    const data = await ortho<any>(job, 'serper/maps', { body: { q, gl: spec.countryIso.toLowerCase() || undefined } }, {
+    const ll = hints.lat !== undefined && hints.lng !== undefined ? `@${hints.lat.toFixed(6)},${hints.lng.toFixed(6)},15z` : undefined;
+    const data = await ortho<any>(job, 'serper/maps', { body: { q, gl: spec.countryIso.toLowerCase() || undefined, ...(ll ? { ll } : {}) } }, {
       agent: 'scout', vendor: 'Serper Maps (Orthogonal)', reason: `find ${spec.name}'s Google listing`, expectUsd: 0.006, maxUsd: 0.01, dry: fx.maps,
     });
-    const scored = (data?.places ?? []).map((p: any) => ({ p, s: Math.max(nameScore(p.title ?? '', spec.name, drop), wantDomain && hostOf(p.website) === wantDomain ? 1 : 0) }));
+    const score = (p: any) => Math.max(nameScore(p.title ?? '', spec.name, drop), hints.name ? nameScore(p.title ?? '', hints.name, drop) : 0, wantDomain && hostOf(p.website) === wantDomain ? 1 : 0);
+    const scored = (data?.places ?? []).map((p: any) => ({ p, s: hints.cid && String(p.cid ?? '') === hints.cid ? 2 : score(p) }));
     hit = scored.filter((x: any) => x.s >= 0.6).sort((a: any, b: any) => b.s - a.s)[0]?.p;
-    job.log('scout', 'match', hit ? `${hit.title}, ${hit.address ?? ''}` : `no listing on Maps matches "${spec.name}"`);
+    // the owner's own link is exact: a name match with another cid is a different place (a second branch, a namesake)
+    if (hit && hints.cid && hit.cid && String(hit.cid) !== hints.cid) {
+      job.log('scout', 'skip', `"${hit.title}" on Maps is not the place in your link; using the link`);
+      hit = undefined;
+    }
+    job.log('scout', 'match', hit ? `${hit.title}, ${hit.address ?? ''}` : hints.cid ? 'using the listing in your Google Maps link' : `no listing on Maps matches "${spec.name}"`);
   } catch (e) { job.log('scout', 'skip', `Maps failed (${errMsg(e).slice(0, 60)}); trying the Business Profile directly`); }
 
   let gbp: any;
+  const cid = hit?.cid ? String(hit.cid) : hints.cid;
+  const pin = hit?.latitude ? [Number(hit.latitude), Number(hit.longitude)] : hints.lat !== undefined && hints.lng !== undefined ? [hints.lat, hints.lng] : undefined;
   try {
     const task = {
-      keyword: hit?.cid ? `cid:${hit.cid}` : q,
-      ...(hit?.latitude ? { location_coordinate: `${Number(hit.latitude).toFixed(6)},${Number(hit.longitude).toFixed(6)},2000` } : { location_name: spec.country }),
+      keyword: cid ? `cid:${cid}` : q,
+      ...(pin ? { location_coordinate: `${pin[0].toFixed(6)},${pin[1].toFixed(6)},2000` } : { location_name: spec.country }),
       language_code: 'en',
     };
     job.log('scout', 'profile', 'full Google Business Profile: hours timetable, open/closed flag, claimed, review topics');
@@ -183,11 +204,16 @@ async function gatherTruth(job: Job, spec: Spec): Promise<Truth> {
       agent: 'scout', vendor: 'Google Business Profile (DataForSEO)', reason: `${spec.name}'s Google Business Profile`, dry: fx.gbp,
     });
     const it = r?.items?.[0];
-    if (it && (hit?.cid || nameScore(it.title ?? '', spec.name, drop) >= 0.6)) gbp = it;
+    if (it && (cid || nameScore(it.title ?? '', spec.name, drop) >= 0.6)) gbp = it;
     else if (it) job.log('scout', 'skip', `the profile Google returned ("${it.title}") is a different business`);
   } catch (e) { job.log('scout', 'skip', `Business Profile failed (${errMsg(e).slice(0, 60)})`); }
 
   t.listing = !!(hit || gbp);
+  t.place = hit;
+  t.profile = gbp;
+  t.cid = gbp?.cid ? String(gbp.cid) : cid;
+  const lat = Number(gbp?.latitude ?? pin?.[0]), lng = Number(gbp?.longitude ?? pin?.[1]);
+  if (Number.isFinite(lat) && Number.isFinite(lng) && (lat || lng)) { t.lat = lat; t.lng = lng; }
   t.name = gbp?.title ?? hit?.title;
   t.category = gbp?.category ?? hit?.type;
   t.address = gbp?.address ?? hit?.address;
@@ -243,7 +269,7 @@ async function gatherTruth(job: Job, spec: Spec): Promise<Truth> {
 }
 
 /** The record the analyst and auditor judge against, as plain text. */
-function recordText(spec: Spec, t: Truth): string {
+export function recordText(spec: Spec, t: Truth): string {
   const L = [`RECORD for ${spec.name} (${spec.category}, ${place(spec)}), checked ${today()}. This is the truth to judge against.`];
   if (t.listing) {
     L.push(`Google listing name: ${t.name}`, `Category: ${t.category ?? 'not listed'}`, `Address: ${t.address ?? 'not listed'}`,
@@ -262,6 +288,47 @@ function recordText(spec: Spec, t: Truth): string {
   const offers = t.siteFacts.filter((f) => f.field === 'offer');
   L.push(`Deals, discounts, promotions: ${offers.length ? 'only those listed above' : t.siteRead ? 'none on the Google listing or the website' : 'unknown'}.`);
   return L.join('\n');
+}
+
+/** The owner's own prices and contact details (order form) join the record the answers are judged against. */
+export function addOwnerFacts(job: Job, truth: Truth, d?: BusinessDetails) {
+  if (!d) return;
+  const owner = 'the owner (order form)';
+  for (const m of parseMenu(d.menu).filter((x) => x.price)) truth.siteFacts.push({ field: 'price', value: `${m.name}: ${m.price}`, quote: m.source, url: owner });
+  if (d.whatsapp ?? d.phone) truth.siteFacts.push({ field: 'phone', value: (d.whatsapp ?? d.phone)!, quote: (d.whatsapp ?? d.phone)!, url: owner });
+  if (d.address) truth.siteFacts.push({ field: 'address', value: d.address, quote: d.address, url: owner });
+  if (d.menu) job.log('analyst', 'facts', `${parseMenu(d.menu).filter((x) => x.price).length} prices from the owner added to the record`);
+}
+
+const SPEC_FIELDS = '"name": the business name exactly as given, "website": domain or URL if given else "", "area": neighbourhood or district if given else "", "city": town or city, "country": country name in English, "countryIso": 2-letter ISO code, "category": the kind of business in 1-3 words, singular (e.g. "restaurant", "dentist", "hair salon"), "categoryPlural": its plural, "service": what customers most often look for there, 1-4 words (e.g. "jollof rice", "teeth whitening"), "priceItem": one specific product or service a customer would ask the price of, with an article (e.g. "a plate of jollof rice")';
+
+/**
+ * Researcher parses the brief; the order form's details are exact and override it (name, website, place).
+ * `extra` adds fields to the parse for a service that needs more (it gets them back in `raw`).
+ */
+export async function readSpec(job: Job, brief: string, d?: BusinessDetails, extra?: { fields: string; dry: Record<string, unknown> }): Promise<{ spec: Spec; raw: Record<string, any> }> {
+  job.log('researcher', 'parse', 'business, website, area, category, what customers look for');
+  const parsed = parseJson<Record<string, any>>(
+    await llm(job, 'researcher', [
+      { role: 'system', content: `Parse a request to audit what AI assistants say about a local business. Reply JSON only: {${SPEC_FIELDS}${extra ? `, ${extra.fields}` : ''}}. Infer the country from the city when it is not stated.` },
+      { role: 'user', content: brief },
+    ], 'parse the audit request', { model: MODELS.fast, maxTokens: extra ? 400 : 300, json: true, dry: () => JSON.stringify({ ...fx.spec, ...extra?.dry }) }),
+    {},
+  );
+  const spec: Spec = { name: '', website: '', area: '', city: '', country: '', countryIso: '', category: 'business', categoryPlural: '', service: '', priceItem: '' };
+  for (const k of Object.keys(spec) as (keyof Spec)[]) if (typeof parsed[k] === 'string' && parsed[k]!.trim()) spec[k] = parsed[k]!.trim();
+  if (d) {
+    spec.name = d.name;
+    if (d.website) spec.website = d.website;
+    if (d.area) spec.area = d.area;
+    if (d.city) spec.city = d.city;
+  }
+  if (!spec.name || !(spec.city || spec.area)) throw new Error('tell us the business name and its town or city');
+  spec.countryIso = spec.countryIso.toUpperCase().slice(0, 2);
+  spec.categoryPlural ||= `${spec.category}s`;
+  spec.service ||= spec.category;
+  spec.priceItem ||= `their most popular ${spec.service}`;
+  return { spec, raw: parsed };
 }
 
 // ---------- 2. ask the assistants
@@ -293,7 +360,7 @@ async function ask(job: Job, e: Engine, agent: Role, p: Prompt, spec: Spec, st: 
     try {
       job.log(agent, 'ask', `${e.label}: "${p.text}"`);
       const [r] = await dataforseo<any>(job, `ai_optimization/${e.path}/llm_responses/live`, task, {
-        agent, vendor: `${e.label} (DataForSEO)`, reason: `ask ${e.label} a customer question (${p.kind})`, dry: () => fx.answer(e.id, p.kind === 'custom' ? 'status' : p.kind),
+        agent, vendor: `${e.label} (DataForSEO)`, reason: `ask ${e.label} a customer question (${p.kind})`, dry: () => fx.answer(e.id, p.kind),
       });
       st.ok = true;
       preferred[e.id] = st.model;
@@ -337,7 +404,7 @@ Reply JSON only: {"answers":[{"id","named","name_quote","facts":[...],"missing":
     out = parseJson(await llm(job, 'analyst', [
       { role: 'system', content: rules },
       { role: 'user', content: `${record}\n\nQUESTION the customer asked: "${p.text}"\n\n` + live.map((a) => `=== ANSWER id=${a.id} (${a.label})\n${a.text.slice(0, 4000)}`).join('\n\n') },
-    ], `check ${live.length} answers against the record`, { maxTokens: 2500, json: true, dry: () => JSON.stringify(fx.judge(p.kind === 'custom' ? 'status' : p.kind)) }), {});
+    ], `check ${live.length} answers against the record`, { maxTokens: 2500, json: true, dry: () => JSON.stringify(fx.judge(p.kind)) }), {});
   } catch (e) { job.log('analyst', 'skip', `compare failed (${errMsg(e).slice(0, 60)})`); }
 
   const drop = [...GENERIC, ...words(spec.area), ...words(spec.city)];
@@ -366,7 +433,7 @@ Reply JSON only: {"answers":[{"id","named","name_quote","facts":[...],"missing":
       }
     }
     const covered = (m: string) => a.facts.some((f) => f.field === m || (m === 'price' && f.field === 'menu'));
-    a.missing = uniq((j.missing ?? []).map(field)).filter((m) => p.expects.includes(m) && !covered(m));
+    a.missing = uniq<string>((j.missing ?? []).map(field)).filter((m) => p.expects.includes(m) && !covered(m));
   }
 }
 
@@ -419,7 +486,7 @@ async function mentions(job: Job, spec: Spec, t: Truth) {
 
 // ---------- 6. the report
 
-type Tally = { name: string; count: number; by: Set<string>; url?: string };
+export type Tally = { name: string; count: number; by: Set<string>; url?: string };
 function tallyNames(answers: Answer[]): Tally[] {
   const out: Tally[] = [];
   for (const a of answers) for (const c of a.competitors) {
@@ -442,7 +509,10 @@ function tallySources(answers: Answer[], own?: string): Tally[] {
 
 const counted = (answers: Answer[], v: Verdict) => answers.flatMap((a) => a.facts.filter((f) => f.final === v).map((f) => ({ a, f })));
 
-function fixList(spec: Spec, t: Truth, answered: Answer[], sources: Tally[], rivals: Tally[]): string[] {
+/** One fix, keyed so a service that merges fix lists (Get Found) can drop the ones it covers itself. */
+export type Fix = { key: string; rank: number; text: string };
+
+function fixList(spec: Spec, t: Truth, answered: Answer[], sources: Tally[], rivals: Tally[]): Fix[] {
   const bad = [...counted(answered, 'wrong'), ...counted(answered, 'made_up')];
   const pick = (fields: string[], v: Verdict) => bad.filter((x) => x.f.final === v && fields.includes(x.f.field));
   const said = (xs: typeof bad) => xs.slice(0, 2).map(({ a, f }) => `${a.label} said “${shown(f.quote)}”`).join('; ');
@@ -453,30 +523,31 @@ function fixList(spec: Spec, t: Truth, answered: Answer[], sources: Tally[], riv
   const site = (field: string) => t.siteFacts.find((f) => f.field === field);
   const disc = answered.filter((a) => a.prompt.type === 'discovery');
   const named = disc.filter((a) => a.named).length;
-  const F: [number, string][] = [];
+  const F: Fix[] = [];
+  const add = (rank: number, key: string, text: string) => F.push({ rank, key, text });
 
-  if (!t.listing) F.push([0, `**Get on Google Maps.** We found no Google listing for ${spec.name}. Create and verify a Google Business Profile with your address, phone, hours and photos: it is the first place assistants look for local facts.`]);
+  if (!t.listing) add(0, 'listing', `**Get on Google Maps.** We found no Google listing for ${spec.name}. Create and verify a Google Business Profile with your address, phone, hours and photos: it is the first place assistants look for local facts.`);
   const status = pick(['status'], 'wrong');
-  if (status.length) F.push([1, `**Stop the "closed" story.** ${said(status)}, but Google shows you as ${t.status?.split(' (')[0] ?? 'operating'}. Post an update and fresh photos on your Google profile this week, and put "We're open" with your hours as text on your homepage.${leaned(status)}`]);
+  if (status.length) add(1, 'status', `**Stop the "closed" story.** ${said(status)}, but Google shows you as ${t.status?.split(' (')[0] ?? 'operating'}. Post an update and fresh photos on your Google profile this week, and put "We're open" with your hours as text on your homepage.${leaned(status)}`);
   const hours = pick(['hours'], 'wrong');
-  if (hours.length) F.push([2, `**Fix your opening hours everywhere.** ${said(hours)}. Your Google listing says ${t.hours ? shortHours(t.hours) : 'nothing (add them)'}. ${site('hours') ? `Your website says “${site('hours')!.quote}”.` : "Your website doesn't state your hours: add them as plain text on the homepage and contact page."}${leaned(hours)}`]);
-  if (t.conflicts.length) F.push([2, `**Make your website and Google listing agree.** ${t.conflicts.map((c) => `Your website says “${c.quote}” but Google says ${c.google}`).join('; ')}. Assistants read both, and when they disagree they pick one or guess. Update whichever is out of date.`]);
+  if (hours.length) add(2, 'hours', `**Fix your opening hours everywhere.** ${said(hours)}. Your Google listing says ${t.hours ? shortHours(t.hours) : 'nothing (add them)'}. ${site('hours') ? `Your website says “${site('hours')!.quote}”.` : "Your website doesn't state your hours: add them as plain text on the homepage and contact page."}${leaned(hours)}`);
+  if (t.conflicts.length) add(2, 'conflict', `**Make your website and Google listing agree.** ${t.conflicts.map((c) => `Your website says “${c.quote}” but Google says ${c.google}`).join('; ')}. Assistants read both, and when they disagree they pick one or guess. Update whichever is out of date.`);
   const contact = pick(['phone', 'address', 'website'], 'wrong');
-  if (contact.length) F.push([3, `**Correct your contact details.** ${said(contact)}. Your listing has ${[t.address, t.phones[0]].filter(Boolean).join(', ')}.${leaned(contact)}`]);
+  if (contact.length) add(3, 'contact', `**Correct your contact details.** ${said(contact)}. Your listing has ${[t.address, t.phones[0]].filter(Boolean).join(', ')}.${leaned(contact)}`);
   const made = bad.filter((x) => x.f.final === 'made_up');
   const prices = [...pick(['price', 'menu', 'delivery', 'rating', 'other'], 'wrong'), ...made];
   if (prices.length) {
     const p = site('price');
-    F.push([4, `**Publish your real prices and offers as text.** ${said(prices)}. ${p ? `Your prices are on ${p.url}: link that page from your homepage, title it "Prices" or "Menu & prices", and keep it current.` : 'Your website shows no prices: add a simple prices page as text, not a photo of a menu.'} Say plainly which deals you run${made.length ? ', so nobody turns up expecting one you never offered' : ''}.`]);
+    add(4, 'prices', `**Publish your real prices and offers as text.** ${said(prices)}. ${p ? `Your prices are on ${p.url}: link that page from your homepage, title it "Prices" or "Menu & prices", and keep it current.` : 'Your website shows no prices: add a simple prices page as text, not a photo of a menu.'} Say plainly which deals you run${made.length ? ', so nobody turns up expecting one you never offered' : ''}.`);
   }
-  if (t.claimed === false) F.push([5, '**Claim your Google Business Profile.** Google shows it as unclaimed, so anyone can suggest changes to your hours and details and nobody asks you first. Claim it at business.google.com and check every field.']);
+  if (t.claimed === false) add(5, 'claim', '**Claim your Google Business Profile.** Google shows it as unclaimed, so anyone can suggest changes to your hours and details and nobody asks you first. Claim it at business.google.com and check every field.');
   const gaps = answered.filter((a) => a.missing.length);
-  if (gaps.length) F.push([6, `**Put the basics where assistants can read them.** ${gaps.length} answer${gaps.length > 1 ? 's' : ''} couldn't say: ${asked(uniq(gaps.flatMap((a) => a.missing)))}. Put hours, phone, address and prices as plain text on your homepage and contact page, and add schema.org LocalBusiness markup (openingHours, telephone, address, priceRange) so machines read them without guessing.`]);
-  if (!t.domain) F.push([6, `**Get a simple website.** ${t.social ? 'You only have a social-media page, which assistants rarely read.' : 'We found no website.'} One page with your hours, phone, address, prices and a map link gives assistants something to quote.`]);
+  if (gaps.length) add(6, 'basics', `**Put the basics where assistants can read them.** ${gaps.length} answer${gaps.length > 1 ? 's' : ''} couldn't say: ${asked(uniq(gaps.flatMap((a) => a.missing)))}. Put hours, phone, address and prices as plain text on your homepage and contact page, and add schema.org LocalBusiness markup (openingHours, telephone, address, priceRange) so machines read them without guessing.`);
+  if (!t.domain) add(6, 'website', `**Get a simple website.** ${t.social ? 'You only have a social-media page, which assistants rarely read.' : 'We found no website.'} One page with your hours, phone, address, prices and a map link gives assistants something to quote.`);
   const third = sources.filter((s) => !/google\.|goo\.gl/.test(s.name)).slice(0, 5);
-  if (disc.length && named < disc.length && third.length) F.push([7, `**Get onto the pages the assistants read.** You were named in ${named} of ${disc.length} "which ${spec.category}?" answers. The pages they cited in those answers: ${third.map((s) => `${s.name} (${s.count}×)`).join(', ')}. Ask to be added to their lists and reviews, and make sure any listing of yours there is complete and correct.`]);
-  if (rivals.length) F.push([8, `**Earn reviews that say what you're known for.** The assistants recommended ${rivals.slice(0, 3).map((r) => `${r.name} (${r.count}×)`).join(', ')} instead. Ask happy customers to mention "${spec.service}" and "${spec.area || spec.city}" in their Google reviews${t.topics.length ? `; today your reviews mostly talk about ${t.topics.slice(0, 3).join(', ')}` : ''}.`]);
-  return F.sort((a, b) => a[0] - b[0]).slice(0, 8).map(([, s]) => s);
+  if (disc.length && named < disc.length && third.length) add(7, 'sources', `**Get onto the pages the assistants read.** You were named in ${named} of ${disc.length} "which ${spec.category}?" answers. The pages they cited in those answers: ${third.map((s) => `${s.name} (${s.count}×)`).join(', ')}. Ask to be added to their lists and reviews, and make sure any listing of yours there is complete and correct.`);
+  if (rivals.length) add(8, 'reviews', `**Earn reviews that say what you're known for.** The assistants recommended ${rivals.slice(0, 3).map((r) => `${r.name} (${r.count}×)`).join(', ')} instead. Ask happy customers to mention "${spec.service}" and "${spec.area || spec.city}" in their Google reviews${t.topics.length ? `; today your reviews mostly talk about ${t.topics.slice(0, 3).join(', ')}` : ''}.`);
+  return F.sort((a, b) => a.rank - b.rank);
 }
 
 function resultCell(a: Answer): string {
@@ -494,7 +565,186 @@ function resultCell(a: Answer): string {
   return parts.join('; ') || 'No checkable facts';
 }
 
-// ---------- the service
+// ---------- 7. the audit as a step any service can run
+
+export const STANDARD_KINDS: Kind[] = ['hours', 'status', 'price', 'best', 'service', 'recommend'];
+type Hit = { a: Answer; f: Fact };
+type Lines = (h: string) => string[];
+
+export type AuditResult = {
+  where: string; record: string; prompts: Prompt[]; answers: Answer[]; answered: Answer[];
+  disc: Answer[]; named: Answer[]; wrong: Hit[]; made: Hit[]; right: Hit[]; disputed: Hit[]; unanswered: Answer[]; worst?: Hit;
+  rivals: Tally[]; sources: Tally[]; ownCites: number; seen?: { scope: string; total: number; questions: string[] };
+  aud: { ok: boolean; agreed: number; total: number };
+  fixes: Fix[]; // every fix, most urgent first (the AI Answer Audit prints the first 8)
+  issues: string[]; hardFail: boolean; literal: boolean; unjudged: number; // deterministic QA: answers back, quotes word for word, auditor agreement
+  /** Report sections; `h` is the heading prefix ('##' on its own, '###' inside a bigger report). */
+  md: { stats: string; scorecard: Lines; wrongFacts: Lines; madeUp: Lines; unanswered: Lines; rivals: Lines; sources: Lines; detail: Lines; record: Lines; method: string[] };
+  files: { name: string; content: string }[]; // answers.csv, ai-answers.md
+};
+
+/**
+ * Ask the assistants and check every answer against the record: (optional) LLM Mentions → the questions,
+ * two lanes → analyst per question → verbatim quote checks → blind audit on another model family → numbers,
+ * rule-based fixes and report sections. `kinds` picks the standard questions; the owner's own question from
+ * the order form is always asked.
+ */
+export async function auditAnswers(job: Job, spec: Spec, truth: Truth, d?: BusinessDetails, opts: { kinds?: Kind[]; mentions?: boolean } = {}): Promise<AuditResult> {
+  const where = place(spec);
+  const record = recordText(spec, truth);
+  const seen = opts.mentions === false ? undefined : await mentions(job, spec, truth);
+
+  // What customers ask: questions about the business by name, and ones where it has to be recommended
+  const kinds = opts.kinds ?? STANDARD_KINDS;
+  const prompts: Prompt[] = ([
+    { kind: 'hours', type: 'direct', text: `What are the opening hours of ${spec.name} in ${where}?`, expects: ['hours'] },
+    { kind: 'status', type: 'direct', text: `Is ${spec.name} in ${where} still open? What is their address and phone number?`, expects: ['status', 'address', 'phone'] },
+    { kind: 'price', type: 'direct', text: `How much does ${spec.name} in ${where} charge for ${spec.priceItem}? Do they have any deals or discounts at the moment?`, expects: ['price', 'deal'] },
+    { kind: 'best', type: 'discovery', text: `What's the best ${spec.category} in ${where}?`, expects: [] },
+    { kind: 'service', type: 'discovery', text: `Where can I get ${spec.service} near ${where}?`, expects: [] },
+    { kind: 'recommend', type: 'discovery', text: `Can you recommend a few good ${spec.categoryPlural} in ${where}?`, expects: [] },
+  ] as Prompt[]).filter((p) => kinds.includes(p.kind));
+  // the customer's own question from the order form, asked about the business by name
+  if (d?.questions) prompts.push({ kind: 'custom', type: 'direct', text: `About ${spec.name} in ${where}: ${d.questions.split('\n')[0].trim().slice(0, 160)}`, expects: ['other'] });
+  job.log('researcher', 'plan', `${prompts.length} questions × ${ENGINES.length} assistants, web search on`);
+
+  // Two lanes ask; the analyst checks each question as soon as all four answers to it are in
+  const states = new Map(ENGINES.map((e) => [e.id, { model: preferred[e.id] ?? e.models[0], ok: false, fails: 0, down: '' } as EngineState]));
+  const pending = new Map<string, Promise<Answer>>();
+  for (const lane of LANES) {
+    let prev: Promise<unknown> = Promise.resolve();
+    for (const p of prompts) for (const id of lane.engines) {
+      const e = ENGINES.find((x) => x.id === id)!;
+      const next = prev.then(() => ask(job, e, lane.agent, p, spec, states.get(id)!));
+      pending.set(`${id}:${p.kind}`, next);
+      prev = next;
+    }
+  }
+  const qa: Qa = { droppedFacts: 0, droppedComps: 0, unjudged: 0 };
+  let n = 0;
+  const answers: Answer[] = [];
+  for (const p of prompts) {
+    const batch = await Promise.all(ENGINES.map((e) => pending.get(`${e.id}:${p.kind}`)!));
+    answers.push(...batch);
+    await judge(job, spec, record, p, batch, qa, () => `F${++n}`);
+  }
+  const answered = answers.filter((a) => a.text);
+  job.log('analyst', 'checked', `${answered.length}/${answers.length} answers; ${qa.droppedFacts} statements and ${qa.droppedComps} names dropped (not word for word in the answer)`);
+
+  // Independent audit
+  const aud = await audit(job, record, answered);
+
+  // Numbers, fixes, deterministic QA
+  const disc = answered.filter((a) => a.prompt.type === 'discovery');
+  const named = disc.filter((a) => a.named);
+  const wrong = counted(answered, 'wrong'), made = counted(answered, 'made_up'), right = counted(answered, 'correct'), disputed = counted(answered, 'disputed' as Verdict);
+  const unanswered = answered.filter((a) => a.missing.length);
+  const rivals = tallyNames(disc);
+  const sources = tallySources(answered, truth.domain);
+  const ownCites = answered.reduce((s, a) => s + a.cites.filter((c) => truth.domain && hostOf(c.url) === truth.domain).length, 0);
+  const discSources = tallySources(disc, truth.domain);
+  const fixes = fixList(spec, truth, answered, discSources.length ? discSources : sources, rivals);
+
+  const literal = answered.every((a) => a.facts.every((f) => a.text.includes(f.quote)) && a.competitors.every((c) => a.text.includes(c)));
+  const issues = [
+    answered.length < answers.length ? `${answered.length} of ${answers.length} answers came back (${ENGINES.map((e) => [e.label, answers.filter((a) => a.engine === e.id && !a.text).length] as const).filter(([, k]) => k).map(([l, k]) => `${l}: ${k} missing`).join(', ')})` : '',
+    qa.droppedFacts ? `${nOf(qa.droppedFacts, 'analyst statement')} dropped: quote not word for word in the answer` : '',
+    qa.droppedComps ? `${nOf(qa.droppedComps, 'competitor name')} dropped: not in the answer` : '',
+    qa.unjudged ? `${nOf(qa.unjudged, 'answer')} the analyst did not return` : '',
+    aud.ok ? `auditor agreed on ${aud.agreed} of ${aud.total} statements; ${disputed.length} disputed and left out of the score` : 'the independent auditor did not answer; wrong facts are the analyst\'s alone',
+    literal ? '' : 'a printed quote or name is not in its answer',
+  ].filter(Boolean);
+  const hardFail = answered.length < answers.length / 2 || !literal;
+  job.log('auditor', 'check', `${hardFail ? 'FAIL' : 'pass'}: ${issues.join('; ')}`);
+  const worst = [...wrong.filter((x) => x.f.field === 'status'), ...wrong.filter((x) => x.f.field === 'hours'), ...wrong, ...made][0];
+
+  // Report sections
+  const models = ENGINES.map((e) => { const a = answered.find((x) => x.engine === e.id); return a ? `${e.label} (${a.model})` : `${e.label} (no answers)`; });
+  const md: AuditResult['md'] = {
+    stats: `**Named in ${named.length} of ${disc.length} recommendation answers · ${wrong.length} wrong fact${wrong.length === 1 ? '' : 's'} · ${made.length} claim${made.length === 1 ? '' : 's'} not found in your records · ${unanswered.length} question${unanswered.length === 1 ? '' : 's'} left unanswered**`,
+    scorecard: (h) => {
+      const L = [`${h} Scorecard`, '', '| Assistant | Named you when asked for a recommendation | Facts right | Wrong | Not in your records | Answers missing basics | Web search used |', '|---|---|---|---|---|---|---|'];
+      for (const e of ENGINES) {
+        const as = answered.filter((a) => a.engine === e.id);
+        const f = (v: Verdict) => as.reduce((s, a) => s + a.facts.filter((x) => x.final === v).length, 0);
+        const dd = as.filter((a) => a.prompt.type === 'discovery');
+        if (!as.length) { L.push(`| ${e.label} | no answers this run | — | — | — | — | — |`); continue; }
+        L.push(`| ${e.label} (${as[0].model}) | ${dd.filter((a) => a.named).length} of ${dd.length} | ${f('correct')} | ${f('wrong')} | ${f('made_up')} | ${as.filter((a) => a.missing.length).length} | ${as.filter((a) => a.webSearch).length} of ${as.length} |`);
+      }
+      return [...L, ''];
+    },
+    wrongFacts: (h) => !wrong.length ? [] : [`${h} Wrong facts`, '', 'Each quote is copied word for word from the assistant\'s answer (all answers are in `ai-answers.md`).', '', '| Assistant | Question | What it said | What your records say |', '|---|---|---|---|',
+      ...wrong.map(({ a, f }) => `| ${a.label} | ${cell(a.prompt.text)} | “${cell(shown(f.quote))}” | ${cell(f.truth || '—')} |`), ''],
+    madeUp: (h) => !made.length ? [] : [`${h} Claims we could not find anywhere in your listing or website`, '', 'If you don\'t offer these, the assistant made them up, and customers may turn up expecting them.', '', '| Assistant | What it said | What your records say |', '|---|---|---|',
+      ...made.map(({ a, f }) => `| ${a.label} | “${cell(shown(f.quote))}” | ${cell(f.truth || 'Not mentioned')} |`), ''],
+    unanswered: (h) => !unanswered.length ? [] : [`${h} Questions the assistants could not answer`, '', ...unanswered.map((a) => `- **${a.label}** couldn't say: ${asked(a.missing)} (asked “${a.prompt.text}”)`), ''],
+    rivals: (h) => [`${h} Who the assistants recommend instead`, '',
+      ...(rivals.length ? ['| Business | Recommendation answers naming them | By |', '|---|---|---|', ...rivals.slice(0, 10).map((r) => `| ${cell(r.name)} | ${r.count} | ${[...r.by].join(', ')} |`)] : ['No other businesses were named.']),
+      ...(truth.alsoSearch.length ? ['', `For comparison, Google's own "People also search for" on your listing: ${truth.alsoSearch.join(', ')}.`] : []), ''],
+    sources: (h) => [`${h} Where the assistants get their answers`, '', 'The pages the assistants cited. Being listed, and described correctly, on these is how a business gets into the answers.', '',
+      ...(sources.length ? ['| Site | Times cited | By | Example page |', '|---|---|---|---|', ...sources.slice(0, 12).map((s) => `| ${s.name} | ${s.count} | ${[...s.by].join(', ')} | ${s.url} |`)] : ['No sources were cited.']),
+      ...(truth.domain ? ['', `Your own site (${truth.domain}) was cited ${ownCites} time${ownCites === 1 ? '' : 's'}.`] : []),
+      ...(seen ? ['', `Beyond this snapshot: DataForSEO's database of ${seen.scope} has **${seen.total}** answer${seen.total === 1 ? '' : 's'} citing ${truth.domain}${seen.questions.length ? `, e.g. for “${seen.questions.join('”, “')}”` : ''}.`] : []), ''],
+    detail: (h) => {
+      const L = [`${h} Answer by answer`, ''];
+      for (const e of ENGINES) {
+        const as = answers.filter((a) => a.engine === e.id);
+        const m = as.find((a) => a.text)?.model;
+        L.push(`${h}# ${e.label}${m ? ` · ${m}` : ''}`, '', '| Question | Result | Recommended instead | Sources cited |', '|---|---|---|---|');
+        for (const a of as) L.push(`| ${cell(a.prompt.text)} | ${cell(resultCell(a))} | ${cell(a.competitors.join(', ') || '—')} | ${cell(uniq(a.cites.map((c) => hostOf(c.url))).slice(0, 3).join(', ') || '—')} |`);
+        L.push('');
+      }
+      return L;
+    },
+    record: (h) => {
+      const L = [`${h} Your record (what we checked against)`, ''];
+      if (truth.listing) {
+        L.push(`- **Google listing:** ${truth.name}${truth.category ? `, ${truth.category}` : ''}`, `- **Address:** ${truth.address ?? 'not listed'}`, `- **Phone:** ${truth.phones.join(' / ') || 'not listed'}`,
+          `- **Hours:** ${shortHours(truth.hours)}`, `- **Status:** ${truth.status ?? 'listed, no closure notice seen'}`,
+          `- **Rating:** ${truth.rating ? `${truth.rating} (${truth.reviews ?? '?'} reviews)` : 'none'}${truth.claimed === undefined ? '' : ` · profile ${truth.claimed ? 'claimed' : '**not claimed**'}`}`);
+        if (truth.topics.length) L.push(`- **What your reviews mention most:** ${truth.topics.join(', ')}`);
+      } else L.push('- **Google listing:** none found');
+      if (truth.siteRead) {
+        L.push(`- **Website (${truth.domain}):**`);
+        for (const f of truth.siteFacts) L.push(`  - ${f.field}: “${cell(f.quote)}” (${f.url})`);
+      } else L.push(`- **Website:** ${truth.domain ? `${truth.domain} could not be read` : truth.social ? 'only a social-media page' : 'none'}`);
+      return [...L, ''];
+    },
+    method: [
+      `- ${prompts.length} questions a customer would ask, put to ${ENGINES.length} assistants through their APIs on ${today()} with web search on: ${models.join(', ')}. Questions asked by name: ${prompts.filter((p) => p.type === 'direct').length}; recommendation questions: ${prompts.filter((p) => p.type === 'discovery').length}.`,
+      '- The truth is your Google listing (via Google Maps and your Google Business Profile) and your own website, read the same day. If those are out of date, an assistant can look "wrong" while being right; the fix is the same: make your records correct.',
+      `- One model compared every statement with your record. Every quote had to appear word for word in the saved answer, and every business named as a competitor had to appear in it too. ${aud.ok ? `A second model from a different company (${MODELS.auditor}) then judged every statement again without seeing the first verdict. A statement counts as wrong or not-found only when both agree.` : `The second, independent check (${MODELS.auditor}) did not run this time, so the wrong and not-found statements are the first model's judgement only: verify them against your records before acting.`}`,
+      ...(disputed.length ? [`- ${disputed.length} statement${disputed.length === 1 ? '' : 's'} where the two checkers disagreed, left out of the score: ${disputed.map(({ a, f }) => `${a.label} “${cell(shown(f.quote))}” (${f.auditNote})`).join('; ')}.`] : []),
+      '- **Honest limits:** assistants give different answers from run to run, to different wordings, in different places and to different accounts, and the consumer apps can differ from their APIs. This is a snapshot, not a guarantee. Re-run it after you make the fixes.',
+    ],
+  };
+
+  // Files: one row per answer, and every answer in full
+  const header = ['engine', 'model', 'web_search', 'question_type', 'prompt', 'named_business', 'facts_checked', 'correct_facts', 'wrong_facts', 'not_in_records', 'unanswered', 'competitors', 'cited_urls', 'answer'];
+  const rows = answers.map((a) => {
+    const fs = (v: Verdict) => a.facts.filter((f) => f.final === v);
+    return [a.label, a.model, a.webSearch === undefined ? '' : a.webSearch ? 'yes' : 'no', a.prompt.type, a.prompt.text,
+      a.prompt.type === 'discovery' ? (a.text ? (a.named ? 'yes' : 'no') : '') : 'asked by name',
+      a.facts.filter((f) => f.final !== 'disputed').length, fs('correct').length,
+      fs('wrong').map((f) => `${f.field}: "${shown(f.quote)}" (record: ${f.truth})`).join(' | '),
+      fs('made_up').map((f) => `${f.field}: "${shown(f.quote)}"`).join(' | '),
+      a.missing.join(' | '), a.competitors.join(' | '), a.cites.map((c) => c.url).join(' '), a.text || `(${a.error ?? 'no answer'})`].map(csvCell).join(',');
+  });
+  const T = [`# Every answer, in full: ${spec.name}, ${today()}`, ''];
+  for (const p of prompts) {
+    T.push(`## “${p.text}”`, '');
+    for (const a of answers.filter((x) => x.prompt.kind === p.kind)) {
+      T.push(`### ${a.label}${a.text ? ` · ${a.model} · web search ${a.webSearch ? 'used' : 'not used'}` : ''}`, '');
+      T.push(a.text ? a.text.split('\n').map((l) => `> ${l}`).join('\n') : `_${a.error ?? 'no answer'}_`, '');
+      if (a.cites.length) T.push('Sources:', ...a.cites.map((c) => `- ${c.title} — ${c.url}`), '');
+    }
+  }
+  const files = [{ name: 'answers.csv', content: [header.join(','), ...rows].join('\n') + '\n' }, { name: 'ai-answers.md', content: T.join('\n') }];
+
+  return { where, record, prompts, answers, answered, disc, named, wrong, made, right, disputed, unanswered, worst, rivals, sources, ownCites, seen, aud, fixes, issues, hardFail, literal, unjudged: qa.unjudged, md, files };
+}
+
+// ---------- the service (off the menu; Get Found runs the same audit; old orders can still be revised)
 
 export const aiAnswerAudit = {
   id: 'ai-answer-audit',
@@ -507,113 +757,19 @@ export const aiAnswerAudit = {
   async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {
     const job = new Job(this.id, brief, this.policy, opts.orderId);
     try {
-      job.log('researcher', 'parse', 'business, website, area, category, what customers look for');
-      const parsed = parseJson<Partial<Spec>>(
-        await llm(job, 'researcher', [
-          { role: 'system', content: 'Parse a request to audit what AI assistants say about a local business. Reply JSON only: {"name": the business name exactly as given, "website": domain or URL if given else "", "area": neighbourhood or district if given else "", "city": town or city, "country": country name in English, "countryIso": 2-letter ISO code, "category": the kind of business in 1-3 words, singular (e.g. "restaurant", "dentist", "hair salon"), "categoryPlural": its plural, "service": what customers most often look for there, 1-4 words (e.g. "jollof rice", "teeth whitening"), "priceItem": one specific product or service a customer would ask the price of, with an article (e.g. "a plate of jollof rice")}. Infer the country from the city when it is not stated.' },
-          { role: 'user', content: brief },
-        ], 'parse the audit request', { model: MODELS.fast, maxTokens: 300, json: true, dry: () => JSON.stringify(fx.spec) }),
-        {},
-      );
-      const spec: Spec = { name: '', website: '', area: '', city: '', country: '', countryIso: '', category: 'business', categoryPlural: '', service: '', priceItem: '' };
-      for (const k of Object.keys(spec) as (keyof Spec)[]) if (typeof parsed[k] === 'string' && parsed[k]!.trim()) spec[k] = parsed[k]!.trim();
-      if (!spec.name || !(spec.city || spec.area)) throw new Error('tell us the business name and its town or city');
-      spec.countryIso = spec.countryIso.toUpperCase().slice(0, 2);
-      spec.categoryPlural ||= `${spec.category}s`;
-      spec.service ||= spec.category;
-      spec.priceItem ||= `their most popular ${spec.service}`;
-      const where = place(spec);
-
-      // 1. The truth
-      // The order form's details are exact: name, website and place override what was parsed.
       const d = opts.details;
-      if (d) {
-        spec.name = d.name;
-        if (d.website) spec.website = d.website;
-        if (d.area) spec.area = d.area;
-        if (d.city) spec.city = d.city;
-      }
+      const { spec } = await readSpec(job, brief, d);
       const truth = await gatherTruth(job, spec);
-      // The owner's own prices and contact details join the record the answers are judged against.
-      if (d) {
-        const owner = 'the owner (order form)';
-        for (const m of parseMenu(d.menu).filter((x) => x.price)) truth.siteFacts.push({ field: 'price', value: `${m.name}: ${m.price}`, quote: m.source, url: owner });
-        if (d.whatsapp ?? d.phone) truth.siteFacts.push({ field: 'phone', value: (d.whatsapp ?? d.phone)!, quote: (d.whatsapp ?? d.phone)!, url: owner });
-        if (d.address) truth.siteFacts.push({ field: 'address', value: d.address, quote: d.address, url: owner });
-        if (d.menu) job.log('analyst', 'facts', `${parseMenu(d.menu).filter((x) => x.price).length} prices from the owner added to the record`);
-      }
-      const record = recordText(spec, truth);
-      const seen = await mentions(job, spec, truth);
-
-      // 2. What customers ask: three questions about the business by name, three where it has to be recommended
-      const prompts: Prompt[] = [
-        { kind: 'hours', type: 'direct', text: `What are the opening hours of ${spec.name} in ${where}?`, expects: ['hours'] },
-        { kind: 'status', type: 'direct', text: `Is ${spec.name} in ${where} still open? What is their address and phone number?`, expects: ['status', 'address', 'phone'] },
-        { kind: 'price', type: 'direct', text: `How much does ${spec.name} in ${where} charge for ${spec.priceItem}? Do they have any deals or discounts at the moment?`, expects: ['price', 'deal'] },
-        { kind: 'best', type: 'discovery', text: `What's the best ${spec.category} in ${where}?`, expects: [] },
-        { kind: 'service', type: 'discovery', text: `Where can I get ${spec.service} near ${where}?`, expects: [] },
-        { kind: 'recommend', type: 'discovery', text: `Can you recommend a few good ${spec.categoryPlural} in ${where}?`, expects: [] },
-        // the customer's own question from the order form, asked about the business by name
-        ...(d?.questions ? [{ kind: 'custom' as Kind, type: 'direct' as const, text: `About ${spec.name} in ${where}: ${d.questions.split('\n')[0].trim().slice(0, 160)}`, expects: ['other'] }] : []),
-      ];
-      job.log('researcher', 'plan', `${prompts.length} questions × ${ENGINES.length} assistants, web search on`);
-
-      // 3. Two lanes ask; the analyst checks each question as soon as all four answers to it are in
-      const states = new Map(ENGINES.map((e) => [e.id, { model: preferred[e.id] ?? e.models[0], ok: false, fails: 0, down: '' } as EngineState]));
-      const pending = new Map<string, Promise<Answer>>();
-      for (const lane of LANES) {
-        let prev: Promise<unknown> = Promise.resolve();
-        for (const p of prompts) for (const id of lane.engines) {
-          const e = ENGINES.find((x) => x.id === id)!;
-          const next = prev.then(() => ask(job, e, lane.agent, p, spec, states.get(id)!));
-          pending.set(`${id}:${p.kind}`, next);
-          prev = next;
-        }
-      }
-      const qa: Qa = { droppedFacts: 0, droppedComps: 0, unjudged: 0 };
-      let n = 0;
-      const answers: Answer[] = [];
-      for (const p of prompts) {
-        const batch = await Promise.all(ENGINES.map((e) => pending.get(`${e.id}:${p.kind}`)!));
-        answers.push(...batch);
-        await judge(job, spec, record, p, batch, qa, () => `F${++n}`);
-      }
-      const answered = answers.filter((a) => a.text);
-      job.log('analyst', 'checked', `${answered.length}/${answers.length} answers; ${qa.droppedFacts} statements and ${qa.droppedComps} names dropped (not word for word in the answer)`);
-
-      // 4. Independent audit
-      const aud = await audit(job, record, answered);
-
-      // 5. Numbers, deterministic QA, report
-      const disc = answered.filter((a) => a.prompt.type === 'discovery');
-      const named = disc.filter((a) => a.named);
-      const wrong = counted(answered, 'wrong'), made = counted(answered, 'made_up'), right = counted(answered, 'correct'), disputed = counted(answered, 'disputed' as Verdict);
-      const unanswered = answered.filter((a) => a.missing.length);
-      const rivals = tallyNames(disc);
-      const sources = tallySources(answered, truth.domain);
-      const ownCites = answered.reduce((s, a) => s + a.cites.filter((c) => truth.domain && hostOf(c.url) === truth.domain).length, 0);
-      const discSources = tallySources(disc, truth.domain);
-      const fixes = fixList(spec, truth, answered, discSources.length ? discSources : sources, rivals);
-
-      const literal = answered.every((a) => a.facts.every((f) => a.text.includes(f.quote)) && a.competitors.every((c) => a.text.includes(c)));
-      const issues = [
-        answered.length < answers.length ? `${answered.length} of ${answers.length} answers came back (${ENGINES.map((e) => [e.label, answers.filter((a) => a.engine === e.id && !a.text).length] as const).filter(([, k]) => k).map(([l, k]) => `${l}: ${k} missing`).join(', ')})` : '',
-        qa.droppedFacts ? `${nOf(qa.droppedFacts, 'analyst statement')} dropped: quote not word for word in the answer` : '',
-        qa.droppedComps ? `${nOf(qa.droppedComps, 'competitor name')} dropped: not in the answer` : '',
-        qa.unjudged ? `${nOf(qa.unjudged, 'answer')} the analyst did not return` : '',
-        aud.ok ? `auditor agreed on ${aud.agreed} of ${aud.total} statements; ${disputed.length} disputed and left out of the score` : 'the independent auditor did not answer; wrong facts are the analyst\'s alone',
-        literal ? '' : 'a printed quote or name is not in its answer',
-      ].filter(Boolean);
-      const hardFail = answered.length < answers.length / 2 || !literal;
-      job.log('auditor', 'check', `${hardFail ? 'FAIL' : 'pass'}: ${issues.join('; ')}`);
-      job.qa = { verdict: hardFail || !aud.ok ? 'revise' : 'pass', notes: issues.join(' | '), model: `${MODELS.auditor} (blind re-judge) + deterministic quote checks` };
+      addOwnerFacts(job, truth, d);
+      const r = await auditAnswers(job, spec, truth, d);
+      const { where, disc, named, wrong, made, unanswered, worst, rivals } = r;
+      job.qa = { verdict: r.hardFail || !r.aud.ok ? 'revise' : 'pass', notes: r.issues.join(' | '), model: `${MODELS.auditor} (blind re-judge) + deterministic quote checks` };
 
       // Writer: a plain-English summary. Every number in it must come from the data we hand over.
-      const worst = [...wrong.filter((x) => x.f.field === 'status'), ...wrong.filter((x) => x.f.field === 'hours'), ...wrong, ...made][0];
       const facts = { business: spec.name, area: where, category: spec.category, discovery_answers: disc.length, named_in: named.length, wrong_facts: wrong.length,
         claims_not_in_records: made.length, questions_left_unanswered: unanswered.length,
         most_harmful: worst ? { assistant: worst.a.label, said: shown(worst.f.quote), truth: worst.f.truth } : null,
-        recommended_instead: rivals.slice(0, 3).map((r) => ({ name: r.name, times: r.count })) };
+        recommended_instead: rivals.slice(0, 3).map((x) => ({ name: x.name, times: x.count })) };
       job.log('writer', 'summary', 'plain-English summary for the owner');
       let summary = '';
       try {
@@ -629,103 +785,18 @@ export const aiAnswerAudit = {
           `Asked about you by name, the assistants stated ${wrong.length} wrong fact${wrong.length === 1 ? '' : 's'}${worst ? ` (${worst.a.label}: “${shown(worst.f.quote)}”)` : ''} and ${made.length} claim${made.length === 1 ? '' : 's'} we could not find anywhere in your listing or website.`;
       }
 
-      const models = ENGINES.map((e) => { const a = answered.find((x) => x.engine === e.id); return a ? `${e.label} (${a.model})` : `${e.label} (no answers)`; });
-      const L: string[] = [];
-      L.push(`# What AI assistants tell customers about ${spec.name}`, '',
-        `${spec.name} · ${spec.category} · ${where} · snapshot taken ${today()}`, '',
-        `**Named in ${named.length} of ${disc.length} recommendation answers · ${wrong.length} wrong fact${wrong.length === 1 ? '' : 's'} · ${made.length} claim${made.length === 1 ? '' : 's'} not found in your records · ${unanswered.length} question${unanswered.length === 1 ? '' : 's'} left unanswered**`, '',
-        summary, '');
-      L.push('## Scorecard', '', '| Assistant | Named you when asked for a recommendation | Facts right | Wrong | Not in your records | Answers missing basics | Web search used |', '|---|---|---|---|---|---|---|');
-      for (const e of ENGINES) {
-        const as = answered.filter((a) => a.engine === e.id);
-        const f = (v: Verdict) => as.reduce((s, a) => s + a.facts.filter((x) => x.final === v).length, 0);
-        const d = as.filter((a) => a.prompt.type === 'discovery');
-        if (!as.length) { L.push(`| ${e.label} | no answers this run | — | — | — | — | — |`); continue; }
-        L.push(`| ${e.label} (${as[0].model}) | ${d.filter((a) => a.named).length} of ${d.length} | ${f('correct')} | ${f('wrong')} | ${f('made_up')} | ${as.filter((a) => a.missing.length).length} | ${as.filter((a) => a.webSearch).length} of ${as.length} |`);
-      }
-      L.push('');
-      if (wrong.length) {
-        L.push('## Wrong facts', '', 'Each quote is copied word for word from the assistant\'s answer (all answers are in `ai-answers.md`).', '', '| Assistant | Question | What it said | What your records say |', '|---|---|---|---|');
-        for (const { a, f } of wrong) L.push(`| ${a.label} | ${cell(a.prompt.text)} | “${cell(shown(f.quote))}” | ${cell(f.truth || '—')} |`);
-        L.push('');
-      }
-      if (made.length) {
-        L.push('## Claims we could not find anywhere in your listing or website', '', 'If you don\'t offer these, the assistant made them up, and customers may turn up expecting them.', '', '| Assistant | What it said | What your records say |', '|---|---|---|');
-        for (const { a, f } of made) L.push(`| ${a.label} | “${cell(shown(f.quote))}” | ${cell(f.truth || 'Not mentioned')} |`);
-        L.push('');
-      }
-      if (unanswered.length) {
-        L.push('## Questions the assistants could not answer', '');
-        for (const a of unanswered) L.push(`- **${a.label}** couldn't say: ${asked(a.missing)} (asked “${a.prompt.text}”)`);
-        L.push('');
-      }
-      L.push('## Who the assistants recommend instead', '');
-      if (rivals.length) {
-        L.push('| Business | Recommendation answers naming them | By |', '|---|---|---|');
-        for (const r of rivals.slice(0, 10)) L.push(`| ${cell(r.name)} | ${r.count} | ${[...r.by].join(', ')} |`);
-      } else L.push('No other businesses were named.');
-      if (truth.alsoSearch.length) L.push('', `For comparison, Google's own "People also search for" on your listing: ${truth.alsoSearch.join(', ')}.`);
-      L.push('', '## Where the assistants get their answers', '', 'The pages the assistants cited. Being listed, and described correctly, on these is how a business gets into the answers.', '');
-      if (sources.length) {
-        L.push('| Site | Times cited | By | Example page |', '|---|---|---|---|');
-        for (const s of sources.slice(0, 12)) L.push(`| ${s.name} | ${s.count} | ${[...s.by].join(', ')} | ${s.url} |`);
-      } else L.push('No sources were cited.');
-      if (truth.domain) L.push('', `Your own site (${truth.domain}) was cited ${ownCites} time${ownCites === 1 ? '' : 's'}.`);
-      if (seen) L.push('', `Beyond this snapshot: DataForSEO's database of ${seen.scope} has **${seen.total}** answer${seen.total === 1 ? '' : 's'} citing ${truth.domain}${seen.questions.length ? `, e.g. for “${seen.questions.join('”, “')}”` : ''}.`);
-      L.push('', '## Fix list, most urgent first', '', ...(fixes.length ? fixes.map((x, i) => `${i + 1}. ${x}`) : ['Nothing urgent: the assistants got your facts right. Re-check in a month; answers change.']), '');
-      L.push('## Answer by answer', '');
-      for (const e of ENGINES) {
-        const as = answers.filter((a) => a.engine === e.id);
-        const m = as.find((a) => a.text)?.model;
-        L.push(`### ${e.label}${m ? ` · ${m}` : ''}`, '', '| Question | Result | Recommended instead | Sources cited |', '|---|---|---|---|');
-        for (const a of as) L.push(`| ${cell(a.prompt.text)} | ${cell(resultCell(a))} | ${cell(a.competitors.join(', ') || '—')} | ${cell(uniq(a.cites.map((c) => hostOf(c.url))).slice(0, 3).join(', ') || '—')} |`);
-        L.push('');
-      }
-      L.push('## Your record (what we checked against)', '');
-      if (truth.listing) {
-        L.push(`- **Google listing:** ${truth.name}${truth.category ? `, ${truth.category}` : ''}`, `- **Address:** ${truth.address ?? 'not listed'}`, `- **Phone:** ${truth.phones.join(' / ') || 'not listed'}`,
-          `- **Hours:** ${shortHours(truth.hours)}`, `- **Status:** ${truth.status ?? 'listed, no closure notice seen'}`,
-          `- **Rating:** ${truth.rating ? `${truth.rating} (${truth.reviews ?? '?'} reviews)` : 'none'}${truth.claimed === undefined ? '' : ` · profile ${truth.claimed ? 'claimed' : '**not claimed**'}`}`);
-        if (truth.topics.length) L.push(`- **What your reviews mention most:** ${truth.topics.join(', ')}`);
-      } else L.push('- **Google listing:** none found');
-      if (truth.siteRead) {
-        L.push(`- **Website (${truth.domain}):**`);
-        for (const f of truth.siteFacts) L.push(`  - ${f.field}: “${cell(f.quote)}” (${f.url})`);
-      } else L.push(`- **Website:** ${truth.domain ? `${truth.domain} could not be read` : truth.social ? 'only a social-media page' : 'none'}`);
-      L.push('', '## How this audit was done', '',
-        `- ${prompts.length} questions a customer would ask, put to ${ENGINES.length} assistants through their APIs on ${today()} with web search on: ${models.join(', ')}. Questions asked by name: ${prompts.filter((p) => p.type === 'direct').length}; recommendation questions: ${prompts.filter((p) => p.type === 'discovery').length}.`,
-        '- The truth is your Google listing (via Google Maps and your Google Business Profile) and your own website, read the same day. If those are out of date, an assistant can look "wrong" while being right; the fix is the same: make your records correct.',
-        `- One model compared every statement with your record. Every quote had to appear word for word in the saved answer, and every business named as a competitor had to appear in it too. ${aud.ok ? `A second model from a different company (${MODELS.auditor}) then judged every statement again without seeing the first verdict. A statement counts as wrong or not-found only when both agree.` : `The second, independent check (${MODELS.auditor}) did not run this time, so the wrong and not-found statements are the first model's judgement only: verify them against your records before acting.`}`,
-        ...(disputed.length ? [`- ${disputed.length} statement${disputed.length === 1 ? '' : 's'} where the two checkers disagreed, left out of the score: ${disputed.map(({ a, f }) => `${a.label} “${cell(shown(f.quote))}” (${f.auditNote})`).join('; ')}.`] : []),
-        '- **Honest limits:** assistants give different answers from run to run, to different wordings, in different places and to different accounts, and the consumer apps can differ from their APIs. This is a snapshot, not a guarantee. Re-run it after you make the fixes.',
-        '', 'Files: `answers.csv` (one row per answer), `ai-answers.md` (every answer in full, with its sources).');
-      if (issues.length) L.push('', `> QA notes: ${issues.join('; ')}.`);
+      const fixes = r.fixes.slice(0, 8).map((f) => f.text);
+      const L = [`# What AI assistants tell customers about ${spec.name}`, '', `${spec.name} · ${spec.category} · ${where} · snapshot taken ${today()}`, '', r.md.stats, '', summary, '',
+        ...r.md.scorecard('##'), ...r.md.wrongFacts('##'), ...r.md.madeUp('##'), ...r.md.unanswered('##'), ...r.md.rivals('##'), ...r.md.sources('##'),
+        '## Fix list, most urgent first', '', ...(fixes.length ? fixes.map((x, i) => `${i + 1}. ${x}`) : ['Nothing urgent: the assistants got your facts right. Re-check in a month; answers change.']), '',
+        ...r.md.detail('##'), ...r.md.record('##'),
+        '## How this audit was done', '', ...r.md.method, '', 'Files: `answers.csv` (one row per answer), `ai-answers.md` (every answer in full, with its sources).'];
+      if (r.issues.length) L.push('', `> QA notes: ${r.issues.join('; ')}.`);
       job.deliverable = L.join('\n');
+      job.files.push(...r.files);
 
-      const header = ['engine', 'model', 'web_search', 'question_type', 'prompt', 'named_business', 'facts_checked', 'correct_facts', 'wrong_facts', 'not_in_records', 'unanswered', 'competitors', 'cited_urls', 'answer'];
-      const rows = answers.map((a) => {
-        const fs = (v: Verdict) => a.facts.filter((f) => f.final === v);
-        return [a.label, a.model, a.webSearch === undefined ? '' : a.webSearch ? 'yes' : 'no', a.prompt.type, a.prompt.text,
-          a.prompt.type === 'discovery' ? (a.text ? (a.named ? 'yes' : 'no') : '') : 'asked by name',
-          a.facts.filter((f) => f.final !== 'disputed').length, fs('correct').length,
-          fs('wrong').map((f) => `${f.field}: "${shown(f.quote)}" (record: ${f.truth})`).join(' | '),
-          fs('made_up').map((f) => `${f.field}: "${shown(f.quote)}"`).join(' | '),
-          a.missing.join(' | '), a.competitors.join(' | '), a.cites.map((c) => c.url).join(' '), a.text || `(${a.error ?? 'no answer'})`].map(csvCell).join(',');
-      });
-      job.files.push({ name: 'answers.csv', content: [header.join(','), ...rows].join('\n') + '\n' });
-      const T = [`# Every answer, in full: ${spec.name}, ${today()}`, ''];
-      for (const p of prompts) {
-        T.push(`## “${p.text}”`, '');
-        for (const a of answers.filter((x) => x.prompt.kind === p.kind)) {
-          T.push(`### ${a.label}${a.text ? ` · ${a.model} · web search ${a.webSearch ? 'used' : 'not used'}` : ''}`, '');
-          T.push(a.text ? a.text.split('\n').map((l) => `> ${l}`).join('\n') : `_${a.error ?? 'no answer'}_`, '');
-          if (a.cites.length) T.push('Sources:', ...a.cites.map((c) => `- ${c.title} — ${c.url}`), '');
-        }
-      }
-      job.files.push({ name: 'ai-answers.md', content: T.join('\n') });
-
-      job.status = hardFail ? 'failed' : 'delivered';
-      if (hardFail) job.error = `QA failed: ${issues.join('; ')}`;
+      job.status = r.hardFail ? 'failed' : 'delivered';
+      if (r.hardFail) job.error = `QA failed: ${r.issues.join('; ')}`;
     } catch (e: any) {
       job.status = 'failed';
       job.error = errMsg(e);

@@ -123,4 +123,5 @@ export const SERVICE_NAME: Record<string, string> = {
   "research-brief": "Research Brief", "local-business-finder": "Local Business Finder", "lead-list": "Lead List",
   "content-pack": "Content Pack", website: "Website", "motion-ad": "Motion Ad", "video-ad": "Video Ad",
   "best-price": "Best Price Finder", "ai-answer-audit": "AI Answer Audit", "vendor-check": "Check Before You Pay",
+  "ad-launch": "Ad Launch", "product-photos": "Product Photo Studio", "get-found": "Get Found", "buy-smart": "Buy Smart",
 };

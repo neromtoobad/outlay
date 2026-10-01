@@ -33,7 +33,7 @@ export type BusinessDetails = {
   // for Content Pack
   platforms?: string[];
   goal?: string;
-  competitors?: string[]; // handles
+  competitors?: string[]; // Instagram handles (Content Pack), business names (Get Found)
   tone?: string;
   // for Motion Ad and Video Ad
   promote?: string; // what the ad is for
@@ -41,9 +41,28 @@ export type BusinessDetails = {
   cta?: 'whatsapp' | 'call' | 'visit' | 'website' | 'dm';
   format?: 'vertical' | 'square' | 'landscape';
   length?: number;
-  // for AI Answer Audit
-  questions?: string;
+  // for Get Found
+  questions?: string; // a question customers ask, put to the AI assistants
+  searches?: string; // what customers type to find a business like this
+  // for Ad Launch
+  adGoal?: (typeof AD_GOALS)[number];
+  adBudget?: string; // e.g. "₦5,000 a day"
+  adPlatforms?: ('meta' | 'tiktok')[];
+  audience?: string;
+  adResults?: string[]; // upload ids: screenshots of the ads or boosts they already ran
+  // for Product Photo Studio
+  product?: string; // what is in the photos
+  uses?: (typeof PHOTO_USES)[number][];
+  look?: 'clean' | 'lifestyle' | 'bold';
+  // for Buy Smart
+  items?: string; // one per line, with quantity
+  deliverTo?: string;
+  budget?: string;
+  condition?: 'new' | 'used' | 'any';
+  sellers?: string; // sellers they are already talking to, one per line
 };
+export const AD_GOALS = ['messages', 'sales', 'calls', 'visits', 'followers'] as const;
+export const PHOTO_USES = ['instagram', 'whatsapp', 'marketplace', 'website'] as const;
 export const PLATFORM_CHOICES = ['instagram', 'tiktok', 'whatsapp-status', 'facebook', 'x', 'linkedin'] as const;
 
 const s = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) || undefined : undefined);
@@ -61,7 +80,12 @@ const RELEVANT: Record<string, (keyof BusinessDetails)[]> = {
   'motion-ad': ['promote', 'price', 'cta', 'whatsapp', 'phone', 'instagram', 'website', 'address', 'format', 'length', 'colour', 'notes', 'logo', 'photos'],
   'video-ad': ['promote', 'price', 'cta', 'whatsapp', 'phone', 'instagram', 'website', 'address', 'colour', 'notes', 'logo', 'photos'],
   'ai-answer-audit': ['website', 'instagram', 'maps', 'menu', 'questions'],
+  'get-found': ['website', 'instagram', 'maps', 'menu', 'questions', 'searches', 'whatsapp', 'phone', 'address', 'competitors'],
+  'ad-launch': ['promote', 'price', 'cta', 'whatsapp', 'phone', 'instagram', 'website', 'address', 'colour', 'notes', 'logo', 'photos', 'competitors', 'adGoal', 'adBudget', 'adPlatforms', 'audience', 'adResults'],
+  'product-photos': ['product', 'uses', 'look', 'colour', 'notes', 'logo', 'photos'],
+  'buy-smart': ['items', 'deliverTo', 'budget', 'condition', 'sellers', 'notes'],
 };
+const AD_SERVICES = ['motion-ad', 'video-ad', 'ad-launch'];
 
 /** Throws a plain-English error when something required is missing (what's required depends on the service). */
 export function cleanDetails(raw: any, service = 'website'): BusinessDetails {
@@ -81,39 +105,62 @@ export function cleanDetails(raw: any, service = 'website'): BusinessDetails {
     logo: typeof raw?.logo === 'string' && uploadExists(raw.logo) ? raw.logo : undefined, photos,
     platforms: Array.isArray(raw?.platforms) ? raw.platforms.filter((x: unknown) => (PLATFORM_CHOICES as readonly string[]).includes(x as string)) : undefined,
     goal: s(raw?.goal, 160), tone: s(raw?.tone, 120),
-    competitors: Array.isArray(raw?.competitors) ? raw.competitors.map(handle).filter(Boolean).slice(0, 3) as string[] : typeof raw?.competitors === 'string' ? raw.competitors.split(/[\s,]+/).map(handle).filter(Boolean).slice(0, 3) as string[] : undefined,
+    competitors: service === 'get-found'
+      ? (Array.isArray(raw?.competitors) ? raw.competitors : typeof raw?.competitors === 'string' ? raw.competitors.split(/[,\n;]+/) : []).map((x: unknown) => s(x, 80)).filter(Boolean).slice(0, 3) as string[]
+      : Array.isArray(raw?.competitors) ? raw.competitors.map(handle).filter(Boolean).slice(0, 3) as string[] : typeof raw?.competitors === 'string' ? raw.competitors.split(/[\s,]+/).map(handle).filter(Boolean).slice(0, 3) as string[] : undefined,
     promote: s(raw?.promote, 200), price: s(raw?.price, 60),
     cta: ['whatsapp', 'call', 'visit', 'website', 'dm'].includes(raw?.cta) ? raw.cta : undefined,
     format: ['vertical', 'square', 'landscape'].includes(raw?.format) ? raw.format : undefined,
     length: [12, 16, 20, 24].includes(Number(raw?.length)) ? Number(raw.length) : undefined,
-    questions: multiline(raw?.questions, 600),
+    questions: multiline(raw?.questions, 600), searches: s(raw?.searches, 200),
+    adGoal: (AD_GOALS as readonly string[]).includes(raw?.adGoal) ? raw.adGoal : undefined,
+    adBudget: s(raw?.adBudget, 60), audience: s(raw?.audience, 200),
+    adPlatforms: Array.isArray(raw?.adPlatforms) ? raw.adPlatforms.filter((x: unknown) => x === 'meta' || x === 'tiktok') : undefined,
+    adResults: Array.isArray(raw?.adResults) ? raw.adResults.filter((x: unknown) => typeof x === 'string' && uploadExists(x)).slice(0, 4) : undefined,
+    product: s(raw?.product, 160),
+    uses: Array.isArray(raw?.uses) ? raw.uses.filter((x: unknown) => (PHOTO_USES as readonly string[]).includes(x as string)) : undefined,
+    look: ['clean', 'lifestyle', 'bold'].includes(raw?.look) ? raw.look : undefined,
+    items: multiline(raw?.items, 1200), deliverTo: s(raw?.deliverTo, 200), budget: s(raw?.budget, 60),
+    condition: ['new', 'used', 'any'].includes(raw?.condition) ? raw.condition : undefined,
+    sellers: multiline(raw?.sellers, 800),
   };
   // The form keeps one draft across services; keep only what this service uses, so nothing stale leaks in.
   const keep = RELEVANT[service] ?? RELEVANT.website;
   for (const k of Object.keys(d) as (keyof BusinessDetails)[]) if (!['name', 'kind', 'offer', 'area', 'city'].includes(k) && !keep.includes(k)) delete d[k];
-  if (service === 'motion-ad' || service === 'video-ad') {
+  if (AD_SERVICES.includes(service)) {
     if (d.cta !== 'call' && d.cta !== 'whatsapp') delete d.whatsapp, delete d.phone;
     if (d.cta !== 'visit') delete d.address;
   }
   const reach = d.whatsapp || d.phone || d.email || d.website;
   if (service === 'website' && !d.whatsapp && !d.phone && !d.email) throw new Error('Add at least one way for customers to reach the business: WhatsApp, phone or email.');
-  if ((service === 'motion-ad' || service === 'video-ad') && !reach && !d.instagram) throw new Error('Add how customers should respond to the ad: WhatsApp, phone, website or Instagram.');
-  if (service === 'ai-answer-audit' && !d.city && !d.area) throw new Error('Add the area or city: the AI assistants are asked about businesses there.');
+  if (AD_SERVICES.includes(service) && !reach && !d.instagram) throw new Error('Add how customers should respond to the ad: WhatsApp, phone, website or Instagram.');
+  if ((service === 'ai-answer-audit' || service === 'get-found') && !d.city && !d.area) throw new Error('Add the area or city: Google and the AI assistants are searched from there.');
+  if (service === 'product-photos' && !d.photos?.length) throw new Error('Upload at least one photo of the product.');
+  if (service === 'buy-smart' && !d.items) throw new Error('List what you want to buy.');
+  if (service === 'buy-smart' && !d.deliverTo && !d.city && !d.area) throw new Error('Add where it should be delivered.');
+  if (service === 'ad-launch' && !d.adPlatforms?.length) d.adPlatforms = ['meta'];
+  if (service === 'product-photos' && !d.uses?.length) d.uses = ['instagram', 'whatsapp'];
   if (service === 'content-pack' && !d.platforms?.length) d.platforms = ['instagram', 'tiktok'];
   return d;
 }
 
 /** The details as a readable brief: shown on the quote and the order, and hashed into the escrow terms. */
 export function detailsBrief(d: BusinessDetails, service: string): string {
-  const what = ({ website: 'A website for', 'content-pack': 'A content pack for', 'motion-ad': 'A motion ad for', 'video-ad': 'A video ad for', 'ai-answer-audit': 'An AI answer audit for' } as Record<string, string>)[service] ?? 'For';
+  const what = ({ website: 'A website for', 'content-pack': 'A content pack for', 'motion-ad': 'A motion ad for', 'video-ad': 'A video ad for', 'ai-answer-audit': 'An AI answer audit for', 'get-found': 'A Google and AI visibility check for', 'ad-launch': 'An ad campaign for', 'product-photos': 'Product photos for', 'buy-smart': 'Buying for' } as Record<string, string>)[service] ?? 'For';
+  const GOAL: Record<string, string> = { messages: 'more WhatsApp or DM messages', sales: 'more sales on the website', calls: 'more phone calls', visits: 'more people visiting the shop', followers: 'more followers' };
   const ctaText = d.cta ? ({ whatsapp: `Order on WhatsApp ${d.whatsapp ?? d.phone ?? ''}`, call: `Call ${d.phone ?? d.whatsapp ?? ''}`, visit: `Visit us${d.address ? ` at ${d.address}` : ''}`, website: `Order at ${d.website ?? ''}`, dm: `DM us on Instagram @${d.instagram ?? ''}` } as const)[d.cta].trim() : undefined;
   const lines = [
     `${what} ${d.name}: ${d.offer}${d.area || d.city ? ` (${[d.area, d.city].filter(Boolean).join(', ')})` : ''}.`,
     d.promote && `Promote: ${d.promote}`, d.price && `Price: ${d.price}`, ctaText && `Call to action: ${ctaText}`,
     d.format && `Format: ${d.format}${d.length ? `, ${d.length} seconds` : ''}`,
     d.platforms?.length && service === 'content-pack' && `Platforms: ${d.platforms.join(', ')}`, d.goal && `Goal: ${d.goal}`, d.tone && `Tone: ${d.tone}`,
-    d.competitors?.length && `Competitors: ${d.competitors.map((c) => `@${c}`).join(', ')}`,
-    d.questions && `Questions customers ask:\n${d.questions}`,
+    d.competitors?.length && `Competitors: ${d.competitors.map((c) => (service === 'get-found' ? c : `@${c}`)).join(', ')}`,
+    d.questions && `Questions customers ask:\n${d.questions}`, d.searches && `Customers search for: ${d.searches}`,
+    d.adGoal && `Ad goal: ${GOAL[d.adGoal]}`, d.adBudget && `Ad budget: ${d.adBudget}`, d.adPlatforms?.length && service === 'ad-launch' && `Run on: ${d.adPlatforms.map((p) => (p === 'meta' ? 'Instagram and Facebook' : 'TikTok')).join(', ')}`,
+    d.audience && `Who buys: ${d.audience}`, d.adResults?.length && `Current ad results: ${d.adResults.length} screenshot${d.adResults.length === 1 ? '' : 's'}`,
+    d.product && `Product: ${d.product}`, d.uses?.length && service === 'product-photos' && `For: ${d.uses.map((u) => ({ whatsapp: 'WhatsApp catalogue and Status', marketplace: 'Jumia, Jiji and Konga listings' } as Record<string, string>)[u] ?? u).join(', ')}`, d.look && `Look: ${d.look}`,
+    d.items && `To buy:\n${d.items}`, d.condition && d.condition !== 'any' && `Condition: ${d.condition}`, d.budget && `Budget: ${d.budget}`, d.deliverTo && `Deliver to: ${d.deliverTo}`,
+    d.sellers && `Sellers already considered:\n${d.sellers}`,
     d.whatsapp && `WhatsApp: ${d.whatsapp}`, d.phone && d.phone !== d.whatsapp && `Phone: ${d.phone}`, d.email && `Email: ${d.email}`, d.address && `Address: ${d.address}`,
     d.instagram && `Instagram: @${d.instagram}`, d.tiktok && `TikTok: @${d.tiktok}`, d.facebook && `Facebook: ${d.facebook}`, d.maps && `Google Maps: ${d.maps}`, d.website && `Current website: ${d.website}`,
     d.menu && `Menu / prices:\n${d.menu}`, d.story && `About: ${d.story}`,

@@ -7,7 +7,7 @@ order: 4
 
 ## Do I need crypto to try it?
 
-No. Your first job is free and needs only an email. For paid jobs you need a browser wallet with USDC on Arc.
+No. Your first website is free and needs only an email. For paid jobs you need a browser wallet with USDC on Arc.
 
 ## How do I get USDC on Arc?
 

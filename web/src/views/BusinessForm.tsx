@@ -1,6 +1,6 @@
 'use client';
-// The business form: who you are, how customers reach you, what you sell (with your own photos), and how
-// you want it to look. Four short steps, saved as a draft on this device so nothing is typed twice.
+// The business form: who you are, how customers reach you, what you sell (with your own photos), and what
+// this job needs. Two to four short steps per service, saved as one draft on this device so nothing is typed twice.
 // Photos are shrunk in the browser before upload, so it stays quick on mobile data.
 import { useEffect, useRef, useState } from 'react';
 
@@ -11,7 +11,10 @@ export type Details = {
   menu: string; story: string; style: string; colour: string; sections: string[]; notes: string;
   logo?: string; photos: string[];
   platforms: string[]; goal: string; competitors: string; tone: string;
-  promote: string; price: string; cta: string; format: string; length: number; questions: string;
+  promote: string; price: string; cta: string; format: string; length: number; questions: string; searches: string;
+  adGoal: string; adBudget: string; adPlatforms: string[]; audience: string; adResults: string[];
+  product: string; uses: string[]; look: string;
+  items: string; deliverTo: string; budget: string; condition: string; sellers: string;
 };
 
 const KINDS: [string, string][] = [['food', 'Food & drinks'], ['beauty', 'Beauty & wellness'], ['creative', 'Photography & creative'], ['events', 'Events & weddings'], ['retail', 'Shop & products'], ['health', 'Health & clinics'], ['professional', 'Professional services'], ['other', 'Something else']];
@@ -27,18 +30,24 @@ const THEMES: { id: string; name: string; mood: string; font: string; bg: string
 ];
 const SECTIONS: [string, string][] = [['offer', 'Menu / prices'], ['gallery', 'Photo gallery'], ['reviews', 'Google reviews'], ['about', 'About us'], ['steps', 'How to order or book'], ['location', 'Map & opening hours'], ['faq', 'Questions & answers']];
 const SWATCHES = ['#C0392B', '#D4380D', '#E67E22', '#D4A017', '#2E7D32', '#0F766E', '#1D4ED8', '#6D28D9', '#BE185D', '#111827'];
-const EMPTY: Details = { name: '', kind: 'food', offer: '', area: '', city: 'Lagos', whatsapp: '', phone: '', email: '', address: '', maps: '', instagram: '', tiktok: '', facebook: '', website: '', menu: '', story: '', style: 'auto', colour: '', sections: SECTIONS.map(([k]) => k), notes: '', photos: [], platforms: ['instagram', 'tiktok'], goal: '', competitors: '', tone: '', promote: '', price: '', cta: 'whatsapp', format: 'vertical', length: 16, questions: '' };
+const EMPTY: Details = { name: '', kind: 'food', offer: '', area: '', city: 'Lagos', whatsapp: '', phone: '', email: '', address: '', maps: '', instagram: '', tiktok: '', facebook: '', website: '', menu: '', story: '', style: 'auto', colour: '', sections: SECTIONS.map(([k]) => k), notes: '', photos: [], platforms: ['instagram', 'tiktok'], goal: '', competitors: '', tone: '', promote: '', price: '', cta: 'whatsapp', format: 'vertical', length: 16, questions: '', searches: '', adGoal: 'messages', adBudget: '', adPlatforms: ['meta'], audience: '', adResults: [], product: '', uses: ['instagram', 'whatsapp'], look: 'clean', items: '', deliverTo: '', budget: '', condition: 'new', sellers: '' };
 const PLATFORMS: [string, string][] = [['instagram', 'Instagram'], ['tiktok', 'TikTok'], ['whatsapp-status', 'WhatsApp Status'], ['facebook', 'Facebook'], ['x', 'X'], ['linkedin', 'LinkedIn']];
 const GOALS = ['More orders this month', 'More bookings', 'More followers who buy', 'Launch a new product', 'Fill quiet weekdays'];
 const TONES = ['Warm and friendly', 'Playful, Lagos street', 'Premium and calm', 'Bold and loud', 'Expert and trustworthy'];
 const CTAS: [string, string][] = [['whatsapp', 'Order on WhatsApp'], ['call', 'Call us'], ['dm', 'DM on Instagram'], ['website', 'Order on our website'], ['visit', 'Visit the shop']];
-type StepId = 'business' | 'contact' | 'links' | 'offer' | 'look' | 'content' | 'ad' | 'audit';
+const AD_GOALS: [string, string][] = [['messages', 'WhatsApp or DM messages'], ['sales', 'Website sales'], ['calls', 'Phone calls'], ['visits', 'Shop visits'], ['followers', 'Followers']];
+const AD_PLATFORMS: [string, string][] = [['meta', 'Instagram & Facebook'], ['tiktok', 'TikTok']];
+const USES: [string, string][] = [['instagram', 'Instagram'], ['whatsapp', 'WhatsApp catalogue & Status'], ['marketplace', 'Jumia, Jiji, Konga'], ['website', 'Website']];
+const LOOKS: [string, string][] = [['clean', 'Clean studio'], ['lifestyle', 'Real-life scenes'], ['bold', 'Bold colour']];
+type StepId = 'business' | 'contact' | 'links' | 'offer' | 'look' | 'content' | 'ad' | 'plan' | 'audit' | 'shots' | 'buy';
 const FLOWS: Record<string, { id: StepId; title: string }[]> = {
   website: [{ id: 'business', title: 'Your business' }, { id: 'contact', title: 'Contact & links' }, { id: 'offer', title: 'What you sell' }, { id: 'look', title: 'The look' }],
   'content-pack': [{ id: 'business', title: 'Your business' }, { id: 'links', title: 'Your accounts' }, { id: 'content', title: 'The content' }],
   'motion-ad': [{ id: 'business', title: 'Your business' }, { id: 'ad', title: 'The ad' }],
-  'video-ad': [{ id: 'business', title: 'Your business' }, { id: 'ad', title: 'The ad' }],
-  'ai-answer-audit': [{ id: 'business', title: 'Your business' }, { id: 'audit', title: 'What to check' }],
+  'ad-launch': [{ id: 'business', title: 'Your business' }, { id: 'ad', title: 'The offer' }, { id: 'plan', title: 'Budget & goal' }],
+  'product-photos': [{ id: 'business', title: 'Your business' }, { id: 'shots', title: 'Your photos' }],
+  'get-found': [{ id: 'business', title: 'Your business' }, { id: 'audit', title: 'Where to look' }],
+  'buy-smart': [{ id: 'business', title: 'Your business' }, { id: 'buy', title: 'What to buy' }],
 };
 const KEY = 'syncly:business';
 
@@ -74,13 +83,13 @@ export default function BusinessForm({ service, onSubmit, busy, email, setEmail,
   const text = (k: keyof Details, label: string, ph: string, hint?: string, type = 'text') => (
     <label className="field">{label}{hint && <span className="hint">{hint}</span>}<input type={type} value={d[k] as string} onChange={(e) => set(k, e.target.value as never)} placeholder={ph} /></label>
   );
-  async function addPhotos(list: FileList | null, logo = false) {
+  async function addPhotos(list: FileList | null, to: 'photos' | 'logo' | 'adResults' = 'photos') {
     if (!list?.length) return;
-    setErr(null); setUp(logo ? 'logo' : 'photos');
+    setErr(null); setUp(to);
     try {
-      const files = [...list].filter((f) => f.type.startsWith('image/')).slice(0, logo ? 1 : 10 - d.photos.length);
-      const ids = await upload(files);
-      if (logo) set('logo', ids[0]); else set('photos', [...d.photos, ...ids].slice(0, 10));
+      const max = to === 'logo' ? 1 : to === 'adResults' ? 4 - d.adResults.length : 10 - d.photos.length;
+      const ids = await upload([...list].filter((f) => f.type.startsWith('image/')).slice(0, max));
+      if (to === 'logo') set('logo', ids[0]); else if (to === 'adResults') set('adResults', [...d.adResults, ...ids].slice(0, 4)); else set('photos', [...d.photos, ...ids].slice(0, 10));
     } catch (e: any) { setErr(e.message); } finally { setUp(null); }
   }
 
@@ -90,13 +99,15 @@ export default function BusinessForm({ service, onSubmit, busy, email, setEmail,
   const reach = !!(d.whatsapp.trim() || d.phone.trim() || d.email.trim());
   const ctaReady = d.cta === 'whatsapp' || d.cta === 'call' ? !!(d.whatsapp.trim() || d.phone.trim()) : d.cta === 'dm' ? !!d.instagram.trim() : d.cta === 'website' ? !!d.website.trim() : d.cta === 'visit' ? !!d.address.trim() : true;
   const valid: Record<StepId, boolean> = {
-    business: !!(d.name.trim() && d.offer.trim() && (service !== 'ai-answer-audit' || d.city.trim() || d.area.trim())),
+    business: !!(d.name.trim() && d.offer.trim() && (service !== 'get-found' || d.city.trim() || d.area.trim())),
     contact: reach, links: true, offer: true, look: true, content: d.platforms.length > 0, ad: !!(d.promote.trim() && ctaReady), audit: true,
+    plan: d.adPlatforms.length > 0, shots: d.photos.length > 0, buy: !!(d.items.trim() && (d.deliverTo.trim() || d.city.trim() || d.area.trim())),
   };
   const why: Partial<Record<StepId, string>> = {
-    business: service === 'ai-answer-audit' ? 'Add the business name, what you sell, and the area or city.' : 'Add the business name and what you sell.',
+    business: service === 'get-found' ? 'Add the business name, what you sell, and the area or city.' : 'Add the business name and what you sell.',
     contact: 'Add at least one way customers can reach you.', content: 'Pick at least one platform.',
     ad: !d.promote.trim() ? 'Say what the ad is for.' : 'Add the contact detail for your call to action.',
+    plan: 'Pick where the ads should run.', shots: 'Add at least one photo of the product.', buy: !d.items.trim() ? 'List what you want to buy.' : 'Add where it should be delivered.',
   };
   const allValid = flow.every((f) => valid[f.id]) && email.includes('@');
 
@@ -112,7 +123,7 @@ export default function BusinessForm({ service, onSubmit, busy, email, setEmail,
     <div className="field">Logo <span className="hint">{hint}</span>
       <div className="uploads">
         {d.logo && <figure className="logo"><img src={`/api/uploads/${d.logo}`} alt="" /><button type="button" aria-label="Remove" onClick={() => set('logo', undefined)}>×</button></figure>}
-        {!d.logo && <label className="addph">{up === 'logo' ? 'Uploading…' : '+ Add logo'}<input type="file" accept="image/*" onChange={(e) => addPhotos(e.target.files, true)} hidden /></label>}
+        {!d.logo && <label className="addph">{up === 'logo' ? 'Uploading…' : '+ Add logo'}<input type="file" accept="image/*" onChange={(e) => addPhotos(e.target.files, 'logo')} hidden /></label>}
       </div>
     </div>
   );
@@ -125,14 +136,14 @@ export default function BusinessForm({ service, onSubmit, busy, email, setEmail,
       </div>
     </div>
   );
-  const chips = (k: 'platforms', options: [string, string][]) => (
+  const chips = (k: 'platforms' | 'adPlatforms' | 'uses', options: [string, string][]) => (
     <div className="checks">{options.map(([v, l]) => <label key={v} className={`chip click${d[k].includes(v) ? ' on' : ''}`}><input type="checkbox" hidden checked={d[k].includes(v)} onChange={(e) => set(k, e.target.checked ? [...d[k], v] : d[k].filter((x) => x !== v))} />{l}</label>)}</div>
   );
-  const pick = (k: 'goal' | 'tone' | 'cta' | 'format', options: [string, string][]) => (
+  const pick = (k: 'goal' | 'tone' | 'cta' | 'format' | 'adGoal' | 'look' | 'condition', options: [string, string][]) => (
     <div className="checks">{options.map(([v, l]) => <button type="button" key={v} className={`chip click${d[k] === v ? ' on' : ''}`} onClick={() => set(k, v)}>{l}</button>)}</div>
   );
   const notes = (hint: string) => <label className="field">Anything else <span className="hint">{hint}</span><textarea style={{ minHeight: 80 }} value={d.notes} onChange={(e) => set('notes', e.target.value)} /></label>;
-  const emailHint: Record<string, string> = { website: 'We send the finished site here.', 'content-pack': 'We send your content pack here.', 'motion-ad': 'We send your motion ad here.', 'video-ad': 'We send your video ad here.', 'ai-answer-audit': 'We send the audit here.' };
+  const emailHint: Record<string, string> = { website: 'We send the finished site here.', 'content-pack': 'We send your content pack here.', 'motion-ad': 'We send your motion ad here.', 'ad-launch': 'We send your ads and the plan here.', 'product-photos': 'We send your photos here.', 'get-found': 'We send the report here.', 'buy-smart': 'We send the best offers and the seller checks here.' };
 
   return (
     <div className="bform">
@@ -229,10 +240,51 @@ export default function BusinessForm({ service, onSubmit, busy, email, setEmail,
           {d.cta === 'visit' && text('address', 'Address', '5 Admiralty Way, Lekki Phase 1')}
           {service === 'motion-ad' && <div className="field">Format {pick('format', [['vertical', 'Vertical · Reels, TikTok, Status'], ['square', 'Square · feed'], ['landscape', 'Landscape · X, YouTube, website']])}</div>}
           {service === 'motion-ad' && <div className="field">Length <div className="checks">{[12, 16, 20, 24].map((n) => <button type="button" key={n} className={`chip click${d.length === n ? ' on' : ''}`} onClick={() => set('length', n)}>{n} s</button>)}</div></div>}
-          {photosField(service === 'video-ad' ? 'Your product photo: we animate the real thing. Add 1–3; the first is used.' : 'Optional, up to 3. They appear inside the motion design.', 3)}
-          {logoField(service === 'video-ad' ? 'Optional. It goes on the end card.' : 'Optional. It closes the ad.')}
-          {colourField(service === 'video-ad' ? 'Choose for me' : 'Choose for me')}
-          {notes('Optional: the mood, words to use, anything to avoid.')}
+          {photosField(service === 'ad-launch' ? 'Your product photo: we stage the real thing for each ad and the video. Add 1–3; the first is used.' : 'Optional, up to 3. They appear inside the motion design.', 3)}
+          {logoField(service === 'ad-launch' ? 'Optional. It goes on every ad and the end card.' : 'Optional. It closes the ad.')}
+          {colourField('Choose for me')}
+          {service !== 'ad-launch' && notes('Optional: the mood, words to use, anything to avoid.')}
+        </div>
+      )}
+
+      {cur === 'plan' && (
+        <div className="form">
+          <div className="field">What should the ads bring you? {pick('adGoal', AD_GOALS)}</div>
+          {text('adBudget', 'How much you can spend', '₦5,000 a day', 'A daily, weekly or total amount. We plan a 7-day test around it.')}
+          <div className="field">Where to run them {chips('adPlatforms', AD_PLATFORMS)}</div>
+          {text('audience', 'Who buys from you', 'Women 25–45 in Lekki and Ajah who host parties', 'Optional. If you leave it out, we keep the audience broad and let Meta find buyers.')}
+          <div className="field">Already boosting or running ads? <span className="hint">Optional: screenshots of the results screen. We read the numbers and tell you what to change.</span>
+            <div className="uploads">
+              {d.adResults.map((id) => <figure key={id}><img src={`/api/uploads/${id}`} alt="" /><button type="button" aria-label="Remove" onClick={() => set('adResults', d.adResults.filter((x) => x !== id))}>×</button></figure>)}
+              {d.adResults.length < 4 && <label className="addph">{up === 'adResults' ? 'Uploading…' : '+ Add screenshots'}<input type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files, 'adResults')} hidden /></label>}
+            </div>
+          </div>
+          {notes('Optional: an offer to push, words to use, anything to avoid.')}
+        </div>
+      )}
+
+      {cur === 'shots' && (
+        <div className="form">
+          {photosField('Up to 3 clear photos of the product, on any background, in good light. Each one becomes several shots.', 3)}
+          {text('product', 'What is in the photos?', 'Shea butter body cream, 250 ml jar', 'So the team knows exactly what must not change.')}
+          <div className="field">Where you'll use them {chips('uses', USES)}</div>
+          <div className="field">The look {pick('look', LOOKS)}</div>
+          {colourField('No preference')}
+          {notes('Optional: a setting you like, props to use, anything to avoid.')}
+        </div>
+      )}
+
+      {cur === 'buy' && (
+        <div className="form">
+          <label className="field">What you need <span className="hint">One per line, with how many. Add the model if you know it.</span>
+            <textarea style={{ minHeight: 100 }} value={d.items} onChange={(e) => set('items', e.target.value)} placeholder={'2 chest freezers, about 300 litres\n1 commercial deep fryer, gas'} />
+          </label>
+          <div className="field">Condition {pick('condition', [['new', 'New'], ['used', 'Used is fine'], ['any', 'Either']])}</div>
+          <div className="two-up">{text('budget', 'Budget', '₦900,000', 'Optional.')}{text('deliverTo', 'Deliver to', 'Surulere, Lagos')}</div>
+          <label className="field">Sellers you're already talking to <span className="hint">Optional, one per line: name, Instagram, phone or link. We check them before you pay.</span>
+            <textarea style={{ minHeight: 80 }} value={d.sellers} onChange={(e) => set('sellers', e.target.value)} placeholder={'Cool Tech NG, @cooltechng, 0803 111 2222'} />
+          </label>
+          {notes('Optional: brands you trust or avoid, how soon you need it.')}
         </div>
       )}
 
@@ -240,10 +292,12 @@ export default function BusinessForm({ service, onSubmit, busy, email, setEmail,
         <div className="form">
           <div className="two-up">{text('website', 'Website', 'yourbusiness.com', 'We read it for your real hours and prices.')}{text('instagram', 'Instagram', '@yourbusiness')}</div>
           {text('maps', 'Google Maps link', 'https://maps.app.goo.gl/…', 'Helps us find the right listing.', 'url')}
-          <label className="field">Your prices <span className="hint">Optional, one per line. We check what the AI assistants say about your prices against these.</span>
+          {text('searches', 'What customers type to find a business like yours', 'small chops Surulere, party catering Lagos', 'Optional. We check where you show up on Google Maps for these, street by street.')}
+          {text('competitors', 'Businesses you compete with', 'Amala Shitta, The Place Yaba', 'Optional, up to 3, separated by commas. We compare you with them.')}
+          <label className="field">Your prices <span className="hint">Optional, one per line. We check what Google and the AI assistants say about your prices against these.</span>
             <textarea style={{ minHeight: 100 }} value={d.menu} onChange={(e) => set('menu', e.target.value)} placeholder={'Jollof rice & chicken – ₦3,500\nPounded yam & egusi – ₦4,000'} />
           </label>
-          <label className="field">Questions your customers ask <span className="hint">Optional. We add them to what we ask the assistants.</span>
+          <label className="field">A question your customers ask <span className="hint">Optional. We ask ChatGPT, Gemini, Claude and Perplexity too.</span>
             <textarea style={{ minHeight: 80 }} value={d.questions} onChange={(e) => set('questions', e.target.value)} placeholder="Do you deliver to Victoria Island?" />
           </label>
         </div>

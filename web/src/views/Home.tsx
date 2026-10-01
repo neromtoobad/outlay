@@ -6,7 +6,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Office from '@/office/Office.tsx';
-import { useApi, usd, timeAgo, ROLE_NAME, ROLES, DEPT_TINT, type Service, type AgentStats, type BooksSummary } from '@/lib.tsx';
+import { useApi, usd, timeAgo, ROLE_NAME, ROLES, DEPT_TINT, SERVICE_NAME, type Service, type AgentStats, type BooksSummary } from '@/lib.tsx';
 import { clamp, Rv, SplitLines, useFrame, useInView, useStickyProgress } from '@/components/scroll.tsx';
 import { CostArt, DecideArt, EscrowArt, MarkBlock, QuoteArt, ReceiptArt, VaultArt } from './home/art.tsx';
 
@@ -37,7 +37,7 @@ function Hero({ books }: { books: Books | null }) {
           <SplitLines as="h1" text="The first AI company with open books." />
           <Rv as="p" delay={0.35}>Hire a team of AI agents for real work. A fixed price upfront, you pay only if you accept, and every cent they spend is public, settled in USDC on Arc.</Rv>
           <Rv className="hx__cta" delay={0.5}>
-            <Link href="/hire/local-business-finder" className="pill white lg">Hire the team <Arrow /></Link>
+            <Link href="/hire/website" className="pill white lg">Hire the team <Arrow /></Link>
             <Link href="/books" className="pill ghost lg">See the books <Arrow /></Link>
           </Rv>
         </div>
@@ -48,7 +48,7 @@ function Hero({ books }: { books: Books | null }) {
             <span className="mono">{last.postings[0].amount.toFixed(4)} USDC · {last.meta.settled ? 'settled on Arc' : 'settling on Arc'}</span>
           </Rv>
         )}
-        <div className="hx__foot mono"><span>First job free · refund + bond if you reject</span><span>Scroll ↓</span></div>
+        <div className="hx__foot mono"><span>First website free · refund + bond if you reject</span><span>Scroll ↓</span></div>
       </div>
     </section>
   );
@@ -198,8 +198,9 @@ function How() {
 
 function OpenBooks({ books }: { books: Books | null }) {
   const [ref, seen] = useInView<HTMLDivElement>();
-  const lbf = books?.perService?.['local-business-finder'];
-  const cost = lbf && lbf.avgCost > 0 ? lbf.avgCost : 0.03;
+  // the service with the most measured jobs; the Website's listed numbers until there are some
+  const [shownId, lbf] = (['website', 'content-pack', 'motion-ad', 'ad-launch', 'product-photos', 'get-found', 'buy-smart'] as const).map((id) => [id, books?.perService?.[id]] as const).filter(([, x]) => x && x.jobs > 0 && x.avgCost > 0).sort((a, b) => b[1]!.jobs - a[1]!.jobs)[0] ?? ['website', undefined];
+  const cost = lbf ? lbf.avgCost : 0.7;
   const settled = books?.ledger.filter((e) => e.meta.kind === 'tool' && e.meta.settled).length ?? 0;
   const c = books?.counters, p = books?.pnl;
   return (
@@ -217,8 +218,8 @@ function OpenBooks({ books }: { books: Books | null }) {
         <Rv delay={0.2}><Link href="/books" className="pill dark">Open the books <Arrow /></Link></Rv>
       </div>
       <div className={`ob__art${seen ? ' in' : ''}`} ref={ref}>
-        <CostArt price={lbf?.price ?? 3} cost={cost} />
-        <p className="mono ob__cap">Local Business Finder: its price next to what a job measurably costs us in tools</p>
+        <CostArt price={lbf?.price ?? 15} cost={cost} />
+        <p className="mono ob__cap">{SERVICE_NAME[shownId]}: its price next to what a job {lbf ? 'measurably costs' : 'is listed to cost'} us in tools</p>
       </div>
     </section>
   );
@@ -270,7 +271,7 @@ function Services({ services }: { services: Service[] }) {
                   <h3>{x.name}</h3>
                   <div className="sv__more"><div>
                     <p>{x.tagline}</p>
-                    <span className="mono">{x.live ? `${x.priceUsd} USDC · about ${x.etaMin} min · first job free` : 'coming soon'}</span>
+                    <span className="mono">{x.live ? `${x.priceUsd} USDC · about ${x.etaMin} min${x.id === 'website' ? ' · your first one is free' : ''}` : 'coming soon'}</span>
                   </div></div>
                 </div>
                 {x.live && <Link href={`/hire/${x.id}`} className="sv__go" aria-label={`Hire for ${x.name}`}>→</Link>}
@@ -286,10 +287,11 @@ function Services({ services }: { services: Service[] }) {
 // ---------------------------------------------------------------- close
 
 const ASK: [string, string, string][] = [
-  ['ai-answer-audit', 'AI answer audit', 'What do ChatGPT and Gemini say about my restaurant in Yaba?'],
   ['website', 'Website', 'A site for my small chops business, WhatsApp 0803 555 0142'],
-  ['vendor-check', 'Check a supplier', 'I’m about to pay ₦850,000 upfront to a phone vendor on Instagram'],
-  ['best-price', 'Best price', 'Where to buy 20 bags of Dangote cement cheapest in Ikeja'],
+  ['ad-launch', 'Run ads', 'Ads that bring WhatsApp orders for my small chops, ₦5,000 a day'],
+  ['product-photos', 'Product photos', 'Studio photos of my shea butter jars for Instagram and Jumia'],
+  ['get-found', 'Get found', 'Why don’t I show up when people search “small chops Surulere”?'],
+  ['buy-smart', 'Buy smart', 'Two chest freezers delivered to Surulere, cheapest from a seller I can trust'],
 ];
 
 function Close() {
@@ -303,7 +305,7 @@ function Close() {
       <div className="cl__grid wrap">
         <div>
           <span className="label"><span className="n">07</span>Start here</span>
-          <SplitLines text="Your first job is free." />
+          <SplitLines text="Your first website is free." />
           <Rv as="p" className="lede">Tell the team what you need in a sentence. You see the price and the bond before anything starts.</Rv>
           <Rv delay={0.15}>
             <form className="cl__ask" onSubmit={go}>
@@ -311,7 +313,7 @@ function Close() {
               <button type="submit" className="pill green">Get a free quote <Arrow /></button>
             </form>
             <div className="cl__chips">{ASK.map(([id, label]) => <button type="button" key={id} className={`chip click dark${svc === id ? ' on' : ''}`} onClick={() => setSvc(id)}>{label}</button>)}</div>
-            <p className="mono cl__fine">First job free · pay in USDC, no card · refund + bond if you reject</p>
+            <p className="mono cl__fine">First website free · then pay in USDC, no card · refund + bond if you reject</p>
           </Rv>
         </div>
         <div className={`cl__art${seen ? ' in' : ''}`} ref={ref}><MarkBlock /></div>

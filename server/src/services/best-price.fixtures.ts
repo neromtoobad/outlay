@@ -3,6 +3,9 @@
 // resolved to the store's own page, a price that changed on the page, an out-of-stock page, pages that
 // need a browser (Exa's copy), a too-cheap unknown seller asking for a bank transfer, a used "swap" phone
 // that only the auditor catches, list pages and a price guide to set aside, and imports priced in USD.
+// Chest freezers and deep fryers get a Lagos appliance market instead (Buy Smart's demo): the fryer has
+// no big-store offer in stock, so its best pick is a specialist shop we don't know, and a seller from the
+// demo order also has a Jiji ad for the freezer.
 
 type Row = {
   seller: string; host: string; path: string; title: string; price: string; via: 'shopping' | 'local' | 'intl' | 'general';
@@ -19,6 +22,8 @@ const ngnJumia = (n: number) => `₦ ${n.toLocaleString('en-US')}`;
 function market(name: string): Row[] {
   const hit = markets.get(name);
   if (hit) return hit;
+  if (/freezer|fridge|refrigerator/i.test(name)) return keep(name, freezers(name));
+  if (/fryer/i.test(name)) return keep(name, fryers(name));
   // prices are a real Lagos snapshot for a Galaxy A16; any other item gets the same shape, scaled
   const scale = /a16/i.test(name) ? 1 : (20 + ([...name].reduce((s, c) => s + c.charCodeAt(0), 0) % 60)) / 190;
   const p = (n: number) => Math.round((n * scale) / 100) * 100;
@@ -114,9 +119,120 @@ function market(name: string): Row[] {
       snippet: `The ${n} sells for between ${ngn(p(175000))} and ${ngn(p(210000))} in Nigeria, depending on the store.`,
     },
   ];
+  return keep(name, list);
+}
+
+function keep(name: string, list: Row[]): Row[] {
   markets.set(name, list);
   for (const r of list) if (!byUrl.get(urlOf(r))?.page) byUrl.set(urlOf(r), r); // a search result must not hide the store's page
   return list;
+}
+
+const title = (s: string) => s.replace(/\b[a-z]/g, (c) => c.toUpperCase()).replace(/\b(\d+)l\b/gi, '$1L');
+
+/** Chest freezers in Lagos, Oct 2026: a Konga store's price moved up on its page, Fouani links to Google, Hotpoint is out of stock. */
+function freezers(name: string): Row[] {
+  const n = title(name), s = slug(name);
+  const branded = /hisense|haier|thermocool|nexus|scanfrost|lg|samsung|midea|polystar/i.test(name);
+  const as = (brand: string) => (branded ? n : `${brand} ${n}`);
+  const about = `\nProduct details\nCapacity: 300 litres gross. Convertible freezer or cooler mode, fast-freeze switch, keeps food frozen for up to 48 hours in a power cut, lockable lid, inner LED light and 4 castor wheels. Energy class A+. Dimensions 112 x 72 x 85 cm.\nWarranty: 1 year on parts, 5 years on the compressor.`;
+  return [
+    {
+      seller: 'Jumia Nigeria', host: 'www.jumia.com.ng', path: `/hisense-${s}-fc-40dd-silver-71842.html`, via: 'shopping',
+      title: `${as('Hisense')} FC-40DD - Silver`, price: ngn(389000), delivery: '₦6,500 delivery', rating: 4.5, ratingCount: 138,
+      page: `${as('Hisense')} FC-40DD - Silver | Jumia Nigeria\nOfficial Store\nBrand: Hisense | Similar products from Hisense\n${ngnJumia(389000)}\n${ngnJumia(445000)}\n-13%\nIn stock\n+ shipping from ₦ 6,500 to SURULERE\nAdd to cart\nDelivery & Returns\nChoose your location: Lagos, Surulere\nDoor Delivery\nDelivery Fees ₦ 6,500\nReady for delivery between 4 October and 7 October\nReturn Policy: free return within 7 days for all eligible items\nSeller Information\nHisense Official Store\n96% Seller Score\n9,412 Followers${about}`,
+    },
+    {
+      seller: 'Konga', host: 'www.konga.com', path: `/product/nexus-${s}-nx-320-5520117`, via: 'local',
+      title: `Buy ${as('Nexus')} NX-320 | Konga Online Shopping`, price: ngn(381000),
+      snippet: `${ngn(381000)}. ${as('Nexus')} NX-320, 300 litres, fast freeze. Pay on delivery in Lagos.`,
+      page: `${as('Nexus')} NX-320\nSold by: Appliance World NG\n${ngn(386000)}\n${ngn(420000)}\nYou save ${ngn(34000)}\nAvailable in stock\nAdd To Cart\nBuy Now\nDelivery\nLagos, Surulere: delivered in 2-4 working days. Delivery fee: ₦5,000\nSeller rating: 4.5/5 (644 ratings)\nPay on Delivery available${about}`,
+    },
+    {
+      seller: 'Fouani Nigeria', host: 'www.fouanistore.com', path: `/haier-thermocool-${s}-htf-319h`, via: 'shopping', google: true,
+      title: `${as('Haier Thermocool')} HTF-319H`, price: ngn(412000), delivery: 'Free delivery', rating: 4.6, ratingCount: 41,
+      page: `${as('Haier Thermocool')} HTF-319H - Fouani\n${ngn(412000)}\nIn Stock\nFree delivery within Lagos\nAdd to Cart\n2 years warranty\nShowrooms in Ikeja, Lekki and Surulere${about}`,
+    },
+    {
+      seller: 'Hotpoint Nigeria', host: 'www.hotpoint.ng', path: `/scanfrost-${s}-sfcf300`, via: 'shopping',
+      title: `${as('Scanfrost')} SFCF300`, price: ngn(398000),
+      page: `${as('Scanfrost')} SFCF300\n${ngn(398000)}\nOut of stock\nNotify me when available\nDelivery within Lagos ₦7,000\nHotpoint: home appliances, Victoria Island and Ikeja${about}`,
+    },
+    {
+      seller: 'Freezer Deals NG', host: 'freezerdealsng.com', path: `/hisense-${s}-promo`, via: 'shopping',
+      title: `${as('Hisense')} Brand New - Promo`, price: ngn(155000),
+      page: `${as('Hisense')} Brand New - PROMO\n${ngn(155000)}\n${ngn(389000)}\nOnly 2 left! In stock.\nTo confirm your order, pay via bank transfer to our account and send proof on WhatsApp: 0907 000 1234.\nNo pay on delivery.${about}`,
+    },
+    {
+      seller: 'Jumia Nigeria', host: 'www.jumia.com.ng', path: `/waterproof-dust-cover-for-${s}-90311.html`, via: 'shopping',
+      title: `Waterproof Dust Cover for ${n}`, price: ngn(9500), rating: 4.1, ratingCount: 23,
+    },
+    {
+      seller: 'Jiji', host: 'jiji.ng', path: `/ojo/kitchen-appliances/brand-new-hisense-${s}-coolhouse-${s.length}.html`, via: 'local',
+      title: `Brand New ${as('Hisense')} in Ojo - Kitchen Appliances, Coolhouse Appliances | Jiji.ng`, price: ngn(372000),
+      snippet: `${ngn(372000)}. Brand new, sealed in carton, 1 year warranty. Coolhouse Appliances, Alaba International Market.`,
+    },
+    {
+      seller: 'Jumia', host: 'www.jumia.com.ng', path: `/catalog/?q=${encodeURIComponent(name.toLowerCase()).replace(/%20/g, '+')}`, via: 'local',
+      title: `${n} - Buy Online | Jumia Nigeria`, price: ngn(279000),
+      snippet: `Shop ${n} from ${ngnJumia(279000)} on Jumia. Pay on delivery, free returns.`,
+    },
+    {
+      seller: 'Temu', host: 'www.temu.com', path: `/replacement-door-gasket-for-${s}-g-6011${s.length}.html`, via: 'intl',
+      title: `Replacement Door Gasket Seal for ${n} - Temu`, price: '$12.99', snippet: `$12.99. Replacement magnetic door gasket for ${n}.`,
+    },
+    {
+      seller: 'NigeriaPrice', host: 'www.nigeriaprice.com.ng', path: `/${s}-prices-in-nigeria`, via: 'general',
+      title: `${n} Prices in Nigeria (2026) - NigeriaPrice`, price: ngn(350000),
+      snippet: `A ${n} costs between ${ngn(350000)} and ${ngn(520000)} in Nigeria, depending on brand and store.`,
+    },
+  ];
+}
+
+/** Commercial deep fryers in Lagos: no big store has one in stock, so a specialist shop we don't know wins. */
+function fryers(name: string): Row[] {
+  const n = title(name), s = slug(name);
+  const about = `\nProduct details\nTwo 6-litre stainless steel tanks with separate thermostats (50 to 200 °C), two baskets with cool-touch handles, lids and an overheat cut-off. Two 2,500 watt elements, 220 to 240 volts. Built for restaurants, small chops and chicken shops.`;
+  return [
+    {
+      seller: "Chef's Corner Equipment", host: 'chefscornerng.com', path: `/product/commercial-electric-${s}-2x6l`, via: 'shopping',
+      title: `Commercial Electric ${n}, 2 x 6L - Stainless`, price: ngn(98500),
+      page: `Commercial Electric ${n}, 2 x 6L - Stainless\n${ngn(98500)}\nIn stock\nAdd to cart\nDelivery within Lagos ₦5,000 (1-2 working days)\nPay on delivery in Lagos\nShowroom: 27 Western Avenue, Surulere, Lagos\n12 months warranty${about}`,
+    },
+    {
+      seller: 'Royal Kitchen Equipment', host: 'royalkitchenequipment.com.ng', path: `/shop/${s}-12l-commercial`, via: 'shopping',
+      title: `${n} 12L Commercial`, price: ngn(104000),
+      page: `${n} 12L Commercial\n${ngn(104000)}\nIn stock\nAdd to cart\nCall 0802 314 7788 to arrange delivery\n6 months warranty${about}`,
+    },
+    {
+      seller: 'Konga', host: 'www.konga.com', path: `/product/${s}-2-x-6l-6113402`, via: 'shopping',
+      title: `${n} 2 x 6L`, price: ngn(112000),
+      page: `${n} 2 x 6L\nSold by: KitchenPro Store\n${ngn(112000)}\nOut of stock\nNotify me\nDelivery fee: ₦4,500\nSeller rating: 4.2/5 (96 ratings)${about}`,
+    },
+    {
+      seller: 'Jumia Nigeria', host: 'www.jumia.com.ng', path: `/electric-deep-fryer-single-basket-6l-88213.html`, via: 'shopping',
+      title: 'Electric Deep Fryer, Single Basket 6L - Silver', price: ngn(61000), rating: 4.0, ratingCount: 57,
+    },
+    {
+      seller: 'Jiji', host: 'jiji.ng', path: `/lagos-island/restaurant-and-catering-equipment/brand-new-${s}-${s.length}.html`, via: 'local',
+      title: `Brand New ${n} in Lagos Island - Restaurant & Catering Equipment, Femi Catering Equipment | Jiji.ng`, price: ngn(92000),
+      snippet: `${ngn(92000)}. Brand new ${name.toLowerCase()}, 2 x 6 litres, stainless steel. Femi Catering Equipment, Lagos Island.`,
+    },
+    {
+      seller: 'Jumia', host: 'www.jumia.com.ng', path: `/catalog/?q=${encodeURIComponent(name.toLowerCase()).replace(/%20/g, '+')}`, via: 'local',
+      title: `${n} - Buy Online | Jumia Nigeria`, price: ngn(45000),
+      snippet: `Shop ${n} from ${ngnJumia(45000)} on Jumia. Pay on delivery, free returns.`,
+    },
+    {
+      seller: 'AliExpress', host: 'www.aliexpress.com', path: `/item/1005008${s.length}2231.html`, via: 'intl',
+      title: `Replacement Basket for ${n} - AliExpress`, price: 'US $8.99', snippet: `US $8.99. Replacement fry basket with handle for ${n}.`,
+    },
+    {
+      seller: 'NigeriaPrice', host: 'www.nigeriaprice.com.ng', path: `/${s}-price-in-nigeria`, via: 'general',
+      title: `${n} Price in Nigeria (2026) - NigeriaPrice`, price: ngn(85000),
+      snippet: `A ${name.toLowerCase()} sells for ${ngn(85000)} to ${ngn(130000)} in Lagos.`,
+    },
+  ];
 }
 
 const nameFrom = (q: string) => q.replace(/\s+(price|site:).*$/i, '').trim();

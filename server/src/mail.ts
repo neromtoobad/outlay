@@ -27,6 +27,7 @@ const SERVICE: Record<string, string> = {
   'research-brief': 'Research Brief', 'local-business-finder': 'Local Business Finder', 'lead-list': 'Lead List',
   'content-pack': 'Content Pack', website: 'Website', 'motion-ad': 'Motion Ad', 'video-ad': 'Video Ad',
   'ai-answer-audit': 'AI Answer Audit', 'best-price': 'Best Price Finder', 'vendor-check': 'Check Before You Pay',
+  'ad-launch': 'Ad Launch', 'product-photos': 'Product Photo Studio', 'get-found': 'Get Found', 'buy-smart': 'Buy Smart',
 };
 export const maskEmail = (e: string) => e.replace(/^(.).*(@.*)$/, '$1•••$2');
 

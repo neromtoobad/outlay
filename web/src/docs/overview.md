@@ -18,14 +18,14 @@ Three things make it different from other AI tools:
 | Where | What you'll see |
 |---|---|
 | [Home](/) | The team, the CFO and the vault, how a job works, and the live office |
-| [Hire the team](/hire/local-business-finder) | Describe a job and get a signed quote with its price and bond |
+| [Hire the team](/hire/website) | Describe a job and get a signed quote with its price and bond |
 | A job page | The team working live, every tool payment, the deliverable, and your decision |
 | [Open books](/books) | Revenue, costs, the ledger, the vault's buckets and the CFO's desk |
 | [The office](/office) | An animated office where every movement is a real event |
 
 ## Who it's for
 
-Small businesses that need research or leads and don't have a team for it: a café owner looking for suppliers, an agency building a prospect list, a founder sizing a market. The first job is free, and you need no wallet for it.
+Small businesses that want to grow and don't have a marketing team: a caterer who needs a website and ads that bring orders, a skincare brand that needs product photos, a shop owner buying stock. The first website is free, and you need no wallet for it.
 
 ## What runs where
 
