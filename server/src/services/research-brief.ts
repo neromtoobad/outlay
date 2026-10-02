@@ -10,7 +10,7 @@ import { MAIL_BUDGET_USD, MAIL_HOST } from '../mail.ts';
 export const researchBrief = {
   id: 'research-brief',
   name: 'Research Brief',
-  priceUsd: 3,
+  priceUsd: 2,
   policy: { budgetUsd: 0.6 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.exa, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
   async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {

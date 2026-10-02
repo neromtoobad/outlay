@@ -12,16 +12,16 @@ A business fills in a short form about itself and the job: *"party trays for 20 
 
 | Service | Price | What you get |
 |---|---|---|
-| Website | 15 USDC | A designed site from the Google listing, Instagram and the owner's photos, hosted at a link the same day, plus the files |
-| Content Pack | 8 USDC | The content styles working in the niche this week (backed by real posts and their numbers), then 7 posts and 3 images |
-| Ad Launch | 20 USDC | 3 ad angles from ads that have run 30+ days, feed and Story creatives, an 8 s video, copy, and a 7-day plan for the budget; diagnoses the ads they already ran |
-| Motion Ad | 12 USDC | A 12–24 s motion video with an original soundtrack, rendered on our own server |
-| Product Photo Studio | 6 USDC | Phone photos turned into studio, lifestyle and white-background shots, each checked against the original so the product doesn't change |
-| Get Found | 15 USDC | Google Maps rank street by street against competitors, profile gaps, what ChatGPT, Gemini, Claude and Perplexity say, a fix list, a profile description and review replies |
-| Buy Smart | 5 USDC | The cheapest trustworthy offers, delivered, and a red/amber/green check on the sellers before paying |
-| Local Business Finder | 3 USDC | Every business of a type in an area, with phone, website and rating, as a spreadsheet |
-| Lead List | 5 USDC | Up to 25 verified business emails, each with a personalised first line |
-| Research Brief | 3 USDC | Competitors, market and pricing, with every claim cited |
+| Website | 2 USDC | A designed site from the Google listing, Instagram and the owner's photos, hosted at a link the same day, plus the files |
+| Content Pack | 2 USDC | The content styles working in the niche this week (backed by real posts and their numbers), then 7 posts and 3 images |
+| Ad Launch | 2 USDC | 3 ad angles from ads that have run 30+ days, feed and Story creatives, an 8 s video, copy, and a 7-day plan for the budget; diagnoses the ads they already ran |
+| Motion Ad | 2 USDC | A 12–24 s motion video with an original soundtrack, rendered on our own server |
+| Product Photo Studio | 2 USDC | Phone photos turned into studio, lifestyle and white-background shots, each checked against the original so the product doesn't change |
+| Get Found | 2 USDC | Google Maps rank street by street against competitors, profile gaps, what ChatGPT, Gemini, Claude and Perplexity say, a fix list, a profile description and review replies |
+| Buy Smart | 2 USDC | The cheapest trustworthy offers, delivered, and a red/amber/green check on the sellers before paying |
+| Local Business Finder | 2 USDC | Every business of a type in an area, with phone, website and rating, as a spreadsheet |
+| Lead List | 2 USDC | Up to 25 verified business emails, each with a personalised first line |
+| Research Brief | 2 USDC | Competitors, market and pricing, with every claim cited |
 
 The menu comes from research into what small businesses already pay agencies and freelancers for, and what a search or a chatbot can't do: jobs that need fresh data from many paid sources at once, checking against the truth, or real production.
 
@@ -36,7 +36,7 @@ The menu comes from research into what small businesses already pay agencies and
 2. **Watch the office** at [/live](https://hiresyncly.site/live). The agents act out real events: the CFO stamps the quote and walks the brief to the whiteboard, and the Messenger carries the delivery out.
 3. **Check a receipt.** Job #1 ([ord_mulrvp33_0603](https://hiresyncly.site/job/ord_mulrvp33_0603)) found 9 restaurants with 5 x402 payments, each linked to its settlement on Arc ([0xb76f18…](https://arcscan.app/tx/0xb76f1819087eea9c3bbd9886384a44556450a6fa831a1575818165fa0355fe25), [0xc99ba1…](https://arcscan.app/tx/0xc99ba105332d26b54c73cc1ba1677e299c9dc632eb3f835e50309a40d41d4fbd)).
 4. **Read the CFO's log** at [/api/cfo](https://hiresyncly.site/api/cfo): each agent's balance and allowance, this week's plan, and every decision with what the CFO saw, signed and hash-chained.
-5. **Pay for a job** (needs about 3.05 USDC on Arc in a browser wallet). The page walks through the steps: connect the wallet, the CFO opens the escrow, then approve and fund. On the job page you then accept, revise or reject from the same wallet.
+5. **Pay for a job** (needs about 2.05 USDC on Arc in a browser wallet). The page walks through the steps: connect the wallet, the CFO opens the escrow, then approve and fund. On the job page you then accept, revise or reject from the same wallet.
 
 ## On Arc mainnet (chain 5042)
 
@@ -94,7 +94,7 @@ Every 10 minutes, and soon after any job is accepted, delivered or refunded, the
 5. **Escalates** when it can't act: TOOLS is empty, its gas is low, or a move exceeds what it may do alone.
 6. **Writes every decision down**: what it saw, the rule that fired, the amount and the transaction.
 
-It also prices every job ([`server/src/cfo/quote.ts`](server/src/cfo/quote.ts)). The cost comes from the median measured cost. p(accept) comes from a Beta(4,1) prior updated with the service's acceptance history. The bond is 10–30% of the price, higher when confidence is higher, and capped by what the BOND bucket can cover. It declines a job whose expected profit falls under 0.5 USDC. Every number is printed on the quote.
+It also prices every job ([`server/src/cfo/quote.ts`](server/src/cfo/quote.ts)). The cost comes from the median measured cost. p(accept) comes from a Beta(4,1) prior updated with the service's acceptance history. The bond is 10–30% of the price, higher when confidence is higher, and capped by what the BOND bucket can cover. Every service is priced at 2 USDC on purpose, so the CFO takes a job unless it is expected to lose more than 2 USDC. Every number is on the quote, which only the owner sees in full.
 
 **Limits it cannot talk its way past** (enforced by [`SynclyVault.sol`](contracts/src/SynclyVault.sol), not by a prompt):
 

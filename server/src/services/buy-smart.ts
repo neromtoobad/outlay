@@ -71,7 +71,7 @@ const adPlace = (o: BP.Offer) => o.title.match(/\bin ([A-Z][\w ]{2,30}?) - /)?.[
 export const buySmart = {
   id: 'buy-smart',
   name: 'Buy Smart',
-  priceUsd: 6,
+  priceUsd: 2,
   // Typical tools: ~$0.10 for the prices, ~$0.07 per seller found online, ~$0.13 per listed seller with a
   // phone (+$0.30 with an Instagram handle), +$0.36 for a sanctions screen. The plan keeps the worst case
   // (3 Instagram sellers, all at $500+) inside this cap by dropping screens before whole checks.

@@ -42,7 +42,7 @@ function tiktokItems(d: any): any[] {
 export const contentPack = {
   id: 'content-pack',
   name: 'Content Pack',
-  priceUsd: 8,
+  priceUsd: 2,
   policy: { budgetUsd: 1.6 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.blockrunArc, HOSTS.apex, AISA, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
   async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {

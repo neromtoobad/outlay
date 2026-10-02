@@ -29,7 +29,7 @@ type Spec = { business: string; offer: string; points: string[]; prices: string[
 export const motionAd = {
   id: 'motion-ad',
   name: 'Motion Ad',
-  priceUsd: 12,
+  priceUsd: 2,
   policy: { budgetUsd: 2.4 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.blockrunArc, HOSTS.apex, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
   async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {

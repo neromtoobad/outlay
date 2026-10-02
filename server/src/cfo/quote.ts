@@ -31,7 +31,9 @@ export type Quote = {
   reasons: string[];
 };
 
-export const POLICY = { priorA: 4, priorB: 1, minBps: 1000, maxBps: 3000, minExpectedProfit: 0.5, promoMaxCost: 1.5 };
+// Every service is priced at 2 USDC on purpose (the owner's call, 2026-10-02), so some jobs cost more in tools
+// than they earn: the CFO takes a job unless it is expected to lose more than 2 USDC.
+export const POLICY = { priorA: 4, priorB: 1, minBps: 1000, maxBps: 3000, minExpectedProfit: -2, promoMaxCost: 1.5 };
 
 const median = (xs: number[]) => {
   if (!xs.length) return NaN;
@@ -76,7 +78,7 @@ export function quote(q: QuoteInput): Quote {
 
   const expectedProfit = pAccept * q.priceUsd - estCost - (1 - pAccept) * bond;
   const decision = expectedProfit >= POLICY.minExpectedProfit ? 'quote' : 'decline';
-  reasons.push(`E[profit] = ${pAccept.toFixed(2)}×${q.priceUsd} − ${r4(estCost)} − ${(1 - pAccept).toFixed(2)}×${bond} = ${r4(expectedProfit)} → ${decision === 'quote' ? 'quote it' : `decline (floor ${POLICY.minExpectedProfit})`}`);
+  reasons.push(`E[profit] = ${pAccept.toFixed(2)}×${q.priceUsd} − ${r4(estCost)} − ${(1 - pAccept).toFixed(2)}×${bond} = ${r4(expectedProfit)} → ${decision === 'quote' ? (expectedProfit < 0 ? 'quote it at a loss (the price is kept low on purpose)' : 'quote it') : `decline (it would lose more than ${-POLICY.minExpectedProfit} USDC)`}`);
 
   return { service: q.service, priceUsd: q.priceUsd, promo: false, bondUsd: bond, bondBps: bps, estCostUsd: r4(estCost), pAccept, expectedProfitUsd: r4(expectedProfit), decision, deliverHours: q.deliverHours, reasons };
 }

@@ -22,7 +22,7 @@ const hostOf = (u?: string) => {
 export const leadList = {
   id: 'lead-list',
   name: 'Lead List',
-  priceUsd: 5,
+  priceUsd: 2,
   policy: { budgetUsd: 0.6 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.orthogonal, HOSTS.apex, HOSTS.exa, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
   async run(brief: string, opts: { orderId?: string } = {}): Promise<Job> {

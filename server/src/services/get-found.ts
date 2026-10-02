@@ -497,7 +497,7 @@ function profileGaps(spec: Spec, truth: Truth, d: BusinessDetails | undefined, t
 export const getFound = {
   id: 'get-found',
   name: 'Get Found',
-  priceUsd: 15,
+  priceUsd: 2,
   // 20-24 AI answers at 0.10 (cap 0.15) + Business Profile 0.10 + LLM Mentions 0.10 + 19 Maps searches at 0.006
   // + 2 review pages at 0.002 + site read + ~14 LLM calls ≈ 3.1; the cap stays under 4.50 of tools per job.
   policy: { budgetUsd: 4.5 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.blockrunArc, HOSTS.orthogonal, HOSTS.apex, HOSTS.exa, AISA, ...(MAIL_HOST ? [MAIL_HOST] : [])] },

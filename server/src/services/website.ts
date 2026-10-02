@@ -45,7 +45,7 @@ async function toJpeg(png: Buffer, maxH: number): Promise<Buffer> {
 export const website = {
   id: 'website',
   name: 'Website',
-  priceUsd: 15,
+  priceUsd: 2,
   policy: { budgetUsd: 2.2 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, HOSTS.blockrunArc, HOSTS.orthogonal, HOSTS.apex, AISA, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
   async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {

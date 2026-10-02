@@ -345,7 +345,7 @@ const msg = (e: any) => String(e?.message ?? e).slice(0, 60);
 export const productPhotos = {
   id: 'product-photos',
   name: 'Product Photo Studio',
-  priceUsd: 6,
+  priceUsd: 2,
   policy: { budgetUsd: 1.5 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 
   async run(brief: string, opts: { orderId?: string; details?: BusinessDetails } = {}): Promise<Job> {

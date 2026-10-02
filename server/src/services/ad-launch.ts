@@ -110,7 +110,7 @@ function diagnose(r: Read, goal: Goal): Finding[] {
 export const adLaunch = {
   id: 'ad-launch',
   name: 'Ad Launch',
-  priceUsd: 20,
+  priceUsd: 2,
   // ad library 0.10–0.20 + 3 staged photos 0.30 + video 1.28 + music 0.11 + vision and ~6 LLM calls ≈ 2.2
   policy: { budgetUsd: 3 + MAIL_BUDGET_USD, allowHosts: [HOSTS.blockrun, AISA, ...(MAIL_HOST ? [MAIL_HOST] : [])] },
 

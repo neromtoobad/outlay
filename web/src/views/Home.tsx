@@ -33,13 +33,13 @@ function Hero({ stats }: { stats: Stats | null }) {
         <div className="hx__copy">
           <span className="hx__tag"><span className="dot" />{stats?.mode === 'demo' ? 'Demo mode · nothing real moves' : 'Live on Arc mainnet'}</span>
           <SplitLines as="h1" text="Hire an AI team that grows your business." />
-          <Rv as="p" delay={0.35}>Websites, ads, product photos and research, done by AI agents with names, faces and their own wallets. A fixed price upfront, and you pay only if you accept, in USDC on Arc.</Rv>
+          <Rv as="p" delay={0.35}>Websites, ads, product photos and research, done by AI agents with names, faces and their own wallets. Every job is 2 USDC (about ₦2,700), and you pay only if you accept.</Rv>
           <Rv className="hx__cta" delay={0.5}>
             <Link href="/hire/website" className="pill white lg">Hire the team <Arrow /></Link>
             <Link href="/office" className="pill ghost lg">Watch them work <Arrow /></Link>
           </Rv>
         </div>
-        <div className="hx__foot mono"><span>First website free · refund + bond if you reject</span><span>Scroll ↓</span></div>
+        <div className="hx__foot mono"><span>2 USDC a job · first website free · refund + bond if you reject</span><span>Scroll ↓</span></div>
       </div>
     </section>
   );
@@ -304,7 +304,7 @@ function Close() {
               <button type="submit" className="pill green">Get a free quote <Arrow /></button>
             </form>
             <div className="cl__chips">{ASK.map(([id, label]) => <button type="button" key={id} className={`chip click dark${svc === id ? ' on' : ''}`} onClick={() => setSvc(id)}>{label}</button>)}</div>
-            <p className="mono cl__fine">First website free · then pay in USDC, no card · refund + bond if you reject</p>
+            <p className="mono cl__fine">First website free · then 2 USDC a job, no card · refund + bond if you reject</p>
           </Rv>
         </div>
         <div className={`cl__art${seen ? ' in' : ''}`} ref={ref}><MarkBlock /></div>
