@@ -1,71 +1,31 @@
 # Syncly
 
-**An AI team for your business.** AI agents with names, faces and their own wallets do real paid work for small businesses. An AI CFO runs the company's money on Arc in USDC, inside limits a smart contract enforces, and every payment, decision and transaction settles on-chain.
+**AI agents do the work. An AI CFO runs the money.** Syncly is a real business staffed by AI agents, with its own treasury on Arc. Small businesses hire the agents for paid work at 2 USDC a job. An AI CFO prices every job, holds customer payments in escrow, pays every agent and supplier in USDC, and signs every decision, inside limits a smart contract enforces and only a human can lift.
 
-**Live on Arc mainnet:** [hiresyncly.site](https://hiresyncly.site) · [the office, live](https://hiresyncly.site/live) · [the CFO's signed log](https://hiresyncly.site/api/cfo) · [traction](TRACTION.md) ([live copy](https://hiresyncly.site/api/traction.md))
+**Live on Arc mainnet:** [hiresyncly.site](https://hiresyncly.site) · [follow the money](https://hiresyncly.site/#money) · [the CFO's signed log](https://hiresyncly.site/api/cfo) · [the office, live](https://hiresyncly.site/live) · [traction](TRACTION.md) ([live copy](https://hiresyncly.site/api/traction.md))
 
 Built for the [Tameion Agents Hackathon](https://tameion.thecanteenapp.com) (Canteen × Circle), Sep 27 – Oct 10, 2026. Everything here was built during the event: the `tameion-kickoff` tag marks the first commit.
 
-## What it does
+## What it does, in the hackathon's terms
 
-A business fills in a short form about itself and the job: *"party trays for 20 guests, ₦25,000, orders on WhatsApp, ₦5,000 a day for ads"*. The CFO prices it, a team of agents does it, and the customer decides whether to pay.
+Tameion asks for AI agents that manage a business's money: the treasury, invoices, contractors, autonomous operations, and the audit trail behind all of it. Syncly is that business, and its customers' payments are the money being managed.
 
-| Service | Price | What you get |
+| The brief | In Syncly | Code |
 |---|---|---|
-| Website | 2 USDC | A designed site from the Google listing, Instagram and the owner's photos, hosted at a link the same day, plus the files |
-| Content Pack | 2 USDC | The content styles working in the niche this week (backed by real posts and their numbers), then 7 posts and 3 images |
-| Ad Launch | 2 USDC | 3 ad angles from ads that have run 30+ days, feed and Story creatives, an 8 s video, copy, and a 7-day plan for the budget; diagnoses the ads they already ran |
-| Motion Ad | 2 USDC | A 12–24 s motion video with an original soundtrack, rendered on our own server |
-| Product Photo Studio | 2 USDC | Phone photos turned into studio, lifestyle and white-background shots, each checked against the original so the product doesn't change |
-| Get Found | 2 USDC | Google Maps rank street by street against competitors, profile gaps, what ChatGPT, Gemini, Claude and Perplexity say, a fix list, a profile description and review replies |
-| Buy Smart | 2 USDC | The cheapest trustworthy offers, delivered, and a red/amber/green check on the sellers before paying |
-| Local Business Finder | 2 USDC | Every business of a type in an area, with phone, website and rating, as a spreadsheet |
-| Lead List | 2 USDC | Up to 25 verified business emails, each with a personalised first line |
-| Research Brief | 2 USDC | Competitors, market and pricing, with every claim cited |
-
-The menu comes from research into what small businesses already pay agencies and freelancers for, and what a search or a chatbot can't do: jobs that need fresh data from many paid sources at once, checking against the truth, or real production.
-
-- **The first website is free** (one per email, when its tools cost under 1.50 USDC, from a promo budget of 2 USDC a week). After that, the customer pays into escrow on Arc from their own wallet.
-- **Nothing is paid unless the customer accepts.** Only the paying wallet can accept, ask for one free revision, or reject. A rejection refunds the price plus a bond the CFO put up.
-- **The agents buy their own tools.** Each has its own wallet and pays per call (x402 nanopayments through Circle Gateway) for AI models, search, page reading and email checks. Every call is listed on the customer's job page, linked to the Arc transaction that settled it. Costs and margins stay in the owner's private books.
-- **The CFO runs the money.** It plans each agent's weekly budget, puts revenue to work, and tops up agents that run low. Anything above its limits goes to a human to co-sign on-chain.
+| **Treasury** | SynclyVault holds the company's USDC in five buckets: operating, tools, bond, reserve and promo. Every 10 minutes the CFO reads the vault, plans the week, puts revenue to work and keeps the reserve above its floor. | [`SynclyVault.sol`](contracts/src/SynclyVault.sol), [`treasury.ts`](server/src/cfo/treasury.ts) |
+| **Invoices** | *Money in:* every order is a fixed-price bill paid into JobEscrow on Arc, released only when the customer accepts (or after 48 h of silence); a rejection refunds it plus a bond the CFO put up. *Money out:* the agents' tool bills, paid per call with x402 and settled on Arc. | [`JobEscrow.sol`](contracts/src/JobEscrow.sol), [`escrow.ts`](server/src/escrow.ts), [`x402.ts`](server/src/x402.ts) |
+| **Contractors** | The ten agents are contractors. Each has its own wallet, a weekly allowance set from what it really spends per job, and a top-up from the CFO when it runs low. Their suppliers' payout addresses are pinned per service and screened against the USDC blacklist before anything is signed. | [`treasury.ts`](server/src/cfo/treasury.ts), [`payees.json`](server/src/payees.json) |
+| **Autonomous operations** | The CFO acts alone up to 2 USDC per move, and per bucket pair per week. Anything bigger is a proposal only the owner's wallet can co-sign on-chain. It prices every job, bonds its own quotes, and turns down jobs its team can't afford to finish. No language model touches the money. | [`quote.ts`](server/src/cfo/quote.ts), [`SynclyVault.sol`](contracts/src/SynclyVault.sol) |
+| **Audit trail** | Every CFO decision is hash-chained to the one before and signed by its key, and the hash rides in the vault transaction's `reason` field. Every payment links to its Arc transaction, and each escrow seals the hashes of the agreed terms and of the delivery. The beancount ledger is in the owner's private books. | [`log.ts`](server/src/cfo/log.ts), [/api/cfo](https://hiresyncly.site/api/cfo) |
 
 ## Try it (for judges)
 
-1. **Order a free website** at [/hire/website](https://hiresyncly.site/hire/website). Watch the team work on the job page; each tool payment appears as it happens.
-2. **Watch the office** at [/live](https://hiresyncly.site/live). The agents act out real events: the CFO stamps the quote and walks the brief to the whiteboard, and the Messenger carries the delivery out.
-3. **Check a receipt.** Job #1 ([ord_mulrvp33_0603](https://hiresyncly.site/job/ord_mulrvp33_0603)) found 9 restaurants with 5 x402 payments, each linked to its settlement on Arc ([0xb76f18…](https://arcscan.app/tx/0xb76f1819087eea9c3bbd9886384a44556450a6fa831a1575818165fa0355fe25), [0xc99ba1…](https://arcscan.app/tx/0xc99ba105332d26b54c73cc1ba1677e299c9dc632eb3f835e50309a40d41d4fbd)).
-4. **Read the CFO's log** at [/api/cfo](https://hiresyncly.site/api/cfo): each agent's balance and allowance, this week's plan, and every decision with what the CFO saw, signed and hash-chained.
+1. **Follow the money** on the home page ([/#money](https://hiresyncly.site/#money)): each stop has a live number from the running company.
+2. **Read the CFO's log** at [/api/cfo](https://hiresyncly.site/api/cfo): the vault's buckets, each agent's balance and allowance, this week's plan, and every decision with what the CFO saw, signed and hash-chained. `verify.ok` means every hash and signature checks out.
+3. **Order a free website** at [/hire/website](https://hiresyncly.site/hire/website). The job page shows the team working live and **the money on this job**: the CFO's quote and bond, the escrow, every tool the agents bought with its Arc settlement, and the release or refund.
+4. **Check a receipt.** Job #1 ([ord_mulrvp33_0603](https://hiresyncly.site/job/ord_mulrvp33_0603)) found 9 restaurants with 5 x402 payments, each linked to its settlement on Arc ([0xb76f18…](https://arcscan.app/tx/0xb76f1819087eea9c3bbd9886384a44556450a6fa831a1575818165fa0355fe25), [0xc99ba1…](https://arcscan.app/tx/0xc99ba105332d26b54c73cc1ba1677e299c9dc632eb3f835e50309a40d41d4fbd)).
 5. **Pay for a job** (needs about 2.05 USDC on Arc in a browser wallet). The page walks through the steps: connect the wallet, the CFO opens the escrow, then approve and fund. On the job page you then accept, revise or reject from the same wallet.
-
-## On Arc mainnet (chain 5042)
-
-| Contract / wallet | Address | Role |
-|---|---|---|
-| **SynclyVault** | [`0x589e8ec9134777acecb83a9abdf018942ddc9f2b`](https://arcscan.app/address/0x589e8ec9134777acecb83a9abdf018942ddc9f2b) | The treasury: five buckets (OPERATING, TOOLS, BOND, RESERVE, PROMO). The CFO can move money between buckets and fund agents, never send it anywhere else. |
-| **JobEscrow** | [`0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd`](https://arcscan.app/address/0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd) | Paid jobs. The customer funds it, and only the customer can accept or reject. Silence for 48 h releases the payment, and a missed deadline refunds it plus the bond. |
-| Boss | [`0xe7aa82bd4659b5af2b16d0af5dcab42fe8089b40`](https://arcscan.app/address/0xe7aa82bd4659b5af2b16d0af5dcab42fe8089b40) | The vault's owner: a human's wallet, outside the server's keys. Co-signs anything above the CFO's limits. |
-| CFO | [`0xB95dd6425d19BF09d206dc780a758e1C2EF4f1a9`](https://arcscan.app/address/0xB95dd6425d19BF09d206dc780a758e1C2EF4f1a9) | The vault's CFO key and the escrow's operator. It signs the decision log. |
-| Treasury | [`0x102AdC546dAE682B7cDD9aB6d624822fdD3DC209`](https://arcscan.app/address/0x102AdC546dAE682B7cDD9aB6d624822fdD3DC209) | Deployed the contracts. Funded the first agents' Gateway balances before the vault existed. |
-| USDC | `0x3600000000000000000000000000000000000000` | Arc's native USDC (gas and settlement) |
-| Circle GatewayWallet | `0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE` | Holds each agent's balance for x402 payments; the vault tops agents up here |
-
-Agent wallets, each registered in the vault and paying for its own tools:
-
-| Agent | Address | Buys |
-|---|---|---|
-| Scout | [`0xF57E…7256`](https://arcscan.app/address/0xF57E85630d0D100cCD2AEf7f6956aa2975B27256) | Search (Exa, Serper Maps) |
-| Researcher | [`0x02aA…d3eb`](https://arcscan.app/address/0x02aA3749c7af3181C85Eee4CBa999747E449d3eb) | AI models (BlockRun) to plan and extract |
-| Reader | [`0x594E…54Cf`](https://arcscan.app/address/0x594EC11A38d68a8c2A365C941d8d76eEe9e954Cf) | Page reading (Exa contents, APEX) |
-| Writer | [`0x16a4…2B28`](https://arcscan.app/address/0x16a4f6FCfAb3B607df1965A443Aa8819fed52B28) | AI models (BlockRun) |
-| Investigator | [`0x7E0C…BCB0`](https://arcscan.app/address/0x7E0C1c33FcE6605630c473d4a44255f26463BCB0) | Email, phone and seller checks (APEX, Twilio via BlockRun, Didit), and AI-assistant answers (DataForSEO) |
-| Designer | [`0x00aF…DAF4`](https://arcscan.app/address/0x00aFF88Ae2B22f67cf87Ca74d36d37f7BA6fDAF4) | Claude Opus 5 for websites, and images (BlockRun) |
-| Producer | [`0x37c8…9f36`](https://arcscan.app/address/0x37c8de9f9740Ed30bcdCc1ea5B8C08567BE19f36) | Claude Opus 5 for motion ads, video and music (BlockRun) |
-| Analyst | [`0x2E51…c958`](https://arcscan.app/address/0x2E516E71912adA3B7aFa989aCE06D9A51e7fc958) | AI models to compare prices, answers and signals (BlockRun) |
-| Auditor | [`0x72e5…c9b6`](https://arcscan.app/address/0x72e514Afed2EFdecA263d9710068259f4B00c9b6) | A second AI model family, to check the work |
-| Messenger | [`0x37D0…95a9`](https://arcscan.app/address/0x37D0ccDfcC37ba1803002d95D0077828Afcd95a9) | Email delivery (Resend; AgentMail by x402 as a fallback) |
-
-Key transactions: [vault deployed](https://arcscan.app/tx/0x77d94e018c642a803962f9031367098fed1a4c2eadac34f1d5dab14d03c8d6ff), [escrow deployed](https://arcscan.app/tx/0xa6066e70dd18c60cd41cbe29fbc0a33af7f3564a1f196221cd79c31a8acf4b26), [ownership handed to the Boss](https://arcscan.app/tx/0x4020c9a206135485c11e3386d488b1e10790077af525a73dc58ff82afc4ec5ab), [the CFO's first weekly plan sealed on-chain](https://arcscan.app/tx/0x8af07f69b1c058e51379bbab8c31f3f419a110fd5dc2174988a566dfb4f158d4). Every address and deploy transaction is in [`deployments/arc.json`](deployments/arc.json).
+6. **Watch the office** at [/live](https://hiresyncly.site/live). The agents act out real events: the CFO stamps the quote and walks the brief to the whiteboard, and the Messenger carries the delivery out.
 
 ## How the money moves
 
@@ -79,7 +39,7 @@ flowchart LR
   V -- CFO allocates --> B[BOND]
   V -- CFO allocates --> R[RESERVE]
   T -- CFO topUp, within allowance --> G[Agent's Gateway balance]
-  G -- x402 per call --> S[Sellers: BlockRun, Exa,<br/>Serper, APEX, AgentMail]
+  G -- x402 per call --> S[Sellers: BlockRun, Exa,<br/>Serper, APEX, DataForSEO]
   S -. batched settlement .-> A[(Arc)]
 ```
 
@@ -119,6 +79,59 @@ Canteen's [essay](https://thecanteenapp.com/analysis/2026/09/12/agents-and-ledge
 | An entry with no document behind it | Every ledger line points to its job. Each escrow seals the hash of the agreed terms (`specHash`) and of the delivery (`deliverableHash`) on-chain, so terms, delivery and payment can be matched. |
 
 **Why beancount:** the ledger is written in [beancount](https://github.com/beancount/beancount) format, kept in the owner's private books. Precision is declared in the entry itself, not hidden in a column type, and a human can read what the agent wrote.
+
+## On Arc mainnet (chain 5042)
+
+| Contract / wallet | Address | Role |
+|---|---|---|
+| **SynclyVault** | [`0x589e8ec9134777acecb83a9abdf018942ddc9f2b`](https://arcscan.app/address/0x589e8ec9134777acecb83a9abdf018942ddc9f2b) | The treasury: five buckets (OPERATING, TOOLS, BOND, RESERVE, PROMO). The CFO can move money between buckets and fund agents, never send it anywhere else. |
+| **JobEscrow** | [`0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd`](https://arcscan.app/address/0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd) | Paid jobs. The customer funds it, and only the customer can accept or reject. Silence for 48 h releases the payment, and a missed deadline refunds it plus the bond. |
+| Boss | [`0xe7aa82bd4659b5af2b16d0af5dcab42fe8089b40`](https://arcscan.app/address/0xe7aa82bd4659b5af2b16d0af5dcab42fe8089b40) | The vault's owner: a human's wallet, outside the server's keys. Co-signs anything above the CFO's limits. |
+| CFO | [`0xB95dd6425d19BF09d206dc780a758e1C2EF4f1a9`](https://arcscan.app/address/0xB95dd6425d19BF09d206dc780a758e1C2EF4f1a9) | The vault's CFO key and the escrow's operator. It signs the decision log. |
+| Treasury | [`0x102AdC546dAE682B7cDD9aB6d624822fdD3DC209`](https://arcscan.app/address/0x102AdC546dAE682B7cDD9aB6d624822fdD3DC209) | Deployed the contracts. Funded the first agents' Gateway balances before the vault existed. |
+| USDC | `0x3600000000000000000000000000000000000000` | Arc's native USDC (gas and settlement) |
+| Circle GatewayWallet | `0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE` | Holds each agent's balance for x402 payments; the vault tops agents up here |
+
+Agent wallets, each registered in the vault and paying for its own tools:
+
+| Agent | Address | Buys |
+|---|---|---|
+| Scout | [`0xF57E…7256`](https://arcscan.app/address/0xF57E85630d0D100cCD2AEf7f6956aa2975B27256) | Search (Exa, Serper Maps) |
+| Researcher | [`0x02aA…d3eb`](https://arcscan.app/address/0x02aA3749c7af3181C85Eee4CBa999747E449d3eb) | AI models (BlockRun) to plan and extract |
+| Reader | [`0x594E…54Cf`](https://arcscan.app/address/0x594EC11A38d68a8c2A365C941d8d76eEe9e954Cf) | Page reading (Exa contents, APEX) |
+| Writer | [`0x16a4…2B28`](https://arcscan.app/address/0x16a4f6FCfAb3B607df1965A443Aa8819fed52B28) | AI models (BlockRun) |
+| Investigator | [`0x7E0C…BCB0`](https://arcscan.app/address/0x7E0C1c33FcE6605630c473d4a44255f26463BCB0) | Email, phone and seller checks (APEX, Twilio via BlockRun, Didit), and AI-assistant answers (DataForSEO) |
+| Designer | [`0x00aF…DAF4`](https://arcscan.app/address/0x00aFF88Ae2B22f67cf87Ca74d36d37f7BA6fDAF4) | Claude Opus 5 for websites, and images (BlockRun) |
+| Producer | [`0x37c8…9f36`](https://arcscan.app/address/0x37c8de9f9740Ed30bcdCc1ea5B8C08567BE19f36) | Claude Opus 5 for motion ads, video and music (BlockRun) |
+| Analyst | [`0x2E51…c958`](https://arcscan.app/address/0x2E516E71912adA3B7aFa989aCE06D9A51e7fc958) | AI models to compare prices, answers and signals (BlockRun) |
+| Auditor | [`0x72e5…c9b6`](https://arcscan.app/address/0x72e514Afed2EFdecA263d9710068259f4B00c9b6) | A second AI model family, to check the work |
+| Messenger | [`0x37D0…95a9`](https://arcscan.app/address/0x37D0ccDfcC37ba1803002d95D0077828Afcd95a9) | Email delivery (Resend; AgentMail by x402 as a fallback) |
+
+Key transactions: [vault deployed](https://arcscan.app/tx/0x77d94e018c642a803962f9031367098fed1a4c2eadac34f1d5dab14d03c8d6ff), [escrow deployed](https://arcscan.app/tx/0xa6066e70dd18c60cd41cbe29fbc0a33af7f3564a1f196221cd79c31a8acf4b26), [ownership handed to the Boss](https://arcscan.app/tx/0x4020c9a206135485c11e3386d488b1e10790077af525a73dc58ff82afc4ec5ab), [the CFO's first weekly plan sealed on-chain](https://arcscan.app/tx/0x8af07f69b1c058e51379bbab8c31f3f419a110fd5dc2174988a566dfb4f158d4). Every address and deploy transaction is in [`deployments/arc.json`](deployments/arc.json).
+
+## Where the money comes from: the work the agents sell
+
+Real money has to flow for the CFO to manage it, so Syncly sells work small businesses already pay freelancers for. A business fills in a short form about itself and the job (*"party trays for 20 guests, ₦25,000, orders on WhatsApp, ₦5,000 a day for ads"*), the CFO prices it, the agents do it, and the customer decides whether to pay.
+
+| Service | Price | What you get |
+|---|---|---|
+| Website | 2 USDC | A designed site from the Google listing, Instagram and the owner's photos, hosted at a link the same day, plus the files |
+| Content Pack | 2 USDC | The content styles working in the niche this week (backed by real posts and their numbers), then 7 posts and 3 images |
+| Ad Launch | 2 USDC | 3 ad angles from ads that have run 30+ days, feed and Story creatives, an 8 s video, copy, and a 7-day plan for the budget; diagnoses the ads they already ran |
+| Motion Ad | 2 USDC | A 12–24 s motion video with an original soundtrack, rendered on our own server |
+| Product Photo Studio | 2 USDC | Phone photos turned into studio, lifestyle and white-background shots, each checked against the original so the product doesn't change |
+| Get Found | 2 USDC | Google Maps rank street by street against competitors, profile gaps, what ChatGPT, Gemini, Claude and Perplexity say, a fix list, a profile description and review replies |
+| Buy Smart | 2 USDC | The cheapest trustworthy offers, delivered, and a red/amber/green check on the sellers before paying |
+| Local Business Finder | 2 USDC | Every business of a type in an area, with phone, website and rating, as a spreadsheet |
+| Lead List | 2 USDC | Up to 25 verified business emails, each with a personalised first line |
+| Research Brief | 2 USDC | Competitors, market and pricing, with every claim cited |
+
+The menu comes from research into what small businesses already pay agencies and freelancers for, and what a search or a chatbot can't do: jobs that need fresh data from many paid sources at once, checking against the truth, or real production.
+
+- **The first website is free** (one per email, when its tools cost under 1.50 USDC, from a promo budget of 2 USDC a week). After that, the customer pays into escrow on Arc from their own wallet.
+- **Nothing is paid unless the customer accepts.** Only the paying wallet can accept, ask for one free revision, or reject. A rejection refunds the price plus a bond the CFO put up.
+- **The agents buy their own tools.** Each has its own wallet and pays per call (x402 nanopayments through Circle Gateway) for AI models, search, page reading and email checks. Every call is listed on the customer's job page, linked to the Arc transaction that settled it. Costs and margins stay in the owner's private books.
+- **The CFO runs the money.** It plans each agent's weekly budget, puts revenue to work, and tops up agents that run low. Anything above its limits goes to a human to co-sign on-chain.
 
 ## Circle tools used
 

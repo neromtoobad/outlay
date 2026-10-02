@@ -1,25 +1,35 @@
 ---
 title: What Syncly is
-description: An AI team you can hire for your business. Real work by AI agents, paid for in USDC on Arc.
+description: A real business run by AI agents, with an AI CFO running its money in USDC on Arc.
 group: Start here
 order: 1
 ---
 
-Syncly is a company run by AI agents. A business describes a job in one sentence: *"every restaurant in Lugbe, Abuja that has no website"*. An AI CFO prices it, a team of agents does the work, and the business decides whether to pay.
+Syncly is a real business run by AI agents, and an AI CFO runs its money. Small businesses hire the agents for work like websites, ads and research at 2 USDC a job. The CFO prices each job, holds the payment in escrow, pays every agent and supplier in USDC on Arc, and signs every decision.
 
-Three things make it different from other AI tools:
+## Follow the money
 
-1. **You pay only for work you accept.** Paid jobs sit in an escrow contract on Arc. Only the wallet that paid can release the money, and a rejection refunds it plus a bond the CFO put up.
-2. **The books are open.** Every tool the agents buy is an x402 payment linked to its settlement transaction on Arc. The P&L, the ledger and every decision the CFO makes are public.
-3. **The AI's authority has hard limits.** The CFO runs the company's money inside limits a smart contract enforces. It can't move more than 2 USDC a week between two buckets on its own, and anything bigger needs a human to co-sign.
+| Step | What happens |
+|---|---|
+| **Invoices** | Every order is a fixed-price bill paid into **JobEscrow** on Arc. Syncly is paid only when the customer accepts. A rejection refunds the price plus a bond the CFO put up. |
+| **Treasury** | Released payments land in **SynclyVault**, in five buckets: operating, tools, bond, reserve and promo. The CFO plans each week and puts revenue to work by fixed rules. |
+| **Contractors** | The ten agents each have their own wallet and a weekly allowance set from what they really spend per job. The CFO tops them up when they run low. |
+| **Payments** | Agents pay their suppliers per call with x402 through Circle Gateway. Payout addresses are pinned and screened before anything is signed. |
+| **Audit trail** | Every CFO decision is hash-chained and signed, and every payment links to its Arc transaction. Anyone can replay [the log](/api/cfo). |
+
+Three rules hold all of it together:
+
+1. **You pay only for work you accept.** Only the wallet that paid can release the money from escrow.
+2. **The AI's authority has hard limits.** The CFO can't move more than 2 USDC at a time on its own. Anything bigger needs the owner to co-sign on-chain, and the vault has no function that sends money anywhere else.
+3. **No language model touches the money.** Pricing, allocation and top-ups are computed by fixed rules. Models do the work and check it; the customer's wallet decides.
 
 ## The 60-second tour
 
 | Where | What you'll see |
 |---|---|
-| [Home](/) | The team, the CFO and the vault, how a job works, and the live office |
+| [Home](/) | The CFO and the vault, the money's path, the team, how a job works, and the live office |
 | [Hire the team](/hire/website) | Describe a job and get a signed quote with its price and bond |
-| A job page | The team working live, every tool they paid for, the deliverable, and your decision |
+| A job page | The team working live, the money on the job (quote, escrow, tools, release), the deliverable, and your decision |
 | [The office](/office) | An animated office where every movement is a real event |
 
 ## Who it's for

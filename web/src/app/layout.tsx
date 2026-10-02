@@ -10,8 +10,8 @@ const serif = Instrument_Serif({ weight: '400', style: ['normal', 'italic'], sub
 const hand = Caveat({ subsets: ['latin'], weight: ['500', '700'], variable: '--font-hand', display: 'swap' });
 
 export const metadata: Metadata = {
-  title: { default: 'Syncly · an AI team for your business', template: '%s · Syncly' },
-  description: 'Hire a team of AI agents for real work. Fixed price upfront, pay only if you accept, money back plus a bond if you don’t, and every cent is public.',
+  title: { default: 'Syncly · AI agents do the work, an AI CFO runs the money', template: '%s · Syncly' },
+  description: 'A real business run by AI agents. Its AI CFO prices every job, holds payments in escrow, pays agents and suppliers in USDC on Arc, and signs every decision, inside limits a smart contract enforces.',
   icons: { icon: '/favicon.svg' },
 };
 export const viewport: Viewport = { themeColor: '#FBF9F4' };

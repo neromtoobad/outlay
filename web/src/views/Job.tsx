@@ -139,6 +139,27 @@ const Tx = ({ cfg, hash, children }: { cfg: EscrowCfg | null; hash?: string; chi
   return href ? <a href={href} target="_blank" rel="noreferrer">{children} ↗</a> : hash ? <span className="mono" title={hash}>{children}</span> : null;
 };
 
+/** Where this job's money went, step by step, each step linked to its Arc transaction. Tool costs stay private. */
+function MoneyTrail({ o, receipt, cfg }: { o: Order; receipt: Receipt[]; cfg: EscrowCfg | null }) {
+  const q = o.quote, e = o.escrow, p = o.payment, st = o.status;
+  const settled = receipt.filter((r) => r.settledTx).length;
+  const paidIn = p && p.mode !== 'promo';
+  const end: { h: ReactNode; s?: ReactNode; on: boolean } =
+    st === 'accepted' ? { h: paidIn ? 'Released to Syncly’s vault' : 'Accepted', s: e?.closeTx ? <Tx cfg={cfg} hash={e.closeTx}>Released</Tx> : o.decision?.by === 'auto' ? 'After 48 h of silence' : 'By you', on: true }
+    : st === 'rejected' || (st === 'failed' && o.refund) ? { h: o.refund ? 'Refunded to you, plus the bond' : 'Rejected', s: o.refund?.tx ? <Tx cfg={cfg} hash={o.refund.tx}>Refund</Tx> : undefined, on: true }
+    : st === 'expired' ? { h: 'The quote expired', s: 'Nothing was taken', on: true }
+    : { h: 'Your decision', s: paidIn ? 'The money moves only when you accept, or after 48 h of silence' : 'Tell the team if it was good', on: false };
+  const steps: { h: ReactNode; s?: ReactNode; on: boolean }[] = [
+    { h: q.promo ? 'The CFO quoted it free' : `The CFO quoted ${usd(q.priceUsd)} USDC`, s: q.promo ? 'Paid from its promo budget for first jobs' : <>{q.bondUsd > 0 ? `and backed its quote with a ${usd(q.bondUsd)} USDC bond` : 'with no bond on this one'}{e?.openTx && <> · <Tx cfg={cfg} hash={e.openTx}>Escrow opened</Tx></>}</>, on: true },
+    { h: !p ? 'Waiting for payment' : p.mode === 'promo' ? 'Nothing for you to pay' : p.mode === 'simulated' ? 'Paid into a demo escrow' : 'You paid into escrow on Arc', s: e?.fundTx ? <Tx cfg={cfg} hash={e.fundTx}>Funded</Tx> : paidIn ? 'Held by the contract, not by Syncly' : undefined, on: !!p },
+    { h: `The team bought ${receipt.length} tool${receipt.length === 1 ? '' : 's'}`, s: receipt.length ? `${settled} settled on Arc so far, each paid from the agent’s own wallet` : 'Each agent pays per call from its own wallet', on: receipt.length > 0 },
+    e ? { h: 'The delivery was sealed on Arc', s: e.submitTx ? <Tx cfg={cfg} hash={e.submitTx}>Fingerprint sealed</Tx> : 'Its hash goes on-chain before you decide', on: !!e.submitTx }
+      : { h: 'Delivered', s: o.deliveredAt ? timeAgo(o.deliveredAt) : undefined, on: !!o.deliveredAt },
+    end,
+  ];
+  return <ol className="trail">{steps.map((x, i) => <li key={i} className={x.on ? 'on' : ''}><b>{x.h}</b>{x.s && <span>{x.s}</span>}</li>)}</ol>;
+}
+
 /** A paid job's decision is signed by the wallet that funded the escrow. The server only reads the chain. */
 function EscrowDecision({ o, cfg, onUpdate }: { o: Order; cfg: EscrowCfg; onUpdate: (o: Order) => void }) {
   const e = o.escrow!, q = o.quote;
@@ -351,10 +372,9 @@ export default function Job({ id }: { id: string }) {
             )}
           </section>
 
-          <PaperReceipt o={o} receipt={receipt} />
-
-          <section className="card pad" style={{ marginTop: 6 }}>
-            <h3 className="t">The deal</h3>
+          <section className="card pad">
+            <h3 className="t">The money on this job</h3>
+            <MoneyTrail o={o} receipt={receipt} cfg={cfg} />
             <div className="srow"><span className="lbl">Price</span><span className="fill" /><span className="v">{q.promo ? 'Free' : `${usd(q.priceUsd)} USDC`}</span></div>
             {!q.promo && <div className="srow"><span className="lbl">In naira</span><span className="fill" /><span className="v">{ngn(q.priceUsd)}</span></div>}
             <div className="srow"><span className="lbl">Bond if rejected</span><span className="fill" /><span className="v">{q.promo ? '—' : `${usd(q.bondUsd)} USDC`}</span></div>
@@ -363,12 +383,6 @@ export default function Job({ id }: { id: string }) {
               <>
                 <div className="srow"><span className="lbl">Paid by</span><span className="fill" /><span className="v">{short(o.escrow.customer)}</span></div>
                 <div className="srow"><span className="lbl">Escrow</span><span className="fill" /><span className="v" style={{ fontFamily: 'var(--sans)' }}>{o.escrow.state}</span></div>
-                <div className="txlinks">
-                  <Tx cfg={cfg} hash={o.escrow.openTx}>Opened</Tx>
-                  <Tx cfg={cfg} hash={o.escrow.fundTx}>Funded</Tx>
-                  <Tx cfg={cfg} hash={o.escrow.submitTx}>Delivery sealed</Tx>
-                  <Tx cfg={cfg} hash={o.escrow.closeTx}>{o.escrow.state === 'Accepted' ? 'Released' : o.escrow.state === 'Cancelled' ? 'Cancelled' : 'Refunded'}</Tx>
-                </div>
                 <details style={{ marginTop: 8 }}>
                   <summary style={{ cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>The terms sealed on-chain</summary>
                   <p className="muted" style={{ fontSize: 12.5, margin: '8px 0 6px' }}>keccak256 of this text is the job's specHash on Arc: <span className="mono" style={{ wordBreak: 'break-all' }}>{o.escrow.specHash}</span></p>
@@ -381,6 +395,8 @@ export default function Job({ id }: { id: string }) {
               <ol className="why">{q.reasons.map((r) => <li key={r}>{r}</li>)}</ol>
             </details>
           </section>
+
+          <PaperReceipt o={o} receipt={receipt} />
           <p className="muted" style={{ fontSize: 13.5 }}>Each agent paid for its own tools, per call, and every payment settles on Arc.</p>
         </aside>
       </div>

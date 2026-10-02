@@ -1,17 +1,17 @@
 'use client';
-// The home page, told by scrolling (after quickfleet.co): a full-bleed hero, the team on a pinned stage,
-// the CFO on a blueprint, how a job works on stacking cards, the books, the office, the services on a
-// pinned index, and a dark close. Every number shown comes from the live API.
-import { useRef, useState, type FormEvent } from 'react';
+// The home page, told by scrolling (after quickfleet.co): a full-bleed hero, the CFO on a blueprint, the
+// money's path from invoice to audit trail, the team on a pinned stage, how a job works on stacking cards,
+// the office, the services on a pinned index, and a dark close. Every number shown comes from the live API.
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Office from '@/office/Office.tsx';
-import { useApi, usd, timeAgo, ROLE_NAME, ROLES, DEPT_TINT, Avatar, tint, type Service, type AgentStats } from '@/lib.tsx';
+import { useApi, timeAgo, ROLE_NAME, ROLES, DEPT_TINT, Avatar, type Service, type AgentStats } from '@/lib.tsx';
 import { clamp, Rv, SplitLines, useFrame, useInView, useStickyProgress } from '@/components/scroll.tsx';
 import { DecideArt, EscrowArt, MarkBlock, QuoteArt, ReceiptArt, VaultArt } from './home/art.tsx';
 
 type Stats = { mode: 'demo' | 'live'; toolCalls: number; settled: number; delivered: number; customers: number };
-type Cfo = { enabled: boolean; mode: string; metrics: { done: number; escalated: number }; verify: { ok: boolean; entries: number }; snapshot: null | { buckets: Record<string, number> }; decisions: { summary: string; at: string; tx?: string; status: string; kind: string }[] };
+type Cfo = { enabled: boolean; mode: string; metrics: { done: number; escalated: number }; verify: { ok: boolean; entries: number }; snapshot: null | { buckets: Record<string, number>; epoch?: number }; decisions: { summary: string; at: string; tx?: string; status: string; kind: string; hash?: string }[] };
 
 const Arrow = () => <span className="pill__ic">→</span>;
 
@@ -32,14 +32,14 @@ function Hero({ stats }: { stats: Stats | null }) {
         <div className="hx__shade" />
         <div className="hx__copy">
           <span className="hx__tag"><span className="dot" />{stats?.mode === 'demo' ? 'Demo mode · nothing real moves' : 'Live on Arc mainnet'}</span>
-          <SplitLines as="h1" text="Hire an AI team that grows your business." />
-          <Rv as="p" delay={0.35}>Websites, ads, product photos and research, done by AI agents with names, faces and their own wallets. Every job is 2 USDC (about ₦2,700), and you pay only if you accept.</Rv>
+          <SplitLines as="h1" text="AI agents do the work. An AI CFO runs the money." />
+          <Rv as="p" delay={0.35}>Syncly is a real business staffed by AI agents. Small businesses hire them for websites, ads and research at 2 USDC a job. The CFO prices every job, pays every agent and supplier in USDC on Arc, and signs every decision, inside limits a smart contract enforces.</Rv>
           <Rv className="hx__cta" delay={0.5}>
             <Link href="/hire/website" className="pill white lg">Hire the team <Arrow /></Link>
-            <Link href="/office" className="pill ghost lg">Watch them work <Arrow /></Link>
+            <Link href="/#money" className="pill ghost lg">Follow the money <Arrow /></Link>
           </Rv>
         </div>
-        <div className="hx__foot mono"><span>2 USDC a job · first website free · refund + bond if you reject</span><span>Scroll ↓</span></div>
+        <div className="hx__foot mono"><span>Every payment settles on Arc · every decision signed · first website free</span><span>Scroll ↓</span></div>
       </div>
     </section>
   );
@@ -57,7 +57,7 @@ const CREW: { role: string; buys: string; from: string; line: string }[] = [
   { role: 'investigator', buys: 'Checks and screening', from: 'APEX · DataForSEO · Didit', line: 'Checks every email, phone number and seller, and asks ChatGPT what it says about you.' },
   { role: 'analyst', buys: 'AI models', from: 'BlockRun', line: 'Compares prices, answers and signals: the numbers on every report.' },
   { role: 'auditor', buys: 'A second model family', from: 'BlockRun', line: 'Checks the work on a different AI before it is delivered.' },
-  { role: 'messenger', buys: 'Email delivery', from: 'AgentMail', line: 'Packs the files and gets them to you.' },
+  { role: 'messenger', buys: 'Email delivery', from: 'Resend', line: 'Packs the files and gets them to you.' },
 ];
 
 function Team({ agents }: { agents: Record<string, AgentStats> }) {
@@ -68,7 +68,7 @@ function Team({ agents }: { agents: Record<string, AgentStats> }) {
     <section className="tm" id="team" ref={ref} style={{ ['--n' as any]: CREW.length }}>
       <div className="tm__stick">
         <div className="tm__copy">
-          <span className="label"><span className="n">01</span>The team</span>
+          <span className="label"><span className="n">03</span>The team</span>
           <div className="tm__steps">
             {CREW.map((c, i) => {
               const s = agents[c.role];
@@ -76,7 +76,7 @@ function Team({ agents }: { agents: Record<string, AgentStats> }) {
                 <div key={c.role} className={`tm__step${i === at ? ' on' : i < at ? ' past' : ''}`} aria-hidden={i !== at}>
                   <h2>{ROLE_NAME[c.role]}</h2>
                   <p className="tm__role">{ROLES[c.role]?.title}</p>
-                  <p>{c.line} It has its own wallet and pays for its own tools, one call at a time.</p>
+                  <p>{c.line} It works like a contractor: its own wallet, a weekly allowance from the CFO, and it pays for its own tools one call at a time.</p>
                   <span className="tm__stat"><span className="dot" />{s?.calls ? `${s.calls} paid calls, settled on Arc` : 'On the team, waiting for its first paid call'}</span>
                 </div>
               );
@@ -92,7 +92,9 @@ function Team({ agents }: { agents: Record<string, AgentStats> }) {
             <div key={c.role} className={`tm__fig${i === at ? ' on' : ''}`} style={{ ['--t' as any]: ROLES[c.role]?.t }}>
               <img className="tm__sprite" src={`/sprites/${c.role}/${c.role}-0.png`} alt={ROLE_NAME[c.role]} />
               <div className="tm__call a"><span className="mono">Buys</span><b>{c.buys}</b><span>from {c.from}</span></div>
-              <div className="tm__call b"><span className="mono">Pays with</span><b>x402 · Circle Gateway</b><span>its own USDC balance on Arc</span></div>
+              {c.role === 'messenger'
+                ? <div className="tm__call b"><span className="mono">Paid by</span><b>The CFO</b><span>one monthly plan, not per email</span></div>
+                : <div className="tm__call b"><span className="mono">Pays with</span><b>x402 · Circle Gateway</b><span>its own USDC balance on Arc</span></div>}
             </div>
           ))}
         </div>
@@ -115,9 +117,9 @@ function Cfo({ cfo }: { cfo: Cfo | null }) {
     <section className="panel dark on-dark cf" id="cfo">
       <div className="cf__grid wrap">
         <div className="cf__copy">
-          <span className="label"><span className="n">02</span>The CFO</span>
+          <span className="label"><span className="n">01</span>The CFO</span>
           <SplitLines text="An AI runs the money. A contract keeps it honest." accent="honest." />
-          <Rv as="p" className="lede">Every few minutes the CFO reads the vault and every agent's balance, then decides by fixed rules. It plans the week, puts revenue to work and tops up agents who run low. No language model touches the money, and every decision is signed and public.</Rv>
+          <Rv as="p" className="lede">Syncly's money lives in a vault on Arc, and an AI CFO runs it. Every few minutes it reads the vault and every agent's balance, then decides by fixed rules: it plans the week, puts revenue to work and tops up agents who run low. No language model touches the money, and every decision is signed.</Rv>
           <div className="cf__notes">
             {[
               ['Plans the week', "Each agent's allowance comes from what it actually spent per job. The plan's hash is sealed on-chain before any money moves."],
@@ -180,7 +182,7 @@ function How() {
   return (
     <section className="hw wrap" id="how">
       <div className="hw__head">
-        <span className="label"><span className="n">03</span>How a job works</span>
+        <span className="label"><span className="n">04</span>How a job works</span>
         <SplitLines text="Pay only for work you accept." />
       </div>
       <ol className="hw__cards">{HOW.map((c, i) => <HowCard key={c.n} c={c} i={i} total={HOW.length} />)}</ol>
@@ -188,30 +190,72 @@ function How() {
   );
 }
 
-// ---------------------------------------------------------------- 04 · paid on Arc
+// ---------------------------------------------------------------- 02 · follow the money
 
-const WALLETS = ['scout', 'researcher', 'reader', 'writer', 'illustrator', 'producer', 'investigator', 'analyst', 'auditor', 'messenger', 'cfo'];
+const SELLERS = ['BlockRun', 'Exa', 'Serper', 'APEX', 'DataForSEO'];
+const CONTRACTORS = ['scout', 'researcher', 'writer', 'illustrator', 'producer'];
+const shortHash = (h?: string) => (h ? `${h.slice(0, 10)}…${h.slice(-6)}` : '0x…');
 
-function PaidOnArc({ stats }: { stats: Stats | null }) {
+/** The money's path through the company, one stop per job the treasury does, each with a live number. */
+function Money({ stats, cfo }: { stats: Stats | null; cfo: Cfo | null }) {
+  const latest = cfo?.decisions[0];
+  const stops: { k: string; h: string; p: string; vis: ReactNode; stat: string }[] = [
+    {
+      k: 'Invoices', h: 'Customers pay into escrow',
+      p: 'Every order is a fixed-price bill, paid into JobEscrow on Arc. Syncly is paid only when the customer accepts. A rejection refunds it, plus a bond the CFO put up.',
+      vis: <span className="mf__tag">JobEscrow · Arc</span>,
+      stat: `${stats?.delivered ?? '—'} jobs delivered`,
+    },
+    {
+      k: 'Treasury', h: 'The vault splits it by rule',
+      p: 'Released money lands in SynclyVault. The CFO puts it to work across five buckets, and keeps the reserve above its floor.',
+      vis: <span className="mf__buckets">{BUCKETS.map(([key, label, color]) => <i key={key} title={label} style={{ background: color }} />)}<span className="mono">5 buckets</span></span>,
+      stat: cfo?.snapshot?.epoch ? `Week ${cfo.snapshot.epoch}’s plan sealed on Arc` : 'A plan sealed on Arc each week',
+    },
+    {
+      k: 'Contractors', h: 'Each agent gets an allowance',
+      p: 'Ten agents, each with its own wallet and a weekly allowance set from what it really spends per job. The CFO tops them up when they run low.',
+      vis: <span className="mf__faces">{CONTRACTORS.map((r) => <Avatar key={r} role={r} />)}<span className="mono">+5</span></span>,
+      stat: '10 agent wallets on Arc',
+    },
+    {
+      k: 'Payments', h: 'Agents pay suppliers per call',
+      p: 'Search, AI models and checks are bought with x402 through Circle Gateway. Payout addresses are pinned and screened before anything is signed.',
+      vis: <span className="mf__sellers">{SELLERS.slice(0, 3).map((x) => <span key={x}>{x}</span>)}<span>+{SELLERS.length - 3}</span></span>,
+      stat: `${stats?.toolCalls ?? '—'} paid · ${stats?.settled ?? '—'} settled on Arc`,
+    },
+    {
+      k: 'Audit trail', h: 'Every decision is signed',
+      p: "Each decision is hash-chained to the one before and signed by the CFO's key, and its hash rides on the vault transaction. Anyone can replay the log.",
+      vis: <span className="mf__hash mono">{shortHash(latest?.hash)}</span>,
+      stat: cfo ? `${cfo.verify.entries} entries · ${cfo.verify.ok ? 'verified ✓' : 'not verified'}` : 'The decision log',
+    },
+  ];
   return (
-    <section className="ob wrap">
-      <div className="ob__copy">
-        <span className="label"><span className="n">04</span>Paid on Arc</span>
-        <SplitLines text="Every agent pays its own way." />
-        <Rv as="p" className="lede">Each agent has its own wallet. When it searches, reads a page or calls a model, it pays the seller itself, per call, in USDC, and the payment settles on Arc. Your job page shows every call the team made for you.</Rv>
-        <div className="ob__nums">
-          <Rv><b>{stats?.toolCalls ?? '—'}</b><span>tool payments by agents</span></Rv>
-          <Rv delay={0.08}><b>{stats?.settled ?? '—'}</b><span>settled on Arc so far</span></Rv>
-          <Rv delay={0.16}><b>{stats?.delivered ?? '—'}</b><span>jobs delivered</span></Rv>
-          <Rv delay={0.24}><b>{stats?.customers ?? '—'}</b><span>businesses served</span></Rv>
-        </div>
-        <Rv delay={0.2}><Link href="/office" className="pill dark">Watch them work <Arrow /></Link></Rv>
+    <section className="mf wrap" id="money">
+      <div className="mf__head">
+        <span className="label"><span className="n">02</span>Follow the money</span>
+        <SplitLines text="From the invoice to the audit trail." />
+        <Rv as="p" className="lede">Real businesses pay real USDC. This is the path every dollar takes through Syncly, and the rule at each step.</Rv>
       </div>
-      <div className="ob__art">
-        <div className="ob__wallets">
-          {WALLETS.map((r) => <div key={r} className={r === 'cfo' ? 'cfo' : undefined} style={tint(r)}><Avatar role={r} lg /><b>{ROLE_NAME[r]}</b><span className="mono">own wallet · Arc</span></div>)}
-        </div>
-      </div>
+      <ol className="mf__flow">
+        {stops.map((s, i) => (
+          <Rv as="li" key={s.k} className="mf__stop" delay={0.06 * i}>
+            <span className="mf__k"><span>{s.k}</span><span>{String(i + 1).padStart(2, '0')}</span></span>
+            <div className="mf__vis">{s.vis}</div>
+            <h3>{s.h}</h3>
+            <p>{s.p}</p>
+            <span className="mf__stat"><span className="dot" />{s.stat}</span>
+          </Rv>
+        ))}
+      </ol>
+      <Rv className="mf__bar" delay={0.2}>
+        <p><b>Autonomous, inside hard limits.</b> The CFO acts alone up to 2 USDC a move. Anything bigger is a proposal that only the owner's wallet can co-sign on Arc, and no language model ever touches the money.</p>
+        <span className="mf__links">
+          <a href="/api/cfo" className="pill green">The signed log <Arrow /></a>
+          <Link href="/docs/the-cfo" className="pill ghost">The CFO's rules <Arrow /></Link>
+        </span>
+      </Rv>
     </section>
   );
 }
@@ -323,10 +367,10 @@ export default function Home() {
   return (
     <main className="home">
       <Hero stats={stats} />
-      <Team agents={team?.agents ?? {}} />
       <Cfo cfo={cfo?.enabled ? cfo : null} />
+      <Money stats={stats} cfo={cfo?.enabled ? cfo : null} />
+      <Team agents={team?.agents ?? {}} />
       <How />
-      <PaidOnArc stats={stats} />
       <TheOffice />
       {svc && <Services services={svc.services} />}
       <Close />
