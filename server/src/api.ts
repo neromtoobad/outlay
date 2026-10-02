@@ -6,6 +6,7 @@ import { serve } from '@hono/node-server';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { fileURLToPath } from 'node:url';
 import { timingSafeEqual } from 'node:crypto';
 import { DATA_DIR, DRY } from './config.ts';
 import { account, hasSeed } from './wallets.ts';
@@ -233,10 +234,13 @@ app.get('/api/orders/:id/files/:name', (c) => {
 
 // Customer sites built by the web designer: static files, isolated from our own origin by a CSP sandbox.
 const SITE_MIME: Record<string, string> = { html: 'text/html; charset=utf-8', css: 'text/css', js: 'text/javascript', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon', txt: 'text/plain', xml: 'application/xml' };
+// A hand-finished file in server/sites/<slug>/ wins over what the designer generated; the rest still comes from the volume.
+const SITE_FINISHED = fileURLToPath(new URL('../sites/', import.meta.url));
 const site = (c: any) => {
   const slug = c.req.param('slug'), file = c.req.param('file') || 'index.html';
   if (!/^[a-z0-9-]{3,60}$/.test(slug) || !/^[a-z0-9._-]{1,80}$/i.test(file)) return c.text('not found', 404);
-  const f = join(DATA_DIR, 'sites', slug, file);
+  const own = join(SITE_FINISHED, slug, file);
+  const f = existsSync(own) ? own : join(DATA_DIR, 'sites', slug, file);
   if (!existsSync(f)) return c.text('not found', 404);
   c.header('content-type', SITE_MIME[file.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream');
   c.header('content-security-policy', "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox; default-src * data: blob: 'unsafe-inline'");
