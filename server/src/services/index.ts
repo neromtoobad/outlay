@@ -101,7 +101,7 @@ export const CATALOG = [
     example: '25 boutique hotels in Victoria Island, Lagos, for my bakery\'s weekly pastry delivery',
   },
   {
-    id: 'research-brief', name: 'Research Brief', dept: 'Research', live: true, priceUsd: 2, listedCostUsd: 0.3, etaMin: 6,
+    id: 'research-brief', name: 'Research Brief', dept: 'Research', live: true, priceUsd: 1, listedCostUsd: 0.3, etaMin: 6,
     tagline: 'Competitors, market and pricing, with every claim cited.',
     youGet: ['A 600–900 word brief with a 3-point summary', 'Every factual claim cited to a source you can open', 'Concrete recommendations', 'Checked by an independent auditor on a different AI model', 'Emailed to you when it is done'],
     team: ['researcher', 'scout', 'reader', 'auditor', 'writer', 'messenger'],
