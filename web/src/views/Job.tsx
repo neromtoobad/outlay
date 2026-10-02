@@ -3,11 +3,13 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { api, useApi, usd, ngn, Avatar, ROLE_NAME, SERVICE_NAME, timeAgo, useStored, type Order, type Receipt, type Step } from '@/lib.tsx';
+import { api, useApi, usd, ngn, Avatar, ROLE_NAME, SERVICE_NAME, timeAgo, useStored, type Order, type Receipt, type Service, type Step } from '@/lib.tsx';
 import { connect, decideOnChain, hasWallet, short, txUrl, walletError, type EscrowCfg } from '@/wallet.ts';
 import type { Address } from 'viem';
 import type { ReactNode } from 'react';
 import Office from '@/office/Office.tsx';
+import { useRouter } from 'next/navigation';
+import { saveBusiness } from './BusinessForm.tsx';
 import { AnimatePresence, motion } from 'motion/react';
 
 function Stepper({ o }: { o: Order }) {
@@ -40,6 +42,23 @@ function Timeline({ steps }: { steps: Step[] }) {
 }
 
 /** Every call the team made for this job, each linked to its settlement on Arc. Costs show only to the owner. */
+/** One tap to another service for the same business: its details become this device's form draft. */
+function MoreFor({ o }: { o: Order }) {
+  const router = useRouter();
+  const { data } = useApi<{ services: Service[] }>('/api/services');
+  const next = (data?.services ?? []).filter((s) => s.live && s.id !== o.service && !['local-business-finder', 'lead-list', 'research-brief'].includes(s.id));
+  if (!next.length) return null;
+  return (
+    <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+      <b style={{ fontSize: 14.5 }}>More for {String(o.details!.name)}</b>
+      <p className="muted" style={{ fontSize: 13, margin: '2px 0 0' }}>Your details are filled in already. Each one is {next[0].priceUsd} USDC.</p>
+      <div className="morefor">
+        {next.map((s) => <button key={s.id} type="button" className="chip click" onClick={() => { saveBusiness(o.details!); router.push(`/hire/${s.id}`); }}>{s.name}</button>)}
+      </div>
+    </div>
+  );
+}
+
 function PaperReceipt({ o, receipt }: { o: Order; receipt: Receipt[] }) {
   const q = o.quote;
   const owner = receipt.some((r) => typeof r.usd === 'number');
@@ -269,6 +288,7 @@ export default function Job({ id }: { id: string }) {
                 <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14.5 }}>How the team did it · {steps.length} steps</summary>
                 <div style={{ marginTop: 10 }}><Timeline steps={steps} /></div>
               </details>
+              {o.details?.name && <MoreFor o={o} />}
             </section>
           ) : (
             <section className="card pad">

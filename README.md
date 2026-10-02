@@ -2,7 +2,7 @@
 
 **An AI team for your business.** AI agents with names, faces and their own wallets do real paid work for small businesses. An AI CFO runs the company's money on Arc in USDC, inside limits a smart contract enforces, and every payment, decision and transaction settles on-chain.
 
-**Live on Arc mainnet:** [hiresyncly.site](https://hiresyncly.site) · [the office, live](https://hiresyncly.site/live) · [the CFO's signed log](https://hiresyncly.site/api/cfo)
+**Live on Arc mainnet:** [hiresyncly.site](https://hiresyncly.site) · [the office, live](https://hiresyncly.site/live) · [the CFO's signed log](https://hiresyncly.site/api/cfo) · [traction](TRACTION.md) ([live copy](https://hiresyncly.site/api/traction.md))
 
 Built for the [Tameion Agents Hackathon](https://tameion.thecanteenapp.com) (Canteen × Circle), Sep 27 – Oct 10, 2026. Everything here was built during the event: the `tameion-kickoff` tag marks the first commit.
 

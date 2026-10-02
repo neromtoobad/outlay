@@ -274,13 +274,13 @@ app.get('/api/cfo', async (c) => {
 });
 app.get('/api/team', (c) => c.json(shown(c, team())));
 app.get('/api/replay', (c) => c.json({ mode: DRY ? 'demo' : 'live', orders: shown(c, replay(Number(c.req.query('limit') ?? 6), c.req.query('order') || undefined)) }));
+// Public: counts and Arc transactions. With the owner's key: the money figures too.
 app.get('/api/traction.md', (c) => {
-  if (!isOwner(c)) return c.text('owner only', 401);
   if (DRY) return c.text('Traction is only reported from live books.', 404);
   c.header('content-type', 'text/markdown; charset=utf-8');
-  return c.body(tractionReport().md);
+  return c.body(tractionReport({ money: isOwner(c) }).md);
 });
-app.get('/api/traction', (c) => (isOwner(c) ? c.json(DRY ? null : tractionReport().summary) : c.json({ error: 'owner only' }, 401)));
+app.get('/api/traction', (c) => (isOwner(c) ? c.json(DRY ? null : tractionReport({ money: true }).summary) : c.json({ error: 'owner only' }, 401)));
 app.get('/api/books.beancount', (c) => {
   if (!isOwner(c)) return c.text('owner only', 401);
   c.header('content-type', 'text/plain; charset=utf-8');

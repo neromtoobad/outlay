@@ -74,7 +74,10 @@ async function loadFrames(id: string): Promise<Frames> {
 /** A side-view walk cycle (frames face RIGHT), scaled to the character's standing height. */
 type Cycle = { tex: PIXI.Texture[]; anchorX: number; k: number; dist: number };
 const bboxH = (f: any) => f.bbox[3] - f.bbox[1];
+// The walk and carry sheets that exist; everyone else walks with their pose frames (no request for a missing sheet).
+const CYCLE_SHEETS = new Set(['cfo-walk', 'auditor-walk', 'messenger-walk', 'messenger-carry']);
 async function loadCycle(id: string, base: Frames): Promise<Cycle | undefined> {
+  if (!CYCLE_SHEETS.has(id)) return undefined;
   try {
     const r = await fetch(`/sprites/${id}/${id}.json`); if (!r.ok) return undefined;
     const meta = await r.json();

@@ -219,6 +219,8 @@ function PaidOnArc({ stats }: { stats: Stats | null }) {
 // ---------------------------------------------------------------- 05 · the office
 
 function TheOffice() {
+  // The office (sprites, sound, a live feed) only starts once you scroll near it; until then the cutaway is a plain picture.
+  const [near, seenNear] = useInView<HTMLDivElement>('900px 0px 900px 0px');
   return (
     <section className="of" id="office">
       <div className="of__head wrap">
@@ -226,7 +228,7 @@ function TheOffice() {
         <SplitLines text="Watch them work. Every movement is a real event." />
       </div>
       <Rv className="of__frame">
-        <Office />
+        <div ref={near}>{seenNear ? <Office /> : <img className="of__ph" src="/scene/building-1920.webp" alt="Syncly HQ, the office where the team works" />}</div>
         <div className="of__bar mono"><span><span className="dot" />Syncly HQ · every coin is a real payment</span><span><Link href="/live">⤢ Full screen</Link> · <Link href="/office">Open the office</Link></span></div>
       </Rv>
     </section>

@@ -654,6 +654,7 @@ body:has(.home) .foot { margin-top: var(--gutter); }
 /* ---------- 05 the office */
 .of { margin-top: clamp(96px, 14vh, 180px); }
 .of__head h2 { max-width: 860px; }
+.of__ph { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
 .of__frame { margin: 40px var(--gutter) 0; border-radius: var(--r-xl); overflow: hidden; background: #173A2A; }
 .of__bar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 20px; background: var(--deep); color: var(--on-deep-3); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
 .of__bar a { color: #fff; text-decoration: none; }
@@ -856,3 +857,12 @@ body:has(.home) .foot { margin-top: var(--gutter); }
 .testmail input { flex: 1 1 220px; max-width: 320px; }
 .testmail .mono { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .testmail .muted { font-size: 13px; }
+
+.savedbiz { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper-2, #f6f3ec); }
+.savedbiz img, .savedbiz .initial { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; }
+.savedbiz .initial { display: grid; place-items: center; background: var(--ink, #13271C); color: #fff; font-weight: 700; }
+.savedbiz > div:nth-child(2) { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.savedbiz .mono { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.savedbiz .muted { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.savedbiz .acts { display: grid; gap: 4px; justify-items: end; font-size: 13px; }
+.morefor { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }

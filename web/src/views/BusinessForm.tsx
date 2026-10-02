@@ -2,7 +2,7 @@
 // The business form: who you are, how customers reach you, what you sell (with your own photos), and what
 // this job needs. Two to four short steps per service, saved as one draft on this device so nothing is typed twice.
 // Photos are shrunk in the browser before upload, so it stays quick on mobile data.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export type Details = {
   name: string; kind: string; offer: string; area: string; city: string;
@@ -51,6 +51,15 @@ const FLOWS: Record<string, { id: StepId; title: string }[]> = {
 };
 const KEY = 'syncly:business';
 
+/** Save a business (e.g. from an earlier order) as this device's draft, so the next order starts with it. */
+export function saveBusiness(details: Record<string, unknown>) {
+  try {
+    const was = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+    const d = { ...details, competitors: Array.isArray(details.competitors) ? (details.competitors as string[]).join(' ') : details.competitors };
+    localStorage.setItem(KEY, JSON.stringify({ ...EMPTY, ...was, ...Object.fromEntries(Object.entries(d).filter(([, v]) => v !== undefined && v !== null)) }));
+  } catch {}
+}
+
 /** Shrink a photo to at most 2000 px and re-encode it as JPEG before upload. */
 async function shrink(file: File): Promise<Blob> {
   try {
@@ -74,11 +83,13 @@ async function upload(files: File[]): Promise<string[]> {
 export default function BusinessForm({ service, onSubmit, busy, email, setEmail, cta }: { service: string; onSubmit: (d: Details) => void; busy: boolean; email: string; setEmail: (v: string) => void; cta: string }) {
   const [d, setD] = useState<Details>(EMPTY);
   const [step, setStep] = useState(0);
+  // A business saved on this device (an earlier order): start from the service's own questions.
+  const [saved, setSaved] = useState(false);
   const [up, setUp] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const loaded = useRef(false);
-  useEffect(() => { try { const s = localStorage.getItem(KEY); if (s) setD({ ...EMPTY, ...JSON.parse(s) }); } catch {} loaded.current = true; }, []);
-  useEffect(() => { if (loaded.current) try { localStorage.setItem(KEY, JSON.stringify(d)); } catch {} }, [d]);
+  const [ready, setReady] = useState(false); // the draft is loaded; only then is it saved back
+  useEffect(() => { try { const s = localStorage.getItem(KEY); if (s) { const x = { ...EMPTY, ...JSON.parse(s) }; setD(x); setSaved(!!(x.name?.trim() && x.offer?.trim())); } } catch {} setReady(true); }, []);
+  useEffect(() => { if (ready) try { localStorage.setItem(KEY, JSON.stringify(d)); } catch {} }, [d, ready]);
   const set = <K extends keyof Details>(k: K, v: Details[K]) => setD((x) => ({ ...x, [k]: v }));
   const text = (k: keyof Details, label: string, ph: string, hint?: string, type = 'text') => (
     <label className="field">{label}{hint && <span className="hint">{hint}</span>}<input type={type} value={d[k] as string} onChange={(e) => set(k, e.target.value as never)} placeholder={ph} /></label>
@@ -93,9 +104,6 @@ export default function BusinessForm({ service, onSubmit, busy, email, setEmail,
     } catch (e: any) { setErr(e.message); } finally { setUp(null); }
   }
 
-  const flow = FLOWS[service] ?? FLOWS.website;
-  const cur = flow[Math.min(step, flow.length - 1)].id;
-  const last = step >= flow.length - 1;
   const reach = !!(d.whatsapp.trim() || d.phone.trim() || d.email.trim());
   const ctaReady = d.cta === 'whatsapp' || d.cta === 'call' ? !!(d.whatsapp.trim() || d.phone.trim()) : d.cta === 'dm' ? !!d.instagram.trim() : d.cta === 'website' ? !!d.website.trim() : d.cta === 'visit' ? !!d.address.trim() : true;
   const valid: Record<StepId, boolean> = {
@@ -109,6 +117,10 @@ export default function BusinessForm({ service, onSubmit, busy, email, setEmail,
     ad: !d.promote.trim() ? 'Say what the ad is for.' : 'Add the contact detail for your call to action.',
     plan: 'Pick where the ads should run.', shots: 'Add at least one photo of the product.', buy: !d.items.trim() ? 'List what you want to buy.' : 'Add where it should be delivered.',
   };
+  const skip = (id: StepId) => saved && ((id === 'business' && valid.business) || (id === 'contact' && valid.contact));
+  const flow = (FLOWS[service] ?? FLOWS.website).filter((f) => !skip(f.id));
+  const cur = flow[Math.min(step, flow.length - 1)].id;
+  const last = step >= flow.length - 1;
   const allValid = flow.every((f) => valid[f.id]) && email.includes('@');
 
   const photosField = (hint: string, max = 10) => (
@@ -148,6 +160,16 @@ export default function BusinessForm({ service, onSubmit, busy, email, setEmail,
   return (
     <div className="bform">
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,500&family=Archivo:wdth,wght@125,850&family=Cormorant+Garamond:ital,wght@1,500&family=Space+Grotesk:wght@500&family=Literata:wght@600&family=Unbounded:wght@700&display=swap" />
+      {saved && (
+        <div className="savedbiz">
+          {d.logo ? <img src={`/api/uploads/${d.logo}`} alt="" /> : <span className="initial">{d.name.trim().slice(0, 1)}</span>}
+          <div><span className="mono">Ordering for</span><b>{d.name}</b><span className="muted">{[KINDS.find(([k]) => k === d.kind)?.[1], [d.area, d.city].filter(Boolean).join(', '), d.whatsapp || d.phone, d.instagram && `@${d.instagram.replace(/^@/, '')}`].filter(Boolean).join(' · ')}</span></div>
+          <div className="acts">
+            <button type="button" className="linkbtn" onClick={() => { setSaved(false); setStep(0); }}>Edit details</button>
+            <button type="button" className="linkbtn" onClick={() => { setD(EMPTY); setSaved(false); setStep(0); }}>New business</button>
+          </div>
+        </div>
+      )}
       <ol className="bsteps" style={{ gridTemplateColumns: `repeat(${flow.length}, 1fr)` }}>{flow.map((f, i) => <li key={f.id} className={i === step ? 'on' : i < step ? 'done' : ''}><button type="button" onClick={() => setStep(i)}><span>{i + 1}</span>{f.title}</button></li>)}</ol>
 
       {cur === 'business' && (

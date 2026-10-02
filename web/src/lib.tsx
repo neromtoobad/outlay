@@ -114,6 +114,7 @@ export type Order = {
   decision?: { kind: string; at: string; by: string; note?: string }; refund?: { priceUsd: number; bondUsd: number; tx?: string }; demo: boolean;
   live: { jobId: string; steps: Step[]; receipt: Receipt[] } | null;
   escrow?: Escrow;
+  details?: Record<string, unknown> & { name?: string };
 };
 /** A paid job's escrow on Arc. `spec` is the exact text whose keccak256 is sealed on-chain as specHash. */
 export type Escrow = {
