@@ -21,7 +21,7 @@ import { decisions as cfoDecisions, verifyLog } from './cfo/log.ts';
 import { tractionReport } from './traction.ts';
 import { approveBill, booksCsv, cancelDoc, confirmBusiness, createBill, createInvoice, desk, getDoc, payConfig, payTick, payWatchlist, publicDoc, registerBusiness, reportFor, syncPaid } from './pay.ts';
 import { vendorPayees } from './payees.ts';
-import { startScreening } from './screen.ts';
+import { screeningStatus, startScreening } from './screen.ts';
 import { books, beancount, team } from './books.ts';
 import { resolveSettlements } from './settle.ts';
 import { MAILER, MAIL_FROM, resend } from './mail.ts';
@@ -320,6 +320,7 @@ app.get('/api/cfo', async (c) => {
     enabled: escrowConfig().enabled, mode: CFO_MODE, policy: CFO_POLICY, snapshot: s, verify: verified.v,
     plan: existsSync(planFile) ? JSON.parse(readFileSync(planFile, 'utf8')) : null,
     metrics: { done: count('done'), escalated: count('escalated'), refused: count('refused'), wouldDo: count('would-do'), proposed: s?.proposals.total ?? 0, cosigned: s?.proposals.cosigned ?? 0 },
+    screening: screeningStatus(),
     decisions: log,
   });
 });

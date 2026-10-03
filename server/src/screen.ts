@@ -16,7 +16,7 @@ import { loggedWithin, record } from './cfo/log.ts';
 
 export type Watched = { address: Address; label: string; role: 'supplier' | 'payer' | 'business' | 'vendor'; biz?: string };
 export type Finding = { address: Address; level: 'stop' | 'warn'; text: string; at: string; tx?: string; counterparty?: Address };
-type State = { cursor?: number; lastFull?: string; checked?: number; watched?: number; transfers?: number; findings: Record<string, Finding[]> };
+type State = { cursor?: number; lastFull?: string; checked?: number; watched?: number; hop?: number; scannedAt?: string; transfers?: number; findings: Record<string, Finding[]> };
 
 const POLICY = { everyMinutes: 30, fullEveryHours: 20, chunk: 9_999, maxChunks: 40, firstLookback: 14_400, hopFindingDays: 30, maxWatched: 200 };
 const TRANSFER = parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 value)');
@@ -34,6 +34,12 @@ export async function denied(who: string): Promise<string | undefined> {
   if (DENY.has(lc(who))) return "on the operator's deny list";
   if (await blacklisted(who)) return "on Circle's USDC blacklist";
   return undefined;
+}
+
+/** For the public CFO page: when screening last ran and how far it has read the chain. */
+export function screeningStatus() {
+  const s = load();
+  return { lastFull: s.lastFull ?? null, scannedAt: s.scannedAt ?? null, throughBlock: s.cursor ?? null, watched: s.watched ?? 0, oneHop: s.hop ?? 0, transfersSinceFull: s.transfers ?? 0, findings: Object.values(s.findings).flat().length, denyList: DENY.size };
 }
 
 /** What screening knows about an address (newest first). */
@@ -96,18 +102,31 @@ export async function screenTick(watch: Watched[], opts: { full?: boolean } = {}
 
     // 2. One hop out: read the USDC transfers our addresses made or received since the last look, and screen
     //    whoever was on the other side. The RPC serves 10,000 blocks per query (about 80 minutes on Arc).
-    if (!DEP || !list.length) return;
+    //    Tool vendors are big platforms that trade with thousands of wallets, so they get the daily check only.
+    const hop = list.filter((w) => w.role !== 'vendor');
+    if (!DEP || !hop.length) return;
     const latest = Number(await pub.getBlockNumber());
     let from = s.cursor ? s.cursor + 1 : Math.max(0, latest - POLICY.firstLookback);
     if (latest - from > POLICY.chunk * POLICY.maxChunks) from = latest - POLICY.chunk * POLICY.maxChunks; // catch up at most ~2 days
-    const addrs = list.map((w) => w.address);
+    const addrs = hop.map((w) => w.address);
+    const usdc = DEP.usdc;
+    // a busy RPC or a crowded window: wait and retry once, then split the window in two
+    const logs = async (args: { from: Address[] } | { to: Address[] }, a: number, b: number): Promise<any[]> => {
+      for (let attempt = 0; ; attempt++) {
+        try { return await pub.getLogs({ address: usdc, event: TRANSFER, args, fromBlock: BigInt(a), toBlock: BigInt(b) }); }
+        catch (e) {
+          if (attempt === 0) { await new Promise((r) => setTimeout(r, 1500)); continue; }
+          if (b - a < 200) throw e;
+          const m = Math.floor((a + b) / 2);
+          return [...(await logs(args, a, m)), ...(await logs(args, m + 1, b))];
+        }
+      }
+    };
     const lookups = new Map<string, string | undefined>();
     for (let a = from; a <= latest; a += POLICY.chunk + 1) {
       const b = Math.min(latest, a + POLICY.chunk);
-      const [outs, ins] = await Promise.all([
-        pub.getLogs({ address: DEP.usdc, event: TRANSFER, args: { from: addrs }, fromBlock: BigInt(a), toBlock: BigInt(b) }),
-        pub.getLogs({ address: DEP.usdc, event: TRANSFER, args: { to: addrs }, fromBlock: BigInt(a), toBlock: BigInt(b) }),
-      ]);
+      const outs = await logs({ from: addrs }, a, b);
+      const ins = await logs({ to: addrs }, a, b);
       for (const l of [...outs, ...ins]) {
         const { from: f, to: t, value } = l.args as { from: Address; to: Address; value: bigint };
         const out = byAddr.has(lc(f)), w = byAddr.get(lc(out ? f : t))!, cp = getAddress(out ? t : f);
@@ -127,7 +146,7 @@ export async function screenTick(watch: Watched[], opts: { full?: boolean } = {}
     // one-hop findings age out; a direct hit stays until a re-screen clears it
     const cutoff = Date.now() - POLICY.hopFindingDays * 86400_000;
     for (const k of Object.keys(s.findings)) { s.findings[k] = s.findings[k].filter((f) => f.level === 'stop' || Date.parse(f.at) > cutoff); if (!s.findings[k].length) delete s.findings[k]; }
-    s.watched = list.length;
+    s.watched = list.length; s.hop = hop.length; s.scannedAt = new Date().toISOString();
   } catch (e: any) {
     if (!loggedWithin('screen-error', 6 * 3600_000)) await record({ kind: 'hold', summary: `Screening couldn't finish: ${String(e?.shortMessage ?? e?.message ?? e).slice(0, 160)}`, rule: 'retry next run', inputs: {}, key: 'screen-error', status: 'failed' });
   } finally {
