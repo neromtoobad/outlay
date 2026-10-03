@@ -103,10 +103,14 @@ export type Palette = { bg: string; surface: string; ink: string; muted: string;
  * Five roles from one brand colour. The action colour is darkened until white text on it passes
  * 4.5:1; text colours are checked against the background they sit on.
  */
-export function palette(brandHex: string, mode: 'light' | 'warm' | 'dark' = 'light'): Palette {
+export function palette(brandHex: string, mode: 'light' | 'warm' | 'dark' = 'light', action: 'brand' | 'ink' = 'brand'): Palette {
   const [L0, C0, H] = rgbToOklch(fromHex(brandHex));
   const C = Math.max(0.08, Math.min(C0, 0.19));
   const darkText = oklchToRgb(0.2, 0.03, H);
+  // The page itself is neutral paper (cream when warm, warm charcoal when dark): a red or pink brand
+  // colour taken from the photos must not turn the whole page pink. Only actions and accents carry it.
+  const NH = mode === 'light' ? H : mode === 'warm' ? 75 : 55;
+  const nc = mode === 'light' ? 0.004 : 0.013;
   // A bright brand (yellow, lime, sky) keeps its colour and takes dark text; darker ones take white.
   let onBrand: RGB = [255, 255, 255];
   let brand = oklchToRgb(Math.min(Math.max(L0, 0.74), 0.88), C, H);
@@ -115,17 +119,23 @@ export function palette(brandHex: string, mode: 'light' | 'warm' | 'dark' = 'lig
     brand = oklchToRgb(L, C, H);
     while (contrast(brand, onBrand) < 4.6 && L > 0.3) { L -= 0.02; brand = oklchToRgb(L, C, H); }
   } else onBrand = darkText;
-  const tintC = mode === 'warm' ? 0.016 : 0.007;
-  const bg = mode === 'dark' ? oklchToRgb(0.18, 0.02, H) : oklchToRgb(mode === 'warm' ? 0.972 : 0.985, tintC, H);
-  const ink = mode === 'dark' ? oklchToRgb(0.95, 0.01, H) : oklchToRgb(0.21, 0.025, H);
-  const muted = mode === 'dark' ? oklchToRgb(0.75, 0.02, H) : oklchToRgb(0.47, 0.02, H);
+  const bg = mode === 'dark' ? oklchToRgb(0.18, 0.012, NH) : oklchToRgb(mode === 'warm' ? 0.972 : 0.985, nc, NH);
+  const ink = mode === 'dark' ? oklchToRgb(0.95, 0.008, NH) : oklchToRgb(0.21, mode === 'warm' ? 0.014 : 0.02, mode === 'warm' ? 55 : H);
+  const muted = mode === 'dark' ? oklchToRgb(0.75, 0.012, NH) : oklchToRgb(0.47, 0.012, NH);
   let brandInk = oklchToRgb(mode === 'dark' ? 0.78 : 0.42, C, H);
   if (contrast(brandInk, bg) < 4.5) brandInk = oklchToRgb(mode === 'dark' ? 0.85 : 0.36, C, H);
+  if (action === 'ink') {
+    // near-black buttons and bands on light pages, near-white on dark ones; the brand colour stays in the accents
+    brand = mode === 'dark' ? oklchToRgb(0.93, 0.012, NH) : oklchToRgb(0.24, 0.018, mode === 'warm' ? 55 : H);
+    onBrand = mode === 'dark' ? oklchToRgb(0.2, 0.012, NH) : bg;
+  }
+  const neutralDeep = action === 'ink' || mode !== 'light';
   return {
     bg: hex(bg), ink: hex(ink), muted: hex(muted), brand: hex(brand), onBrand: hex(onBrand), brandInk: hex(brandInk),
-    surface: hex(mode === 'dark' ? oklchToRgb(0.23, 0.025, H) : oklchToRgb(0.945, 0.03, H)),
-    line: hex(mode === 'dark' ? oklchToRgb(0.32, 0.02, H) : oklchToRgb(0.885, 0.02, H)),
-    deep: hex(oklchToRgb(0.24, Math.min(C, 0.06), H)), onDeep: hex(oklchToRgb(0.96, 0.015, H)),
-    tint: hex(mode === 'dark' ? oklchToRgb(0.28, 0.05, H) : oklchToRgb(0.93, 0.045, H)),
+    surface: hex(mode === 'dark' ? oklchToRgb(0.23, 0.014, NH) : oklchToRgb(mode === 'warm' ? 0.94 : 0.955, mode === 'warm' ? 0.016 : 0.006, NH)),
+    line: hex(mode === 'dark' ? oklchToRgb(0.32, 0.012, NH) : oklchToRgb(0.885, mode === 'warm' ? 0.016 : 0.008, NH)),
+    deep: hex(neutralDeep ? oklchToRgb(0.23, 0.016, mode === 'warm' ? 55 : NH) : oklchToRgb(0.24, Math.min(C, 0.06), H)),
+    onDeep: hex(oklchToRgb(0.96, 0.012, NH)),
+    tint: hex(mode === 'dark' ? oklchToRgb(0.26, 0.02, NH) : oklchToRgb(mode === 'warm' ? 0.95 : 0.96, mode === 'warm' ? 0.02 : 0.012, mode === 'warm' ? 75 : H)),
   };
 }

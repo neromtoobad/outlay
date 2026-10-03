@@ -28,7 +28,7 @@ export type Rendered = { html: string; llms: string; robots: string };
 
 export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: string; year?: number }): Rendered {
   const t = THEMES[plan.theme];
-  const pal = palette(plan.brand, t.mode);
+  const pal = palette(plan.brand, t.mode, t.action);
   const ph = new Map(photos.map((p) => [p.id, p]));
   const item = new Map(f.items.map((i) => [i.id, i]));
   const review = new Map(f.reviews.map((r) => [r.id, r]));
@@ -37,9 +37,36 @@ export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: s
   const tel = telLink(f.phone ?? f.whatsapp, f.country);
   const dir = f.mapsUrl ?? (f.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${f.name}, ${f.address}`)}` : undefined);
   const hasOffer = plan.sections.some((s) => s.kind === 'offer');
+  const priced = f.items.some((i) => i.price);
+  const showsWork = ['creative', 'beauty', 'events'].includes(f.kind);
+
+  // ---------- layout rules that keep every site from looking generated
+  // Businesses that sell how their work looks show the work first: the gallery goes right under the hero.
+  let sections = plan.sections;
+  const gi = sections.findIndex((x) => x.kind === 'gallery');
+  if (showsWork && gi > 0) {
+    const at = sections[0]?.kind === 'strip' ? 1 : 0;
+    if (gi > at) sections = [...sections.slice(0, at), sections[gi], ...sections.slice(at, gi), ...sections.slice(gi + 1)];
+  }
+  const heroPhoto0 = plan.hero.photo;
+  const aboutPhoto = (sections.find((x) => x.kind === 'about') as Extract<Section, { kind: 'about' }> | undefined)?.photo;
+  // Service cards keep their photos only when each one is a distinct picture that belongs to that card:
+  // most items have one, none repeats or reappears in the hero or about, and the work isn't shown in a
+  // gallery anyway. Otherwise the services become a clean numbered list and the photos go to the gallery.
+  const offerSec = sections.find((x) => x.kind === 'offer') as Extract<Section, { kind: 'offer' }> | undefined;
+  const cardPhotos = (() => {
+    if (!offerSec || offerSec.variant !== 'cards') return false;
+    const ps = offerSec.items.map((x) => x.photo).filter((x): x is string => !!x && ph.has(x));
+    if (ps.length < Math.ceil(offerSec.items.length * 0.7) || new Set(ps).size !== ps.length) return false;
+    if (ps.some((x) => x === heroPhoto0 || x === aboutPhoto)) return false;
+    if (showsWork && gi >= 0) return false;
+    return true;
+  })();
+  const used = new Set<string>([heroPhoto0, aboutPhoto, ...(cardPhotos && offerSec ? offerSec.items.map((x) => x.photo) : [])].filter((x): x is string => !!x));
+  const spare = photos.filter((p) => !used.has(p.id) && p.kind !== 'flyer' && p.kind !== 'logo' && p.quality >= 3).sort((a, b) => b.quality - a.quality).map((p) => p.id);
 
   const actionHref = (a: Action) => a === 'whatsapp' ? wa() : a === 'book' ? wa(`Hello ${f.name}, I'd like to book.`) : a === 'call' ? tel : a === 'directions' ? dir : hasOffer ? '#offer' : undefined;
-  const ACTION_LABEL: Record<Action, string> = { whatsapp: 'Chat on WhatsApp', book: 'Book on WhatsApp', call: 'Call us', directions: 'Get directions', menu: f.kind === 'food' ? 'See the menu' : 'See prices' };
+  const ACTION_LABEL: Record<Action, string> = { whatsapp: 'Chat on WhatsApp', book: 'Book on WhatsApp', call: 'Call us', directions: 'Get directions', menu: f.kind === 'food' ? 'See the menu' : priced ? 'See prices' : 'See services' };
   const ACTION_ICON: Record<Action, string> = { whatsapp: ICON.whatsapp, book: ICON.whatsapp, call: ICON.phone, directions: ICON.pin, menu: ICON.arrow };
   const btn = (a: Action, cls = 'btn-primary') => { const h = actionHref(a); return h ? `<a class="btn ${cls}" href="${esc(h)}"${/^https?:/.test(h) ? ' target="_blank" rel="noopener"' : ''}>${ACTION_ICON[a]}<span>${esc(ACTION_LABEL[a])}</span></a>` : ''; };
   const img = (id: string | undefined, sizes: string, cls = '', eager = false) => {
@@ -76,16 +103,23 @@ export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: s
           body = `<div class="menu">${cats.map((c) => `<div class="menu-col rv">${c ? `<h3 class="menu-cat">${esc(c)}</h3>` : ''}<ul>${rows.filter((r) => (r.it.category ?? '') === c).map((r) => `<li><div class="mi"><span class="mi-name">${esc(r.it.name)}</span><span class="dots" aria-hidden="true"></span>${price(r.it.price)}</div>${r.desc || r.it.note ? `<p class="mi-desc">${esc(r.desc ?? r.it.note)}</p>` : ''}</li>`).join('')}</ul></div>`).join('')}</div>`;
         } else if (s.variant === 'features') {
           body = `<div class="features">${rows.slice(0, 4).map((r, j) => `<article class="feature rv${j % 2 ? ' flip' : ''}">${r.photo ? `<div class="feature-img">${img(r.photo, '(min-width: 900px) 50vw, 100vw')}</div>` : ''}<div class="feature-text"><span class="num">${String(j + 1).padStart(2, '0')}</span><h3>${esc(r.it.name)}</h3>${r.desc || r.it.note ? `<p>${esc(r.desc ?? r.it.note)}</p>` : ''}${price(r.it.price)}</div></article>`).join('')}</div>`;
+        } else if (cardPhotos) {
+          const cols = [3, 4, 2].find((c) => rows.length % c === 0) ?? 3;
+          body = `<div class="cards cols-${cols}">${rows.map((r) => `<article class="card rv">${r.photo ? `<div class="card-img">${img(r.photo, '(min-width: 900px) 33vw, 100vw')}</div>` : ''}<div class="card-body"><h3>${esc(r.it.name)}</h3>${r.desc || r.it.note ? `<p>${esc(r.desc ?? r.it.note)}</p>` : ''}${price(r.it.price)}</div></article>`).join('')}</div>`;
         } else {
-          body = `<div class="cards">${rows.map((r) => `<article class="card rv">${r.photo ? `<div class="card-img">${img(r.photo, '(min-width: 900px) 33vw, 100vw')}</div>` : ''}<div class="card-body"><h3>${esc(r.it.name)}</h3>${r.desc || r.it.note ? `<p>${esc(r.desc ?? r.it.note)}</p>` : ''}${price(r.it.price)}</div></article>`).join('')}</div>`;
+          body = `<ol class="svc-list">${rows.map((r) => `<li class="rv"><div class="svc-h"><h3>${esc(r.it.name)}</h3>${price(r.it.price)}</div>${r.desc || r.it.note ? `<p>${esc(r.desc ?? r.it.note)}</p>` : ''}</li>`).join('')}</ol>`;
         }
         return `<section id="offer" class="sect offer offer-${s.variant}"><div class="wrap"><header class="sect-head rv">${h(2, s.title)}${s.intro ? `<p class="lede">${esc(s.intro)}</p>` : ''}</header>${body}${chat ? `<p class="offer-cta rv">${btn('whatsapp', 'btn-ghost')}</p>` : ''}</div></section>`;
       }
       case 'gallery': {
-        // grids only tile cleanly at 3, 5 or 9 photos (one large + pairs); strips take any number
-        const n = s.variant === 'grid' ? (s.photos.length >= 9 ? 9 : s.photos.length >= 5 ? 5 : 3) : s.photos.length;
-        s = { ...s, photos: s.photos.slice(0, n) };
-        return `<section class="sect gallery gallery-${s.variant}${s.variant === 'grid' && n === 3 ? ' g-three' : ''}"><div class="wrap">${s.title ? `<header class="sect-head rv">${h(2, s.title)}</header>` : ''}<div class="g">${s.photos.map((id, j) => `<figure class="rv g${j}">${img(id, s.variant === 'strip' ? '(min-width: 900px) 30vw, 75vw' : j === 0 ? '(min-width: 900px) 50vw, 100vw' : '(min-width: 900px) 25vw, 50vw')}</figure>`).join('')}</div>${f.instagram ? `<p class="g-more rv"><a href="https://instagram.com/${esc(f.instagram.replace(/^@/, ''))}" target="_blank" rel="noopener">${ICON.ig}<span>More on Instagram @${esc(f.instagram.replace(/^@/, ''))}</span></a></p>` : ''}</div></section>`;
+        const own = [...new Set(s.photos.filter((id) => ph.has(id) && !used.has(id)))];
+        const want = !cardPhotos && offerSec ? 8 : Math.max(own.length, 3);
+        const pool = [...own, ...spare.filter((id) => !own.includes(id))].slice(0, Math.min(8, Math.max(want, own.length)));
+        // grids tile cleanly at 3, 5 or 9 photos (one large + pairs) or 8 (an even 4×2); strips take any number
+        const uniform = s.variant === 'grid' && pool.length >= 8;
+        const n = s.variant === 'grid' ? (uniform ? 8 : pool.length >= 5 ? 5 : 3) : pool.length;
+        s = { ...s, photos: pool.slice(0, n) };
+        return `<section id="work" class="sect gallery gallery-${s.variant}${s.variant === 'grid' && n === 3 ? ' g-three' : ''}${uniform ? ' g-uniform' : ''}"><div class="wrap">${s.title ? `<header class="sect-head rv">${h(2, s.title)}</header>` : ''}<div class="g">${s.photos.map((id, j) => `<figure class="rv g${j}">${img(id, s.variant === 'strip' ? '(min-width: 900px) 30vw, 75vw' : j === 0 ? '(min-width: 900px) 50vw, 100vw' : '(min-width: 900px) 25vw, 50vw')}</figure>`).join('')}</div>${f.instagram ? `<p class="g-more rv"><a href="https://instagram.com/${esc(f.instagram.replace(/^@/, ''))}" target="_blank" rel="noopener">${ICON.ig}<span>More on Instagram @${esc(f.instagram.replace(/^@/, ''))}</span></a></p>` : ''}</div></section>`;
       }
       case 'reviews': {
         const rs = s.ids.map((id) => review.get(id)!).filter(Boolean);
@@ -98,15 +132,20 @@ export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: s
           const [first, ...rest] = s.body.split(/(?<=[.!?])\s+/);
           return `<section class="sect about about-statement"><div class="wrap narrow rv">${label(s.title)}<p class="statement">${esc(first)}</p>${rest.length ? `<p class="lede">${esc(rest.join(' '))}</p>` : ''}</div></section>`;
         }
-        return `<section class="sect about about-split"><div class="wrap two">${s.photo ? `<div class="about-img rv">${img(s.photo, '(min-width: 900px) 45vw, 100vw')}</div>` : ''}<div class="about-text rv">${h(2, s.title)}${s.body.split(/\n+/).map((p) => `<p>${esc(p)}</p>`).join('')}</div></div></section>`;
+        const cap = s.photo && showsWork && ph.get(s.photo)?.kind === 'people' ? `<p class="cap">From a recent session</p>` : '';
+        return `<section class="sect about about-split"><div class="wrap two">${s.photo ? `<div class="about-img rv">${img(s.photo, '(min-width: 900px) 45vw, 100vw')}${cap}</div>` : ''}<div class="about-text rv">${h(2, s.title)}${s.body.split(/\n+/).map((p) => `<p>${esc(p)}</p>`).join('')}</div></div></section>`;
       }
       case 'steps':
         return `<section class="sect steps"><div class="wrap"><header class="sect-head rv">${h(2, s.title)}</header><ol class="step-list">${s.steps.map((st) => `<li class="rv"><span class="num" aria-hidden="true"></span><h3>${esc(st.title)}</h3><p>${esc(st.body)}</p></li>`).join('')}</ol>${chat ? `<p class="steps-cta rv">${btn('whatsapp')}</p>` : ''}</div></section>`;
       case 'location': {
         const lines = f.hours ? hoursLines(f.hours) : [];
-        const info = `<div class="loc-info rv">${h(2, s.title)}<p class="addr">${ICON.pin}<span>${esc(f.address)}</span></p>${s.note ? `<p class="muted">${esc(s.note)}</p>` : ''}${lines.length ? `<table class="hours"><caption class="label">Opening hours</caption>${lines.map((l) => `<tr><th scope="row">${esc(l.days)}</th><td>${esc(l.time)}</td></tr>`).join('')}</table>` : f.hoursText ? `<p class="muted">${esc(f.hoursText)}</p>` : ''}<p class="btns">${dir ? `<a class="btn btn-primary" href="${esc(dir)}" target="_blank" rel="noopener">${ICON.pin}<span>Get directions</span></a>` : ''}${tel ? `<a class="btn btn-ghost" href="${esc(tel)}">${ICON.phone}<span>${esc(prettyPhone(f.phone ?? f.whatsapp, f.country))}</span></a>` : ''}</p></div>`;
+        const flat = (x?: string) => (x ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const note = s.note && !flat(s.note).includes(flat(f.address)) && !flat(f.address).includes(flat(s.note)) ? s.note : undefined;
+        const place = [f.area, f.city].filter((x) => x && !flat(f.address).includes(flat(x))).join(', ');
+        const info = `<div class="loc-info rv">${h(2, s.title)}<p class="addr">${ICON.pin}<span>${esc(f.address)}</span></p>${place ? `<p class="muted">${esc(place)}</p>` : ''}${note ? `<p class="muted">${esc(note)}</p>` : ''}${lines.length ? `<table class="hours"><caption class="label">Opening hours</caption>${lines.map((l) => `<tr><th scope="row">${esc(l.days)}</th><td>${esc(l.time)}</td></tr>`).join('')}</table>` : f.hoursText ? `<p class="muted">${esc(f.hoursText)}</p>` : ''}<p class="btns">${dir ? `<a class="btn btn-primary" href="${esc(dir)}" target="_blank" rel="noopener">${ICON.pin}<span>Get directions</span></a>` : ''}${tel ? `<a class="btn btn-ghost" href="${esc(tel)}">${ICON.phone}<span>${esc(prettyPhone(f.phone ?? f.whatsapp, f.country))}</span></a>` : ''}</p></div>`;
         if (s.variant === 'card') return `<section id="visit" class="sect location location-card"><div class="wrap">${info}</div></section>`;
-        return `<section id="visit" class="sect location location-map"><div class="wrap two">${info}<div class="map rv"><iframe title="Map to ${esc(f.name)}" src="https://www.google.com/maps?q=${encodeURIComponent(`${f.name}, ${f.address}`)}&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div></div></section>`;
+        const card = `<span class="mc-grid" aria-hidden="true"></span><span class="mc-pin" aria-hidden="true"></span><span class="mc-label"><b>${esc(f.name)}</b><span>${esc([f.address, f.area].filter(Boolean).join(', ').slice(0, 48))}</span></span>${dir ? '<span class="mc-open">Open in Google Maps ↗</span>' : ''}`;
+        return `<section id="visit" class="sect location location-map"><div class="wrap two">${info}${dir ? `<a class="map mapcard rv" href="${esc(dir)}" target="_blank" rel="noopener" aria-label="Open ${esc(f.name)} in Google Maps">${card}</a>` : `<div class="map mapcard rv">${card}</div>`}</div></section>`;
       }
       case 'faq':
         return `<section class="sect faq"><div class="wrap narrow"><header class="sect-head rv">${h(2, s.title)}</header>${s.items.map((q) => `<details class="rv"><summary>${esc(q.q)}<span class="plus" aria-hidden="true"></span></summary><p>${esc(q.a)}</p></details>`).join('')}</div></section>`;
@@ -117,7 +156,7 @@ export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: s
 
   // ---------- hero
   const hr = plan.hero;
-  const nav = `<nav class="top${hr.variant === 'photo' ? ' on-photo' : ''}"><div class="wrap"><a class="brand" href="#top">${f.logo ? `<img class="brand-logo" src="${esc(f.logo)}" alt="" width="40" height="40">` : ''}<span>${esc(f.name)}</span></a><div class="top-links">${hasOffer ? `<a href="#offer">${f.kind === 'food' ? 'Menu' : 'Prices'}</a>` : ''}${plan.sections.some((s) => s.kind === 'reviews') ? '<a href="#reviews">Reviews</a>' : ''}${plan.sections.some((s) => s.kind === 'location') ? '<a href="#visit">Visit</a>' : ''}${chat ? `<a class="btn btn-small" href="${esc(wa())}" target="_blank" rel="noopener">${ICON.whatsapp}<span>WhatsApp</span></a>` : ''}</div></div></nav>`;
+  const nav = `<nav class="top${hr.variant === 'photo' ? ' on-photo' : ''}"><div class="wrap"><a class="brand" href="#top">${f.logo ? `<img class="brand-logo" src="${esc(f.logo)}" alt="" width="40" height="40">` : ''}<span>${esc(f.name)}</span></a><div class="top-links">${showsWork && gi >= 0 ? '<a href="#work">Work</a>' : ''}${hasOffer ? `<a href="#offer">${f.kind === 'food' ? 'Menu' : priced ? 'Prices' : 'Services'}</a>` : ''}${plan.sections.some((s) => s.kind === 'reviews') ? '<a href="#reviews">Reviews</a>' : ''}${plan.sections.some((s) => s.kind === 'location') ? '<a href="#visit">Visit</a>' : ''}${chat ? `<a class="btn btn-small" href="${esc(wa())}" target="_blank" rel="noopener">${ICON.whatsapp}<span>WhatsApp</span></a>` : ''}</div></div></nav>`;
   const heroText = `${hr.eyebrow ? `<p class="label hero-eyebrow">${esc(hr.eyebrow)}</p>` : ''}${h(1, hr.headline, hr.accent, 'hero-h')}<p class="hero-sub">${esc(hr.sub)}</p><p class="btns hero-btns">${btn(hr.primary)}${hr.secondary ? btn(hr.secondary, hr.variant === 'photo' || hr.variant === 'type' ? 'btn-line' : 'btn-ghost') : ''}</p>${f.hours ? '<p class="hero-open" data-open-pill hidden></p>' : ''}`;
   const hero = hr.variant === 'photo'
     ? `<header id="top" class="hero hero-photo">${img(hr.photo, '100vw', 'hero-bg', true)}<div class="scrim"></div>${nav}<div class="wrap hero-in">${heroText}</div></header>`
@@ -174,7 +213,7 @@ ${heroPhoto ? `<link rel="preload" as="image" href="${esc(heroPhoto.file)}">` : 
 <body class="t-${t.id} k-${f.kind}">
 ${hero}
 <main>
-${plan.sections.map(section).join('\n')}
+${sections.map(section).join('\n')}
 </main>
 ${footer}
 ${bar}
@@ -295,6 +334,24 @@ ${t.rule ? '.sect+.sect{border-top:1px solid var(--line)}' : ''}
 .card-body{padding:22px;display:grid;gap:8px;align-content:start;flex:1}
 .card-body p{color:var(--muted);font-size:var(--s-1)}
 .card .price{margin-top:6px}
+.cards.cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}@media(min-width:900px){.cards.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}.cards.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}.cards.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.svc-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);column-gap:clamp(32px,6vw,72px);border-top:1px solid var(--line);counter-reset:svc}
+@media(min-width:760px){.svc-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.svc-list li{position:relative;padding:24px 0 24px 58px;border-bottom:1px solid var(--line);counter-increment:svc}
+.svc-list li::before{content:counter(svc,decimal-leading-zero);position:absolute;left:0;top:31px;font:500 .78rem/1 var(--mono);letter-spacing:.12em;color:var(--brand-ink)}
+.svc-h{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+.svc-list h3{font-size:var(--s2);line-height:1.15}
+.svc-list p{color:var(--muted);margin-top:6px;font-size:var(--s-1)}
+.about-img .cap{margin-top:12px;font-size:var(--s-1);color:var(--muted);${t.label === 'italic' ? 'font-family:var(--display);font-style:italic;' : ''}}
+.mapcard{position:relative;display:block;text-decoration:none;color:var(--ink);background:${dark ? 'var(--surface)' : 'color-mix(in srgb,var(--surface) 70%,var(--line))'}!important}
+.mc-grid{position:absolute;inset:-30%;transform:rotate(-14deg);background:linear-gradient(90deg,transparent calc(50% - 7px),var(--bg) calc(50% - 7px),var(--bg) calc(50% + 7px),transparent calc(50% + 7px)) 0 0/210px 100%,linear-gradient(0deg,transparent calc(50% - 5px),var(--bg) calc(50% - 5px),var(--bg) calc(50% + 5px),transparent calc(50% + 5px)) 0 0/100% 150px,linear-gradient(90deg,color-mix(in srgb,var(--ink) 7%,transparent) 1px,transparent 1px) 0 0/42px 42px,linear-gradient(0deg,color-mix(in srgb,var(--ink) 7%,transparent) 1px,transparent 1px) 0 0/42px 42px}
+.mc-pin{position:absolute;left:50%;top:44%;width:26px;height:26px;margin:-26px 0 0 -13px;border-radius:50% 50% 50% 0;background:var(--brand);transform:rotate(-45deg);box-shadow:0 10px 20px -8px rgba(0,0,0,.5)}
+.mc-pin::after{content:"";position:absolute;inset:8px;border-radius:50%;background:var(--on-brand)}
+.mc-label{position:absolute;left:50%;top:calc(44% + 14px);transform:translateX(-50%);display:grid;justify-items:center;gap:1px;padding:10px 16px;max-width:86%;background:${dark ? 'var(--bg)' : '#fff'};border-radius:12px;box-shadow:0 14px 34px -16px rgba(0,0,0,.4);font-size:var(--s-1);color:var(--muted);text-align:center}
+.mc-label b{font-family:var(--display);font-weight:${Math.min(700, t.display.weight)};font-size:1.05rem;color:var(--ink)}
+.mc-open{position:absolute;right:14px;bottom:14px;padding:9px 14px;border-radius:999px;background:var(--brand);color:var(--on-brand);font:600 .85rem/1 var(--body)}
+.g-uniform .g{grid-template-columns:repeat(2,minmax(0,1fr))!important}@media(min-width:900px){.g-uniform .g{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+.g-uniform .g figure{aspect-ratio:4/5!important;grid-column:auto!important;grid-row:auto!important}
 .features{display:grid;gap:clamp(48px,8vw,96px)}
 .feature{display:grid;gap:clamp(20px,4vw,56px);align-items:center}
 @media(min-width:900px){.feature{grid-template-columns:1fr 1fr}.feature.flip .feature-img{order:2}}
