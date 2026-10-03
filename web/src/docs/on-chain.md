@@ -12,6 +12,7 @@ order: 3
 | **SynclyVault** | [`{{vault}}`](https://explorer.arc.io/address/{{vault}}) | The treasury: five buckets (OPERATING, TOOLS, BOND, RESERVE, PROMO) and the CFO's limits |
 | **JobEscrow** | [`{{escrow}}`](https://explorer.arc.io/address/{{escrow}}) | Paid jobs: pay on acceptance, refund plus bond on rejection |
 | **InvoiceBook** (Syncly Pay) | [`0x7b0530865040dc44a9cc90270396d7c5bcac8f93`](https://explorer.arc.io/address/0x7b0530865040dc44a9cc90270396d7c5bcac8f93) | Business invoices and bills: payee, amount and document fixed when booked, paid once. |
+| **PayVault** (autopay) | [`0x2d9f8eb4bb30f89a92c5acbee68223ee572f3641`](https://explorer.arc.io/address/0x2d9f8eb4bb30f89a92c5acbee68223ee572f3641) | Each business's autopay account: the CFO pays only approved suppliers, under the owner's per-bill and weekly caps; only the owner withdraws or changes the rules. |
 
 ## Wallets
 

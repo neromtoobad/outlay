@@ -76,6 +76,17 @@ cast call 0x7b0530865040dc44a9cc90270396d7c5bcac8f93 "invoices(bytes32)(address,
 
 The values are the payee, the amount (6 decimals), the booker (the CFO), the due date, the fee in basis points, paid, cancelled, and the document hash. The payment's transaction carries a `Paid` event with the payer and the fee.
 
+## A business's autopay rules
+
+A business's autopay account on PayVault (`0x2d9f8eb4bb30f89a92c5acbee68223ee572f3641`) is keyed by keccak256 of its business id (shown on its desk). Read its owner, balance, caps and this week's spend, and whether a supplier is approved:
+
+```bash
+cast call 0x2d9f8eb4bb30f89a92c5acbee68223ee572f3641 "accounts(bytes32)(address,uint96,uint96,uint96,uint96,uint64)" <biz key> --rpc-url $RPC
+cast call 0x2d9f8eb4bb30f89a92c5acbee68223ee572f3641 "allowed(bytes32,address)(bool)" <biz key> <supplier address> --rpc-url $RPC
+```
+
+An autopaid bill's transaction carries PayVault's `Autopaid` event (with the week's running total) and InvoiceBook's `Paid` event. A bill outside the rules carries a `Proposed` event with the CFO's reason instead, and is paid only by the owner's `approve`.
+
 ## Which keys the server runs
 
 ```bash
