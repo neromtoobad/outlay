@@ -59,7 +59,7 @@ export const CATALOG = [
     example: 'Ads for Tolu’s Small Chops party trays, ₦25,000 for 20 guests, orders on WhatsApp 0803 555 0142, ₦5,000 a day',
   },
   {
-    id: 'motion-ad', name: 'Motion Ad', dept: 'Growth Studio', live: true, priceUsd: 2, listedCostUsd: 0.9, etaMin: 10,
+    id: 'motion-ad', name: 'Motion Ad', dept: 'Growth Studio', live: true, priceUsd: 1, listedCostUsd: 0.9, etaMin: 10,
     tagline: 'A designer-grade motion video of your offer, with its own soundtrack.',
     youGet: ['A 12–24 s motion video, vertical for Reels, TikTok and Status (square or landscape on request)', 'One shape that morphs through your offer, every change driven by a tap, drag or hold', 'An original soundtrack composed from the video’s own timeline, no licensing', 'Every state reviewed for legibility before rendering', 'The editable scene file, so changes are cheap'],
     team: ['researcher', 'reader', 'producer', 'auditor', 'messenger'],
@@ -87,14 +87,14 @@ export const CATALOG = [
     example: '2 chest freezers (300 L) and a double-basket deep fryer, new, delivered to Surulere, Lagos. Budget ₦900k. Also talking to @frostking_ng on Instagram',
   },
   {
-    id: 'local-business-finder', name: 'Local Business Finder', dept: 'Research', live: true, priceUsd: 2, listedCostUsd: 0.2, etaMin: 3,
+    id: 'local-business-finder', name: 'Local Business Finder', dept: 'Research', live: true, priceUsd: 1, listedCostUsd: 0.2, etaMin: 3,
     tagline: 'Every business of a type in an area, with phone, website and rating.',
     youGet: ['A clean spreadsheet (CSV) of up to 60 businesses', 'Phone numbers normalised to +234', 'Filters like "no website" or "has a phone"', 'Checked by rules: no duplicates, every row complete, filter holds', 'Emailed to you with the spreadsheet attached'],
     team: ['researcher', 'scout', 'investigator', 'analyst', 'auditor', 'messenger'],
     example: 'Every café and coffee shop in Lekki Phase 1 that has no website',
   },
   {
-    id: 'lead-list', name: 'Lead List', dept: 'Research', live: true, priceUsd: 2, listedCostUsd: 0.5, etaMin: 8,
+    id: 'lead-list', name: 'Lead List', dept: 'Research', live: true, priceUsd: 1, listedCostUsd: 0.5, etaMin: 8,
     tagline: 'Up to 25 verified business emails, each with a personalised first line.',
     youGet: ['Up to 25 leads with emails that passed a live deliverability check', 'Where each email came from (their own site or a finder)', 'One opening line per lead, written from real data', 'You send; we never cold-email for you', 'Emailed to you with the spreadsheet attached'],
     team: ['researcher', 'scout', 'reader', 'investigator', 'writer', 'auditor', 'messenger'],

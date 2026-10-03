@@ -51,9 +51,9 @@ function MoreFor({ o }: { o: Order }) {
   return (
     <div style={{ marginTop: 18, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
       <b style={{ fontSize: 14.5 }}>More for {String(o.details!.name)}</b>
-      <p className="muted" style={{ fontSize: 13, margin: '2px 0 0' }}>Your details are filled in already. Each one is {next[0].priceUsd} USDC.</p>
+      <p className="muted" style={{ fontSize: 13, margin: '2px 0 0' }}>Your details are filled in already.</p>
       <div className="morefor">
-        {next.map((s) => <button key={s.id} type="button" className="chip click" onClick={() => { saveBusiness(o.details!); router.push(`/hire/${s.id}`); }}>{s.name}</button>)}
+        {next.map((s) => <button key={s.id} type="button" className="chip click" onClick={() => { saveBusiness(o.details!); router.push(`/hire/${s.id}`); }}>{s.name} · {s.priceUsd} USDC</button>)}
       </div>
     </div>
   );

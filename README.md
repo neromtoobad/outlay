@@ -1,6 +1,6 @@
 # Syncly
 
-**AI agents do the work. An AI CFO runs the money.** Syncly is a real business staffed by AI agents, with its own treasury on Arc. Small businesses hire the agents for paid work at 2 USDC a job. An AI CFO prices every job, holds customer payments in escrow, pays every agent and supplier in USDC, and signs every decision, inside limits a smart contract enforces and only a human can lift.
+**AI agents do the work. An AI CFO runs the money.** Syncly is a real business staffed by AI agents, with its own treasury on Arc. Small businesses hire the agents for paid work from 1 USDC a job. An AI CFO prices every job, holds customer payments in escrow, pays every agent and supplier in USDC, and signs every decision, inside limits a smart contract enforces and only a human can lift.
 
 **Live on Arc mainnet:** [hiresyncly.site](https://hiresyncly.site) · [follow the money](https://hiresyncly.site/#money) · [the CFO's signed log](https://hiresyncly.site/api/cfo) · [the office, live](https://hiresyncly.site/live) · [traction](TRACTION.md) ([live copy](https://hiresyncly.site/api/traction.md))
 
@@ -54,7 +54,7 @@ Every 10 minutes, and soon after any job is accepted, delivered or refunded, the
 5. **Escalates** when it can't act: TOOLS is empty, its gas is low, or a move exceeds what it may do alone.
 6. **Writes every decision down**: what it saw, the rule that fired, the amount and the transaction.
 
-It also prices every job ([`server/src/cfo/quote.ts`](server/src/cfo/quote.ts)). The cost comes from the median measured cost. p(accept) comes from a Beta(4,1) prior updated with the service's acceptance history. The bond is 10–30% of the price, higher when confidence is higher, and capped by what the BOND bucket can cover. Every service is priced at 2 USDC on purpose, so the CFO takes a job unless it is expected to lose more than 2 USDC. Every number is on the quote, which only the owner sees in full.
+It also prices every job ([`server/src/cfo/quote.ts`](server/src/cfo/quote.ts)). The cost comes from the median measured cost. p(accept) comes from a Beta(4,1) prior updated with the service's acceptance history. The bond is 10–30% of the price, higher when confidence is higher, and capped by what the BOND bucket can cover. Every service is priced at 1 or 2 USDC on purpose (traction over profit), so the CFO takes a job unless it is expected to lose more than 2 USDC. Every number is on the quote, which only the owner sees in full.
 
 **Limits it cannot talk its way past** (enforced by [`SynclyVault.sol`](contracts/src/SynclyVault.sol), not by a prompt):
 
@@ -118,13 +118,13 @@ Real money has to flow for the CFO to manage it, so Syncly sells work small busi
 | Website | 2 USDC | A designed site from the Google listing, Instagram and the owner's photos, hosted at a link the same day, plus the files |
 | Content Pack | 2 USDC | The content styles working in the niche this week (backed by real posts and their numbers), then 7 posts and 3 images |
 | Ad Launch | 2 USDC | 3 ad angles from ads that have run 30+ days, feed and Story creatives, an 8 s video, copy, and a 7-day plan for the budget; diagnoses the ads they already ran |
-| Motion Ad | 2 USDC | A 12–24 s motion video with an original soundtrack, rendered on our own server |
+| Motion Ad | 1 USDC | A 12–24 s motion video with an original soundtrack, rendered on our own server |
 | Product Photo Studio | 2 USDC | Phone photos turned into studio, lifestyle and white-background shots, each checked against the original so the product doesn't change |
 | Get Found | 2 USDC | Google Maps rank street by street against competitors, profile gaps, what ChatGPT, Gemini, Claude and Perplexity say, a fix list, a profile description and review replies |
 | Buy Smart | 2 USDC | The cheapest trustworthy offers, delivered, and a red/amber/green check on the sellers before paying |
-| Local Business Finder | 2 USDC | Every business of a type in an area, with phone, website and rating, as a spreadsheet |
-| Lead List | 2 USDC | Up to 25 verified business emails, each with a personalised first line |
-| Research Brief | 2 USDC | Competitors, market and pricing, with every claim cited |
+| Local Business Finder | 1 USDC | Every business of a type in an area, with phone, website and rating, as a spreadsheet |
+| Lead List | 1 USDC | Up to 25 verified business emails, each with a personalised first line |
+| Research Brief | 1 USDC | Competitors, market and pricing, with every claim cited |
 
 The menu comes from research into what small businesses already pay agencies and freelancers for, and what a search or a chatbot can't do: jobs that need fresh data from many paid sources at once, checking against the truth, or real production.
 

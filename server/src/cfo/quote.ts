@@ -31,8 +31,8 @@ export type Quote = {
   reasons: string[];
 };
 
-// Every service is priced at 2 USDC on purpose (the owner's call, 2026-10-02), so some jobs cost more in tools
-// than they earn: the CFO takes a job unless it is expected to lose more than 2 USDC.
+// Prices are kept at 1 or 2 USDC on purpose (the owner's call, 2026-10-03: traction over profit), so some jobs cost
+// more in tools than they earn: the CFO takes a job unless it is expected to lose more than 2 USDC.
 export const POLICY = { priorA: 4, priorB: 1, minBps: 1000, maxBps: 3000, minExpectedProfit: -2, promoMaxCost: 1.5 };
 
 const median = (xs: number[]) => {

@@ -12,15 +12,15 @@ Syncly does the jobs a small business would otherwise pay an agency or a freelan
 | **Website** | 2 USDC | ~6 min | A designed site from your Google listing, Instagram and photos, live at a link today, plus the files |
 | **Content Pack** | 2 USDC | ~6 min | The content styles working in your niche this week, backed by real posts, then 7 posts in your voice and 3 images |
 | **Ad Launch** | 2 USDC | ~12 min | 3 ads with feed and Story creatives, an 8 s video, copy, and a 7-day plan for your budget |
-| **Motion Ad** | 2 USDC | ~10 min | A 12–24 s motion video of your offer with an original soundtrack |
+| **Motion Ad** | 1 USDC | ~10 min | A 12–24 s motion video of your offer with an original soundtrack |
 | **Product Photo Studio** | 2 USDC | ~8 min | Your phone photos turned into studio, lifestyle and white-background shots, sized for where you sell |
 | **Get Found** | 2 USDC | ~10 min | Where you rank on Google Maps street by street, what ChatGPT and Gemini say about you, and the fixes |
 | **Buy Smart** | 2 USDC | ~8 min | The cheapest trustworthy offers for what you need, and a risk check on the sellers before you pay |
-| **Local Business Finder** | 2 USDC | ~3 min | Every business of a type in an area, with phone, website and rating |
-| **Lead List** | 2 USDC | ~8 min | Up to 25 verified business emails, each with a personalised first line |
-| **Research Brief** | 2 USDC | ~6 min | Competitors, market and pricing, with every claim cited |
+| **Local Business Finder** | 1 USDC | ~3 min | Every business of a type in an area, with phone, website and rating |
+| **Lead List** | 1 USDC | ~8 min | Up to 25 verified business emails, each with a personalised first line |
+| **Research Brief** | 1 USDC | ~6 min | Competitors, market and pricing, with every claim cited |
 
-Every service costs 2 USDC (about ₦2,700), and your first website is free. You pay into an escrow on Arc. The money only leaves when you accept the work; reject it and you get it back, plus a bond. See [Escrow payments](/docs/escrow).
+Quick jobs cost 1 USDC (about ₦1,330) and bigger ones 2 USDC (about ₦2,660), and your first website is free. You pay into an escrow on Arc. The money only leaves when you accept the work; reject it and you get it back, plus a bond. See [Escrow payments](/docs/escrow).
 
 ## Growing
 
