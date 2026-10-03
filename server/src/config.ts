@@ -8,7 +8,7 @@ export const ARC = {
   usdc: '0x3600000000000000000000000000000000000000',
   gatewayWallet: '0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE',
   gatewayMinter: '0x2222222d7164433c4C09B0b0D809a9b52C04C205',
-  explorer: process.env.ARC_EXPLORER ?? 'https://arcscan.app',
+  explorer: process.env.ARC_EXPLORER ?? 'https://explorer.arc.io',
 } as const;
 
 /** OUTLAY_DRY=1 → no payments, tools return fixtures. For testing plumbing only. */

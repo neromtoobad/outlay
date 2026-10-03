@@ -32,9 +32,9 @@ export default function Footer() {
         <div>
           <h5 className="mono">On Arc</h5>
           <ul>
-            <li><a href="https://arcscan.app/address/0x589e8ec9134777acecb83a9abdf018942ddc9f2b" target="_blank" rel="noreferrer">SynclyVault ↗</a></li>
-            <li><a href="https://arcscan.app/address/0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd" target="_blank" rel="noreferrer">JobEscrow ↗</a></li>
-            <li><a href="https://arcscan.app/address/0x7b0530865040dc44a9cc90270396d7c5bcac8f93" target="_blank" rel="noreferrer">InvoiceBook ↗</a></li>
+            <li><a href="https://explorer.arc.io/address/0x589e8ec9134777acecb83a9abdf018942ddc9f2b" target="_blank" rel="noreferrer">SynclyVault ↗</a></li>
+            <li><a href="https://explorer.arc.io/address/0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd" target="_blank" rel="noreferrer">JobEscrow ↗</a></li>
+            <li><a href="https://explorer.arc.io/address/0x7b0530865040dc44a9cc90270396d7c5bcac8f93" target="_blank" rel="noreferrer">InvoiceBook ↗</a></li>
           </ul>
         </div>
       </div>

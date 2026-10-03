@@ -36,7 +36,7 @@ async function deploy(name: string, args: unknown[]) {
   const r = await pub.waitForTransactionReceipt({ hash });
   if (r.status !== 'success' || !r.contractAddress) throw new Error(`${name} deploy failed: ${hash}`);
   dep.txs = { ...(dep.txs ?? {}), [`deploy${name}`]: hash };
-  console.log(`  ${name} → ${r.contractAddress} (gas ${r.gasUsed})${network === 'arc' ? `\n  https://arcscan.app/tx/${hash}` : ''}`);
+  console.log(`  ${name} → ${r.contractAddress} (gas ${r.gasUsed})${network === 'arc' ? `\n  https://explorer.arc.io/tx/${hash}` : ''}`);
   return { address: r.contractAddress, block: Number(r.blockNumber) };
 }
 

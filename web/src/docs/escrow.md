@@ -5,7 +5,7 @@ group: Money and trust
 order: 1
 ---
 
-Paid jobs run through **JobEscrow**, a contract on Arc mainnet at [`{{escrow}}`](https://arcscan.app/address/{{escrow}}). Your payment waits in the contract until you decide.
+Paid jobs run through **JobEscrow**, a contract on Arc mainnet at [`{{escrow}}`](https://explorer.arc.io/address/{{escrow}}). Your payment waits in the contract until you decide.
 
 ## What you need
 

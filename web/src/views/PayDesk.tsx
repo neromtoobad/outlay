@@ -139,7 +139,7 @@ function Autopay({ desk, onChange }: { desk: Desk; onChange: () => void }) {
   const proposals = desk.docs.filter((d) => d.kind === 'bill' && d.status === 'open' && d.autopay?.state === 'proposed');
   return (
     <div className="card pad form" style={{ gap: 12 }}>
-      <h3 className="t">Autopay <small>owned by <span className="mono">{short(acct.owner)}</span> · <a href={`https://arcscan.app/address/${ap.vault}`} target="_blank" rel="noreferrer">PayVault ↗</a></small></h3>
+      <h3 className="t">Autopay <small>owned by <span className="mono">{short(acct.owner)}</span> · <a href={`https://explorer.arc.io/address/${ap.vault}`} target="_blank" rel="noreferrer">PayVault ↗</a></small></h3>
       <div className="apstats">
         <div><span className="muted">Balance</span><b>{f2(acct.balanceUsd)}</b></div>
         <div><span className="muted">Per bill</span><b>{f2(acct.perPayCapUsd)}</b></div>

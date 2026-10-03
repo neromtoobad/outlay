@@ -63,7 +63,7 @@ function PayBox({ d, onPaid }: { d: PayDocView; onPaid: (d: PayDocView) => void 
 }
 
 export function Proof({ d }: { d: PayDocView }) {
-  const arc = (tx?: string, label?: string) => (real(tx) ? <a href={`https://arcscan.app/tx/${tx}`} target="_blank" rel="noreferrer">{label} ↗</a> : tx ? <span className="muted">{label} (demo)</span> : null);
+  const arc = (tx?: string, label?: string) => (real(tx) ? <a href={`https://explorer.arc.io/tx/${tx}`} target="_blank" rel="noreferrer">{label} ↗</a> : tx ? <span className="muted">{label} (demo)</span> : null);
   return (
     <section className="card pad">
       <h3 className="t">Fixed on Arc</h3>
@@ -124,7 +124,7 @@ export default function PayInvoice({ id }: { id: string }) {
               <div className="card pad paybox">
                 <b>Paid · thank you</b>
                 <p>{f2(d.amountUsd)} USDC paid {d.paidAt ? `on ${new Date(d.paidAt).toLocaleString()}` : ''}{d.payer ? ` from ${short(d.payer)}` : ''}. {d.seller.name} received {f2(d.amountUsd - (d.feeUsd ?? 0))} USDC after the {(d.feeBps / 100).toFixed(1)}% fee.</p>
-                {real(d.payTx) && <a className="btn secondary block" href={`https://arcscan.app/tx/${d.payTx}`} target="_blank" rel="noreferrer">See the payment on Arc ↗</a>}
+                {real(d.payTx) && <a className="btn secondary block" href={`https://explorer.arc.io/tx/${d.payTx}`} target="_blank" rel="noreferrer">See the payment on Arc ↗</a>}
               </div>
             ) : (
               <div className="card pad paybox"><b>{STATUS_LABEL[d.status]}</b><p>{d.status === 'confirm-email' ? `${d.seller.name} has to confirm this invoice by email before it can be paid.` : d.status === 'review' ? 'The business is reviewing the agents’ checks before this bill is booked.' : d.status === 'checking' ? 'The Analyst is reading the bill and the Investigator is checking the payee.' : d.error ?? 'This invoice can’t be paid.'}</p></div>

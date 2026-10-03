@@ -1,6 +1,6 @@
 // Circle Gateway batches x402 payments and settles them on Arc a few minutes later. pay() returns a
 // Gateway transfer id; this looks each live receipt up (read-only) and records the on-chain
-// settlement transaction so every receipt can link to arcscan.
+// settlement transaction so every receipt can link to the Arc explorer.
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DATA_DIR, DRY } from './config.ts';

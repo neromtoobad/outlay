@@ -25,7 +25,7 @@ const chainOf = (c: EscrowCfg): Chain => ({
   id: c.chainId, name: c.chainName,
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, // Arc pays gas in USDC
   rpcUrls: { default: { http: [c.rpc] } },
-  blockExplorers: c.explorer ? { default: { name: 'Arcscan', url: c.explorer } } : undefined,
+  blockExplorers: c.explorer ? { default: { name: 'Arc explorer', url: c.explorer } } : undefined,
 });
 // Arc drops transactions priced under 20 gwei; set a floor so no wallet underprices them.
 const fees = (c: EscrowCfg) => (c.chainId === 5042 ? { maxFeePerGas: parseGwei('60'), maxPriorityFeePerGas: parseGwei('1') } : {});

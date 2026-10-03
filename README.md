@@ -31,7 +31,7 @@ Syncly's CFO doesn't only run Syncly's money. [**Syncly Pay**](https://hiresyncl
 1. **Follow the money** on the home page ([/#money](https://hiresyncly.site/#money)): each stop has a live number from the running company.
 2. **Read the CFO's log** at [/api/cfo](https://hiresyncly.site/api/cfo): the vault's buckets, each agent's balance and allowance, this week's plan, and every decision with what the CFO saw, signed and hash-chained. `verify.ok` means every hash and signature checks out.
 3. **Order a free website** at [/hire/website](https://hiresyncly.site/hire/website). The job page shows the team working live and **the money on this job**: the CFO's quote and bond, the escrow, every tool the agents bought with its Arc settlement, and the release or refund.
-4. **Check a receipt.** Job #1 ([ord_mulrvp33_0603](https://hiresyncly.site/job/ord_mulrvp33_0603)) found 9 restaurants with 5 x402 payments, each linked to its settlement on Arc ([0xb76f18…](https://arcscan.app/tx/0xb76f1819087eea9c3bbd9886384a44556450a6fa831a1575818165fa0355fe25), [0xc99ba1…](https://arcscan.app/tx/0xc99ba105332d26b54c73cc1ba1677e299c9dc632eb3f835e50309a40d41d4fbd)).
+4. **Check a receipt.** Job #1 ([ord_mulrvp33_0603](https://hiresyncly.site/job/ord_mulrvp33_0603)) found 9 restaurants with 5 x402 payments, each linked to its settlement on Arc ([0xb76f18…](https://explorer.arc.io/tx/0xb76f1819087eea9c3bbd9886384a44556450a6fa831a1575818165fa0355fe25), [0xc99ba1…](https://explorer.arc.io/tx/0xc99ba105332d26b54c73cc1ba1677e299c9dc632eb3f835e50309a40d41d4fbd)).
 5. **Pay for a job** (needs about 2.05 USDC on Arc in a browser wallet). The page walks through the steps: connect the wallet, the CFO opens the escrow, then approve and fund. On the job page you then accept, revise or reject from the same wallet.
 6. **Watch the office** at [/live](https://hiresyncly.site/live). The agents act out real events: the CFO stamps the quote and walks the brief to the whiteboard, and the Messenger carries the delivery out.
 
@@ -92,12 +92,12 @@ Canteen's [essay](https://thecanteenapp.com/analysis/2026/09/12/agents-and-ledge
 
 | Contract / wallet | Address | Role |
 |---|---|---|
-| **SynclyVault** | [`0x589e8ec9134777acecb83a9abdf018942ddc9f2b`](https://arcscan.app/address/0x589e8ec9134777acecb83a9abdf018942ddc9f2b) | The treasury: five buckets (OPERATING, TOOLS, BOND, RESERVE, PROMO). The CFO can move money between buckets and fund agents, never send it anywhere else. |
-| **JobEscrow** | [`0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd`](https://arcscan.app/address/0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd) | Paid jobs. The customer funds it, and only the customer can accept or reject. Silence for 48 h releases the payment, and a missed deadline refunds it plus the bond. |
-| **InvoiceBook** | [`0x7b0530865040dc44a9cc90270396d7c5bcac8f93`](https://arcscan.app/address/0x7b0530865040dc44a9cc90270396d7c5bcac8f93) | Syncly Pay. Each business invoice's payee, exact amount and document hash are fixed when the CFO books it; it is paid once, straight from payer to payee, with 0.5% to the vault. |
-| Boss | [`0xe7aa82bd4659b5af2b16d0af5dcab42fe8089b40`](https://arcscan.app/address/0xe7aa82bd4659b5af2b16d0af5dcab42fe8089b40) | The vault's owner: a human's wallet, outside the server's keys. Co-signs anything above the CFO's limits. |
-| CFO | [`0xB95dd6425d19BF09d206dc780a758e1C2EF4f1a9`](https://arcscan.app/address/0xB95dd6425d19BF09d206dc780a758e1C2EF4f1a9) | The vault's CFO key and the escrow's operator. It signs the decision log. |
-| Treasury | [`0x102AdC546dAE682B7cDD9aB6d624822fdD3DC209`](https://arcscan.app/address/0x102AdC546dAE682B7cDD9aB6d624822fdD3DC209) | Deployed the contracts. Funded the first agents' Gateway balances before the vault existed. |
+| **SynclyVault** | [`0x589e8ec9134777acecb83a9abdf018942ddc9f2b`](https://explorer.arc.io/address/0x589e8ec9134777acecb83a9abdf018942ddc9f2b) | The treasury: five buckets (OPERATING, TOOLS, BOND, RESERVE, PROMO). The CFO can move money between buckets and fund agents, never send it anywhere else. |
+| **JobEscrow** | [`0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd`](https://explorer.arc.io/address/0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd) | Paid jobs. The customer funds it, and only the customer can accept or reject. Silence for 48 h releases the payment, and a missed deadline refunds it plus the bond. |
+| **InvoiceBook** | [`0x7b0530865040dc44a9cc90270396d7c5bcac8f93`](https://explorer.arc.io/address/0x7b0530865040dc44a9cc90270396d7c5bcac8f93) | Syncly Pay. Each business invoice's payee, exact amount and document hash are fixed when the CFO books it; it is paid once, straight from payer to payee, with 0.5% to the vault. |
+| Boss | [`0xe7aa82bd4659b5af2b16d0af5dcab42fe8089b40`](https://explorer.arc.io/address/0xe7aa82bd4659b5af2b16d0af5dcab42fe8089b40) | The vault's owner: a human's wallet, outside the server's keys. Co-signs anything above the CFO's limits. |
+| CFO | [`0xB95dd6425d19BF09d206dc780a758e1C2EF4f1a9`](https://explorer.arc.io/address/0xB95dd6425d19BF09d206dc780a758e1C2EF4f1a9) | The vault's CFO key and the escrow's operator. It signs the decision log. |
+| Treasury | [`0x102AdC546dAE682B7cDD9aB6d624822fdD3DC209`](https://explorer.arc.io/address/0x102AdC546dAE682B7cDD9aB6d624822fdD3DC209) | Deployed the contracts. Funded the first agents' Gateway balances before the vault existed. |
 | USDC | `0x3600000000000000000000000000000000000000` | Arc's native USDC (gas and settlement) |
 | Circle GatewayWallet | `0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE` | Holds each agent's balance for x402 payments; the vault tops agents up here |
 
@@ -105,18 +105,18 @@ Agent wallets, each registered in the vault and paying for its own tools:
 
 | Agent | Address | Buys |
 |---|---|---|
-| Scout | [`0xF57E…7256`](https://arcscan.app/address/0xF57E85630d0D100cCD2AEf7f6956aa2975B27256) | Search (Exa, Serper Maps) |
-| Researcher | [`0x02aA…d3eb`](https://arcscan.app/address/0x02aA3749c7af3181C85Eee4CBa999747E449d3eb) | AI models (BlockRun) to plan and extract |
-| Reader | [`0x594E…54Cf`](https://arcscan.app/address/0x594EC11A38d68a8c2A365C941d8d76eEe9e954Cf) | Page reading (Exa contents, APEX) |
-| Writer | [`0x16a4…2B28`](https://arcscan.app/address/0x16a4f6FCfAb3B607df1965A443Aa8819fed52B28) | AI models (BlockRun) |
-| Investigator | [`0x7E0C…BCB0`](https://arcscan.app/address/0x7E0C1c33FcE6605630c473d4a44255f26463BCB0) | Email, phone and seller checks (APEX, Twilio via BlockRun, Didit), and AI-assistant answers (DataForSEO) |
-| Designer | [`0x00aF…DAF4`](https://arcscan.app/address/0x00aFF88Ae2B22f67cf87Ca74d36d37f7BA6fDAF4) | Claude Opus 5 for websites, and images (BlockRun) |
-| Producer | [`0x37c8…9f36`](https://arcscan.app/address/0x37c8de9f9740Ed30bcdCc1ea5B8C08567BE19f36) | Claude Opus 5 for motion ads, video and music (BlockRun) |
-| Analyst | [`0x2E51…c958`](https://arcscan.app/address/0x2E516E71912adA3B7aFa989aCE06D9A51e7fc958) | AI models to compare prices, answers and signals (BlockRun) |
-| Auditor | [`0x72e5…c9b6`](https://arcscan.app/address/0x72e514Afed2EFdecA263d9710068259f4B00c9b6) | A second AI model family, to check the work |
-| Messenger | [`0x37D0…95a9`](https://arcscan.app/address/0x37D0ccDfcC37ba1803002d95D0077828Afcd95a9) | Email delivery (Resend; AgentMail by x402 as a fallback) |
+| Scout | [`0xF57E…7256`](https://explorer.arc.io/address/0xF57E85630d0D100cCD2AEf7f6956aa2975B27256) | Search (Exa, Serper Maps) |
+| Researcher | [`0x02aA…d3eb`](https://explorer.arc.io/address/0x02aA3749c7af3181C85Eee4CBa999747E449d3eb) | AI models (BlockRun) to plan and extract |
+| Reader | [`0x594E…54Cf`](https://explorer.arc.io/address/0x594EC11A38d68a8c2A365C941d8d76eEe9e954Cf) | Page reading (Exa contents, APEX) |
+| Writer | [`0x16a4…2B28`](https://explorer.arc.io/address/0x16a4f6FCfAb3B607df1965A443Aa8819fed52B28) | AI models (BlockRun) |
+| Investigator | [`0x7E0C…BCB0`](https://explorer.arc.io/address/0x7E0C1c33FcE6605630c473d4a44255f26463BCB0) | Email, phone and seller checks (APEX, Twilio via BlockRun, Didit), and AI-assistant answers (DataForSEO) |
+| Designer | [`0x00aF…DAF4`](https://explorer.arc.io/address/0x00aFF88Ae2B22f67cf87Ca74d36d37f7BA6fDAF4) | Claude Opus 5 for websites, and images (BlockRun) |
+| Producer | [`0x37c8…9f36`](https://explorer.arc.io/address/0x37c8de9f9740Ed30bcdCc1ea5B8C08567BE19f36) | Claude Opus 5 for motion ads, video and music (BlockRun) |
+| Analyst | [`0x2E51…c958`](https://explorer.arc.io/address/0x2E516E71912adA3B7aFa989aCE06D9A51e7fc958) | AI models to compare prices, answers and signals (BlockRun) |
+| Auditor | [`0x72e5…c9b6`](https://explorer.arc.io/address/0x72e514Afed2EFdecA263d9710068259f4B00c9b6) | A second AI model family, to check the work |
+| Messenger | [`0x37D0…95a9`](https://explorer.arc.io/address/0x37D0ccDfcC37ba1803002d95D0077828Afcd95a9) | Email delivery (Resend; AgentMail by x402 as a fallback) |
 
-Key transactions: [vault deployed](https://arcscan.app/tx/0x77d94e018c642a803962f9031367098fed1a4c2eadac34f1d5dab14d03c8d6ff), [escrow deployed](https://arcscan.app/tx/0xa6066e70dd18c60cd41cbe29fbc0a33af7f3564a1f196221cd79c31a8acf4b26), [ownership handed to the Boss](https://arcscan.app/tx/0x4020c9a206135485c11e3386d488b1e10790077af525a73dc58ff82afc4ec5ab), [the CFO's first weekly plan sealed on-chain](https://arcscan.app/tx/0x8af07f69b1c058e51379bbab8c31f3f419a110fd5dc2174988a566dfb4f158d4). Every address and deploy transaction is in [`deployments/arc.json`](deployments/arc.json).
+Key transactions: [vault deployed](https://explorer.arc.io/tx/0x77d94e018c642a803962f9031367098fed1a4c2eadac34f1d5dab14d03c8d6ff), [escrow deployed](https://explorer.arc.io/tx/0xa6066e70dd18c60cd41cbe29fbc0a33af7f3564a1f196221cd79c31a8acf4b26), [ownership handed to the Boss](https://explorer.arc.io/tx/0x4020c9a206135485c11e3386d488b1e10790077af525a73dc58ff82afc4ec5ab), [the CFO's first weekly plan sealed on-chain](https://explorer.arc.io/tx/0x8af07f69b1c058e51379bbab8c31f3f419a110fd5dc2174988a566dfb4f158d4). Every address and deploy transaction is in [`deployments/arc.json`](deployments/arc.json).
 
 ## Where the money comes from: the work the agents sell
 

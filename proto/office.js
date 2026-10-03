@@ -268,7 +268,7 @@
     const li = document.createElement('li'); li.className = `ev ${ev.type}`;
     li.innerHTML = `<div class="ico">${ICON[ev.type] ?? '•'}</div>
       <div><div class="ttl">${ev.title}</div><div class="meta">${ev.meta ?? ''}</div></div>
-      <div class="amt">${ev.amount ?? ''}<small>${ev.tx ? `<a href="#" title="Simulated. In the product this opens arcscan">${ev.tx} ↗</a>` : 'just now'}</small></div>`;
+      <div class="amt">${ev.amount ?? ''}<small>${ev.tx ? `<a href="#" title="Simulated. In the product this opens the Arc explorer">${ev.tx} ↗</a>` : 'just now'}</small></div>`;
     const feed = $('feed'); feed.prepend(li); while (feed.children.length > 80) feed.lastChild.remove();
     if (ev.worker) { const a = byId[ev.worker]; a.feed.unshift(ev); a.feed.length = Math.min(a.feed.length, 12); if (drawerFor === ev.worker) renderFile(); }
   }

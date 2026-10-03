@@ -51,7 +51,7 @@ if (cmd === 'fund') {
   if (need > have - 0.05) throw new Error(`treasury has ${have} USDC; funding ${roles.length} × ${amount} needs ${need} plus a little gas`);
   for (const role of roles) {
     const r = await t.depositFor(amount, account(role).address);
-    console.log(`funded ${role.padEnd(11)} ${r.formattedAmount} USDC  deposit tx ${r.depositTxHash}  (https://arcscan.app/tx/${r.depositTxHash})`);
+    console.log(`funded ${role.padEnd(11)} ${r.formattedAmount} USDC  deposit tx ${r.depositTxHash}  (https://explorer.arc.io/tx/${r.depositTxHash})`);
   }
   console.log('Gateway balances can take a minute to show up. Check with: node scripts/wallet.ts status ' + roles.join(' '));
   process.exit(0);
@@ -67,7 +67,7 @@ if (cmd === 'send') {
   const w = createWalletClient({ account: account('treasury'), chain: CHAIN_CONFIGS.arc.chain, transport: http(ARC.rpc) });
   for (const role of roles) {
     const hash = await w.writeContract({ address: ARC.usdc as Address, abi: parseAbi(['function transfer(address,uint256) returns (bool)']), functionName: 'transfer', args: [account(role).address, BigInt(Math.round(Number(amount) * 1e6))] });
-    console.log(`sent ${amount} USDC to ${role.padEnd(11)} wallet  tx ${hash}  (https://arcscan.app/tx/${hash})`);
+    console.log(`sent ${amount} USDC to ${role.padEnd(11)} wallet  tx ${hash}  (https://explorer.arc.io/tx/${hash})`);
   }
   process.exit(0);
 }
@@ -126,10 +126,10 @@ if (cmd === 'split') {
     await pub.waitForTransactionReceipt({ hash });
     return hash;
   };
-  if (cfoTop) console.log(`cfo          gas ${cfoTop.toFixed(2)}  https://arcscan.app/tx/${await transfer(account('cfo').address, cfoTop)}`);
+  if (cfoTop) console.log(`cfo          gas ${cfoTop.toFixed(2)}  https://explorer.arc.io/tx/${await transfer(account('cfo').address, cfoTop)}`);
   for (const x of plan) {
-    if (x.gw >= 0.01) { const r = await t.depositFor(x.gw.toFixed(2), account(x.r).address); console.log(`${x.r.padEnd(12)} Gateway ${x.gw.toFixed(2)}  https://arcscan.app/tx/${r.depositTxHash}`); }
-    if (x.own >= 0.01) console.log(`${x.r.padEnd(12)} wallet  ${x.own.toFixed(2)}  https://arcscan.app/tx/${await transfer(account(x.r).address, x.own)}`);
+    if (x.gw >= 0.01) { const r = await t.depositFor(x.gw.toFixed(2), account(x.r).address); console.log(`${x.r.padEnd(12)} Gateway ${x.gw.toFixed(2)}  https://explorer.arc.io/tx/${r.depositTxHash}`); }
+    if (x.own >= 0.01) console.log(`${x.r.padEnd(12)} wallet  ${x.own.toFixed(2)}  https://explorer.arc.io/tx/${await transfer(account(x.r).address, x.own)}`);
   }
   console.log('done. Gateway balances can take a minute to show. Check with: node scripts/wallet.ts status');
   process.exit(0);

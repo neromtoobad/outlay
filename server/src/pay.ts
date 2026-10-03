@@ -290,7 +290,7 @@ const sendInvoice = (d: PayDoc) => mail(d.buyer.email, `Invoice from ${d.seller.
 ]);
 async function sendReceipts(d: PayDoc) {
   const biz = getBiz(d.biz);
-  const tx = d.payTx && !d.payTx.startsWith('demo') ? ` Transaction: https://arcscan.app/tx/${d.payTx}` : '';
+  const tx = d.payTx && !d.payTx.startsWith('demo') ? ` Transaction: https://explorer.arc.io/tx/${d.payTx}` : '';
   if (d.kind === 'invoice') {
     await mail(biz?.email, `Paid: ${d.buyer.name} paid ${d.amountUsd.toFixed(2)} USDC`, [`${d.buyer.name} paid your invoice: ${d.amountUsd.toFixed(2)} USDC. You received ${(d.amountUsd - (d.feeUsd ?? 0)).toFixed(2)} USDC at ${short(d.payee)} after the 0.5% fee.${tx}`, `Your books: ${biz ? deskLink(biz) : link(d)}`]);
     await mail(d.buyer.email, `Receipt from ${d.seller.name}`, [`You paid ${d.seller.name} ${d.amountUsd.toFixed(2)} USDC. Thank you.${tx}`, `Receipt: ${link(d)}`]);
