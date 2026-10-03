@@ -26,7 +26,8 @@
     "hire:bookkeeper": "0x193f61a4e8b78f8796bf23cad51e098c8f024139f980a8f25416f8180322f467",
     "hire:linguist": "0x9ccfc38ae6ae6b3bb441e5952daaeb5c4be9bd2f20525632584910e62193a0de",
     "hire:investigator": "0xaa1d5dd01527dcac49f40fdc5279be42faee69864baac3d49a4c5233689f56f4",
-    "setOwner→boss": "0x4020c9a206135485c11e3386d488b1e10790077af525a73dc58ff82afc4ec5ab"
+    "setOwner→boss": "0x4020c9a206135485c11e3386d488b1e10790077af525a73dc58ff82afc4ec5ab",
+    "deployInvoiceBook": "0xa2d1e20fe3d13ad2fea630ee06065ee2185e1d058f6cb31ad39188da7ce21c34"
   },
   "vault": "0x589e8ec9134777acecb83a9abdf018942ddc9f2b",
   "escrow": "0xde2ca0c975a1f5789f9b79fe578d43ccf417edbd",
@@ -46,5 +47,7 @@
     "linguist": "0xc8b538B194b340d009F8Dd2e47ee4C1E0B3c7ef2",
     "investigator": "0x7E0C1c33FcE6605630c473d4a44255f26463BCB0"
   },
-  "at": "2026-09-29T08:30:41.740Z"
+  "at": "2026-09-29T08:30:41.740Z",
+  "invoiceBook": "0x7b0530865040dc44a9cc90270396d7c5bcac8f93",
+  "invoiceBookBlock": 24066886
 }

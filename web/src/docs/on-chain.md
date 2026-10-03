@@ -11,6 +11,7 @@ order: 3
 |---|---|---|
 | **SynclyVault** | [`{{vault}}`](https://arcscan.app/address/{{vault}}) | The treasury: five buckets (OPERATING, TOOLS, BOND, RESERVE, PROMO) and the CFO's limits |
 | **JobEscrow** | [`{{escrow}}`](https://arcscan.app/address/{{escrow}}) | Paid jobs: pay on acceptance, refund plus bond on rejection |
+| **InvoiceBook** (Syncly Pay) | [`0x7b0530865040dc44a9cc90270396d7c5bcac8f93`](https://arcscan.app/address/0x7b0530865040dc44a9cc90270396d7c5bcac8f93) | Business invoices and bills: payee, amount and document fixed when booked, paid once. |
 
 ## Wallets
 
