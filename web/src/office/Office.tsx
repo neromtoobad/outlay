@@ -23,7 +23,7 @@ type Props = {
 const wait = (ms: number, signal: { stop: boolean }) => new Promise<void>((r) => { const t = setInterval(() => { if (signal.stop) { clearInterval(t); r(); } }, 100); setTimeout(() => { clearInterval(t); r(); }, ms); });
 
 export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, onMode, replayToken, controls = true, onAgentClick, fill = false, fullLink = !fill, soundOnFirstClick = false, onSound }: Props) {
-  const [director, setDirector] = useState(true);
+  const [director, setDirector] = useState(false); // the whole building by default; Director follows the action
   const [sound, setSound] = useState(false);
   const el = useRef<HTMLDivElement>(null);
   const scene = useRef<OfficeScene | null>(null);
@@ -126,7 +126,7 @@ export default function Office({ orderId, team, idleReplayMs = 12000, onFeed, on
       {controls && ready && (
         <div className="office-controls">
           <button className={director ? 'on' : ''} onClick={() => { const v = !director; setDirector(v); scene.current?.setDirector(v); }} title="The camera follows the action">{director ? '● Director' : '○ Director'}</button>
-          <button onClick={() => { setDirector(false); scene.current?.setDirector(false); }} title="See the whole building">Wide</button>
+          <button className={director ? '' : 'on'} onClick={() => { setDirector(false); scene.current?.setDirector(false); }} title="See the whole building">Wide</button>
           <button className={sound ? 'on' : ''} onPointerDown={(e) => e.stopPropagation()} onClick={() => setSoundOn(!sound)} title="Marimba soundtrack and sound effects">{sound ? '♪ Marimba on' : '♪ Marimba off'}</button>
           {fullLink && <Link href="/live" className="office-full" title="Just the office, full screen">⤢ Office only</Link>}
         </div>

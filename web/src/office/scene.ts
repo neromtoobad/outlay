@@ -190,7 +190,7 @@ export class OfficeScene {
   private lift = { y: LANE.ground as number, back: new PIXI.Graphics(), front: new PIXI.Graphics(), busy: Promise.resolve() as Promise<void> };
   private cam: { cx: number; cy: number; w: number } = { cx: SHOTS.wide.cx, cy: SHOTS.wide.cy, w: SHOTS.wide.w };
   private shake = 0;
-  private dir = { on: true, lockUntil: 0, current: 'wide' as ShotName | 'follow', follow: null as Actor | null, lastEvent: 0, pending: [] as { shot: ShotName; hold: number }[] };
+  private dir = { on: false, lockUntil: 0, current: 'wide' as ShotName | 'follow', follow: null as Actor | null, lastEvent: 0, pending: [] as { shot: ShotName; hold: number }[] };
   private tweens = new Set<gsap.core.Animation>();
   private screen!: { rev: PIXI.Text; sub: PIXI.Text; tick: PIXI.Text; clock: PIXI.Text; value: { rev: number } };
   private board!: { title: PIXI.Text; body: PIXI.Text; team: PIXI.Text; c: PIXI.Container };
