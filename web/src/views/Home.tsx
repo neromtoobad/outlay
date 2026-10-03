@@ -23,7 +23,7 @@ function Hero({ stats }: { stats: Stats | null }) {
     const el = media.current;
     if (!el) return;
     const t = clamp(window.scrollY / window.innerHeight);
-    el.style.transform = `scale(${1.04 + t * 0.08}) translateY(${t * 40}px)`;
+    el.style.transform = `scale(${1.04 + t * 0.08})`; // grows from the top edge, so the sign stays in frame
   });
   return (
     <section className="hx">

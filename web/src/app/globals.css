@@ -523,8 +523,9 @@ body:has(.home) .foot { margin-top: var(--gutter); }
 /* ---------- hero: a full-bleed office, shaded for the words */
 .hx { padding: 0 var(--gutter); }
 .hx__panel { position: relative; height: calc(100svh - var(--nav-h) - var(--gutter)); min-height: 620px; max-height: 940px; border-radius: var(--r-xl); overflow: hidden; background: #173A2A; isolation: isolate; }
-.hx__media { position: absolute; inset: 0; transform-origin: 62% 50%; will-change: transform; transform: scale(1.04); }
-.hx__media img { width: 100%; height: 100%; object-fit: cover; object-position: 72% 55%; display: block; }
+/* the sign sits on the picture's top edge, so wide screens crop from the bottom and the zoom grows from the top */
+.hx__media { position: absolute; inset: 0; transform-origin: 62% 0%; will-change: transform; transform: scale(1.04); }
+.hx__media img { width: 100%; height: 100%; object-fit: cover; object-position: 72% 0%; display: block; }
 .hx__shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(9, 28, 19, 0.86) 0%, rgba(9, 28, 19, 0.6) 36%, rgba(9, 28, 19, 0.06) 68%), linear-gradient(0deg, rgba(9, 28, 19, 0.6), transparent 32%); }
 .hx__copy { position: absolute; z-index: 2; left: clamp(22px, 4vw, 60px); top: 50%; transform: translateY(-54%); max-width: 660px; color: #fff; }
 .hx__tag { display: inline-flex; align-items: center; gap: 9px; font: 500 12.5px var(--mono); letter-spacing: .06em; color: var(--on-deep); }
