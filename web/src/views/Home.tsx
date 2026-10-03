@@ -259,6 +259,11 @@ function Money({ stats, cfo }: { stats: Stats | null; cfo: Cfo | null }) {
           <Link href="/docs/the-cfo" className="pill ghost">The CFO's rules <Arrow /></Link>
         </span>
       </Rv>
+      <Rv className="mf__pay" delay={0.25}>
+        <span className="mf__new mono">New</span>
+        <p><b>Syncly Pay.</b> The same rules, for your business's own money: invoices your customers can pay only once, to the right address, and suppliers' bills the Investigator checks before you pay.</p>
+        <Link href="/pay" className="pill dark">Open Syncly Pay <Arrow /></Link>
+      </Rv>
     </section>
   );
 }

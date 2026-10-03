@@ -13,7 +13,7 @@ Tameion asks for AI agents that manage a business's money: the treasury, invoice
 | The brief | In Syncly | Code |
 |---|---|---|
 | **Treasury** | SynclyVault holds the company's USDC in five buckets: operating, tools, bond, reserve and promo. Every 10 minutes the CFO reads the vault, plans the week, puts revenue to work and keeps the reserve above its floor. | [`SynclyVault.sol`](contracts/src/SynclyVault.sol), [`treasury.ts`](server/src/cfo/treasury.ts) |
-| **Invoices** | *Money in:* every order is a fixed-price bill paid into JobEscrow on Arc, released only when the customer accepts (or after 48 h of silence); a rejection refunds it plus a bond the CFO put up. *Money out:* the agents' tool bills, paid per call with x402 and settled on Arc. | [`JobEscrow.sol`](contracts/src/JobEscrow.sol), [`escrow.ts`](server/src/escrow.ts), [`x402.ts`](server/src/x402.ts) |
+| **Invoices** | *Money in:* every order is a fixed-price bill paid into JobEscrow on Arc, released only when the customer accepts (or after 48 h of silence); a rejection refunds it plus a bond the CFO put up. *Money out:* the agents' tool bills, paid per call with x402 and settled on Arc. *A customer's own invoices and bills:* [Syncly Pay](https://hiresyncly.site/pay) books them on InvoiceBook, paid once, straight to the right payee. | [`JobEscrow.sol`](contracts/src/JobEscrow.sol), [`InvoiceBook.sol`](contracts/src/InvoiceBook.sol), [`escrow.ts`](server/src/escrow.ts), [`pay.ts`](server/src/pay.ts), [`x402.ts`](server/src/x402.ts) |
 | **Contractors** | The ten agents are contractors. Each has its own wallet, a weekly allowance set from what it really spends per job, and a top-up from the CFO when it runs low. Their suppliers' payout addresses are pinned per service and screened against the USDC blacklist before anything is signed. | [`treasury.ts`](server/src/cfo/treasury.ts), [`payees.json`](server/src/payees.json) |
 | **Autonomous operations** | The CFO acts alone up to 2 USDC per move, and per bucket pair per week. Anything bigger is a proposal only the owner's wallet can co-sign on-chain. It prices every job, bonds its own quotes, and turns down jobs its team can't afford to finish. No language model touches the money. | [`quote.ts`](server/src/cfo/quote.ts), [`SynclyVault.sol`](contracts/src/SynclyVault.sol) |
 | **Audit trail** | Every CFO decision is hash-chained to the one before and signed by its key, and the hash rides in the vault transaction's `reason` field. Every payment links to its Arc transaction, and each escrow seals the hashes of the agreed terms and of the delivery. The beancount ledger is in the owner's private books. | [`log.ts`](server/src/cfo/log.ts), [/api/cfo](https://hiresyncly.site/api/cfo) |
@@ -146,7 +146,7 @@ The menu comes from research into what small businesses already pay agencies and
 
 - **Circle Gateway (x402 batching):** every agent pays sellers per call from its own Gateway balance, via [`@circle-fin/x402-batching`](https://www.npmjs.com/package/@circle-fin/x402-batching). The vault funds agents by calling `GatewayWallet.depositFor`, and settlement transactions are read back with `getTransferById`.
 - **USDC on Arc:** customer payments, escrow, bonds, the vault, and gas (Arc pays gas in USDC).
-- **Smart contracts on Arc:** SynclyVault and JobEscrow, written in Foundry with 16 tests.
+- **Smart contracts on Arc:** SynclyVault and JobEscrow, and InvoiceBook (Syncly Pay), written in Foundry with 30 tests.
 - **x402 discovery:** sellers were chosen from Circle's x402 discovery API for Arc (2,133 paid endpoints on 30 Sep 2026), and `scripts/preflight.ts` checks each one's payment terms without paying.
 - **Two ways to pay a seller:** Gateway-batched payments from an agent's Gateway balance, and direct EIP-3009 USDC transfers from the agent's own wallet for sellers that only take those (Claude Opus 5 on BlockRun's Arc endpoint), through `@x402/core` with the batch scheme and an exact-scheme fallback. Async sellers (video) are polled with the same signed payment and settle only when the result is ready. `scripts/pay-safety.ts` tests both paths against a fake seller.
 
@@ -157,7 +157,7 @@ The menu comes from research into what small businesses already pay agencies and
 | [`server/`](server) | The company: API (Hono, Node 24 running TypeScript directly), services, x402 payments, the CFO, escrow, the ledger |
 | [`server/assets/reel/`](server/assets/reel) | The motion engine behind Motion Ad: one-shape morph reels with springs, a cursor and a synthesised score, rendered frame by frame in headless Chrome |
 | [`web/`](web) | The site (Next.js 16): hire, job pages, books, the CFO's desk, the office (PixiJS) with a marimba soundtrack |
-| [`contracts/`](contracts) | SynclyVault and JobEscrow, with tests (Foundry) |
+| [`contracts/`](contracts) | SynclyVault, JobEscrow and InvoiceBook, with tests (Foundry) |
 | [`deployments/`](deployments) | Mainnet addresses and deploy transactions |
 | [`assets/`](assets) | The cast (generated with Higgsfield), sliced sprites and the office scene; [`STYLE.md`](assets/STYLE.md) logs every generation credit |
 | [`proto/`](proto) | The day-1 office prototype |
@@ -172,7 +172,7 @@ cd web && npm ci && npm run dev                                    # http://loca
 Tests:
 
 ```bash
-cd contracts && forge test                                   # 16 contract tests
+cd contracts && forge test                                   # 30 contract tests
 cd server && node scripts/pay-safety.ts                      # no double pay, payee pinning (fake local seller)
 anvil --port 8645 &                                          # local chain with a mock USDC at Arc's address
 LOCAL_RPC=http://127.0.0.1:8645 node scripts/escrow-local.ts # deploy contracts, fund a bond pool

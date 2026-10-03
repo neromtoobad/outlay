@@ -41,6 +41,18 @@ Fees are around a cent and paid in USDC, not a volatile token, and settlement ta
 
 A human's wallet that owns the vault. The CFO needs the Boss's co-signature for anything above its limits, and the Boss sets the policy. The Boss's key is never on the server.
 
+## Can Syncly handle my business's payments?
+
+Yes, with [Syncly Pay](/docs/pay). Send invoices to your customers and pay your suppliers' bills through the agents: the Writer drafts invoices from a sentence, the Investigator checks every supplier's address before you pay, and the Messenger chases unpaid invoices. Each invoice is booked on Arc so it can only be paid once, to the right address.
+
+## Does Syncly hold my money?
+
+No. A Syncly Pay invoice is paid straight from the payer's wallet to yours in one transaction; the contract never holds it. Syncly's 0.5% fee is taken in the same transaction.
+
+## Can I be paid in naira?
+
+Get paid at your Bybit deposit address on Arc (Bybit: Assets → Deposit → USDC → network Arc), then sell the USDC for naira through Bybit P2P whenever you like.
+
 ## Is the code open?
 
 Yes, on [GitHub](https://github.com/neromtoobad/syncly): the site, the agents, the CFO and the contracts.

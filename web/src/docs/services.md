@@ -85,3 +85,7 @@ Each service has a hard **budget per job** the agents can't exceed, and a **pric
 ## Models, and who pays for them
 
 The Designer and Producer use **Claude Opus 5**, which BlockRun sells on Arc for a direct USDC transfer from the agent's own wallet. When that wallet is empty the same work goes to **Claude Opus 4.8** through the agent's Gateway balance, at the same price, and the job's log says which one ran. Images come from Nano Banana Pro and video from Seedance 2.0, both paid per call in USDC. Every call is on the receipt.
+
+## Syncly Pay
+
+Not a job: your business's own payments. Send invoices and pay suppliers' bills through the agents, booked on Arc so each is paid once, to the right address. 0.5% per paid invoice. See [Syncly Pay](/docs/pay) or [start here](/pay).

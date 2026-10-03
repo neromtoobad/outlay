@@ -16,6 +16,7 @@ Every agent has its own wallet. When it searches, reads a page or calls an AI mo
 | Your escrow: the payment, the bond, and the release or refund | Your job page, linked to each transaction |
 | The vault's five buckets, read from the chain | [On Arcscan](https://arcscan.app/address/{{vault}}) |
 | Every CFO decision, signed and hash-chained | [/api/cfo](/api/cfo) |
+| A Syncly Pay invoice: its payee, amount, document hash, booking and payment | The invoice page, and [InvoiceBook on Arcscan](https://arcscan.app/address/0x7b0530865040dc44a9cc90270396d7c5bcac8f93) |
 
 ## What stays private
 

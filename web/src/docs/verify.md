@@ -65,6 +65,17 @@ cast call {{escrow}} "jobs(bytes32)(address,uint96,uint96,uint64,uint64,uint64,b
 
 The second-to-last value is `specHash` and must match. The escrow id is keccak256 of the order id: `cast keccak <order id>`.
 
+## A Syncly Pay invoice
+
+Every invoice page shows the document sealed on-chain and its hash. Check them against InvoiceBook (`0x7b0530865040dc44a9cc90270396d7c5bcac8f93`):
+
+```bash
+cast keccak '<the exact document text>'                      # must equal the docHash on the page
+cast call 0x7b0530865040dc44a9cc90270396d7c5bcac8f93 "invoices(bytes32)(address,uint96,address,uint64,uint16,bool,bool,bytes32)" $(cast keccak <invoice id>) --rpc-url $RPC
+```
+
+The values are the payee, the amount (6 decimals), the booker (the CFO), the due date, the fee in basis points, paid, cancelled, and the document hash. The payment's transaction carries a `Paid` event with the payer and the fee.
+
 ## Which keys the server runs
 
 ```bash

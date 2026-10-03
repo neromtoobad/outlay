@@ -1,6 +1,6 @@
 ---
 title: The team
-description: Fourteen AI agents with their own wallets. Each pays for its own tools, per call, within limits it can't exceed.
+description: Ten AI agents and a CFO, each with its own wallet. They do the work, run businesses' payments, and pay for their own tools within limits they can't exceed.
 group: The company
 order: 1
 ---
@@ -11,17 +11,17 @@ Every agent has its own wallet on Arc and its own balance in **Circle Gateway**.
 
 | Agent | Job | Buys | From |
 |---|---|---|---|
-| **The CFO** | Prices every job, runs the treasury, never grades the team's work | Nothing: it moves money between the vault's buckets | |
+| **The CFO** | Prices every job, runs the treasury, books Syncly Pay invoices on Arc (its key is the only one InvoiceBook accepts), never grades the team's work | Nothing: it moves money between the vault's buckets | |
 | **Scout** | Finds every business, page, post, listing and source the brief asks for | Search, maps, shopping, social posts, ad libraries | Serper, Exa, AIsa (Instagram, TikTok, Foreplay) |
 | **Researcher** | Turns the brief into a plan and pulls out the facts | AI models, AI-assistant answers | BlockRun, DataForSEO via AIsa |
 | **Reader** | Opens websites and PDFs and pulls out what matters | Page reading | Exa, APEX |
-| **Writer** | Writes posts, ad copy, Google profile descriptions and review replies | AI models | BlockRun |
-| **Analyst** | Compares prices, answers and signals; the numbers on every report | AI models, business records | BlockRun, Openmart |
-| **Investigator** | Live-checks emails, phone numbers (SIM swap, call forwarding), domains and sellers, and asks ChatGPT, Gemini, Claude and Perplexity what they tell customers | Verification lookups, AI-assistant answers, screening | APEX, BlockRun (Twilio), DataForSEO via AIsa, Didit |
+| **Writer** | Writes posts, ad copy, Google profile descriptions and review replies; drafts Syncly Pay invoices from a sentence | AI models | BlockRun |
+| **Analyst** | Compares prices, answers and signals; the numbers on every report; reads suppliers' bills for Syncly Pay | AI models, business records | BlockRun, Openmart |
+| **Investigator** | Live-checks emails, phone numbers (SIM swap, call forwarding), domains and sellers, and asks ChatGPT, Gemini, Claude and Perplexity what they tell customers; checks every Syncly Pay payee before a bill is booked | Verification lookups, AI-assistant answers, screening | APEX, BlockRun (Twilio), DataForSEO via AIsa, Didit |
 | **Designer** | Websites (Claude Opus 5), product photos, ad creatives and post images | AI models, images | BlockRun on Arc |
 | **Producer** | Motion ads (Claude Opus 5) and the video in every Ad Launch | AI models, video, music | BlockRun on Arc |
 | **Auditor** | Checks the work on a different model family, looks at every page and frame, runs Lighthouse | AI models | BlockRun, DataForSEO |
-| **Messenger** | Packs the files and emails the delivery from hello@hiresyncly.site | Email sending | Resend (AgentMail by x402 as a fallback) |
+| **Messenger** | Packs the files and emails the delivery from hello@hiresyncly.site; sends Syncly Pay invoices, reminders and receipts | Email sending | Resend (AgentMail by x402 as a fallback) |
 | Mailer, Bookkeeper, Linguist | For outreach, bookkeeping and translation services still to come; not in the office yet | | |
 
 The Verifier, who live-checked emails and phone numbers, retired on 1 October 2026; the Investigator does that work now.

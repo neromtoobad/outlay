@@ -48,6 +48,20 @@ Canteen's essay [*Agents and Ledgers in 2026*](https://thecanteenapp.com/analysi
 
 **What we do:** every ledger line points to its job. Every escrow seals the terms (`specHash`) and the delivery (`deliverableHash`) on-chain, so terms, delivery and payment can be matched.
 
+## A business's own payments (Syncly Pay)
+
+[Syncly Pay](/docs/pay) moves a customer business's money, not ours, so it has its own controls, most of them in the [InvoiceBook](https://github.com/neromtoobad/syncly/blob/main/contracts/src/InvoiceBook.sol) contract:
+
+| Risk | Control |
+|---|---|
+| A pay link edited to send the money elsewhere | The payee is fixed on-chain when the invoice is booked; `pay` only transfers to it. |
+| An invoice paid twice | `pay` works once per invoice; a second call reverts. The Investigator also stops a bill that matches one already booked (same document, or same supplier and invoice number) before it is booked at all. |
+| A supplier's "new bank details" scam | Each supplier's payout address is pinned after the first payment. A bill with a different address is stopped until the owner says they called the supplier on a number they already had. |
+| An invoice with no real document | Each invoice's document hash is fixed before any money moves; the pay page shows the document and its hash. |
+| Someone invoicing in a business's name | Only the CFO's key can book, and only after the business confirms its email. A new payout address for an existing business waits for the same confirmation. |
+| A sanctioned address | Every payee is screened against Circle's USDC blacklist. |
+| Rounding | Exact USDC to 6 decimals; the 0.5% fee is floored, in the payee's favour. |
+
 ## Limits the agents can't talk past
 
 | Limit | Enforced by |

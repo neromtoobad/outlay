@@ -40,6 +40,22 @@ curl -N https://hiresyncly.site/api/events
 | `POST /api/orders/:id/retry` | `{ email }` | Try a failed free job again |
 | `POST /api/orders/:id/accept`, `/revise`, `/reject` | `{ email, note? }` | For free jobs only. Paid jobs are decided on-chain from the wallet that paid. |
 
+## Syncly Pay
+
+| Endpoint | Body | Notes |
+|---|---|---|
+| `GET /api/pay/config` | | `mode` (`live`, `demo` or `off`), the InvoiceBook address, USDC |
+| `POST /api/pay/invoices` | `{ business: { name, email, payee }, customer?: { name?, email? }, text? or lines?, due?, token? }` | The Writer drafts lines from `text`. Without the business's desk `token`, it waits for a confirmation by email before it is booked. |
+| `GET /api/pay/invoices/:id` | | The invoice, its sealed document and hash, status, and the booking and payment transactions. No emails. |
+| `POST /api/pay/invoices/:id/sync` | `{ tx? }` | After the payer pays, the server reads the chain (the transaction, or recent `Paid` events) and marks it paid. |
+| `POST /api/pay/business` | `{ name, email, payee }` | Emails the owner a confirmation link that opens their desk |
+| `POST /api/pay/confirm` | `{ b, c }` | The confirmation link: verifies the business and books what was waiting |
+| `GET /api/pay/desk/:token` | | The business's desk: totals, invoices, bills, pinned suppliers. The token is private. |
+| `GET /api/pay/desk/:token/books.csv` | | Every payment in and out, with its Arc transaction |
+| `POST /api/pay/bills` | `{ token, upload, payee? }` | A photo of a supplier's bill (uploaded via `/api/uploads`); the Analyst reads it and the Investigator checks the payee |
+| `POST /api/pay/bills/:id/approve` | `{ token, confirmPayee?, notDuplicate?, payee? }` | Books an approved bill on Arc. A changed payout address or a likely duplicate needs the matching confirmation. |
+| `POST /api/pay/docs/:id/cancel` | `{ token }` | Cancels an unpaid invoice or bill |
+
 ## Example: get a quote
 
 ```bash

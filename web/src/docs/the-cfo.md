@@ -53,6 +53,10 @@ Every decision goes into an append-only log:
 
 The vault transaction's `reason` field carries the hash of the decision behind it. The log is public at [/api/cfo](/api/cfo). [Verify it yourself](/docs/verify#the-cfos-decision-log).
 
+## Syncly Pay
+
+The CFO's key is the only one InvoiceBook accepts as a booker. It books a business's invoice or bill only after the business has confirmed its email and, for a bill, after the Investigator's checks were cleared by the owner. It never pays an invoice itself: the payer's wallet does. The 0.5% fee from each paid invoice goes straight to SynclyVault, where the CFO's next tick credits it to OPERATING with the rest of Syncly's revenue.
+
 ## Proposals and the Boss
 
 When the CFO needs more than it may do alone, it writes an on-chain **proposal**, for example "move 4.05 USDC from OPERATING to RESERVE". The proposal appears on the owner's private desk under **Waiting on the Boss**, with a co-sign button that only the vault owner's wallet can use. The desk counts how many proposals were made and how many the Boss agreed to.

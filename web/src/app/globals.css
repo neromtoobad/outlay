@@ -969,3 +969,7 @@ label.check input { margin-top: 3px; }
 .payee-full { display: grid; gap: 4px; padding: 4px 0 12px; border-bottom: 1px dashed var(--line-2); margin-bottom: 4px; }
 .payee-full .lbl { font-size: 13.5px; color: var(--muted); }
 .payee-full .mono { font-size: 13px; word-break: break-all; color: var(--ink); }
+.mf__pay { margin-top: 14px; display: flex; align-items: center; gap: 16px 22px; flex-wrap: wrap; padding: 18px 22px; border-radius: 18px; background: #fff; border: 1px solid var(--line); }
+.mf__pay p { flex: 1 1 380px; font-size: 15px; line-height: 1.55; color: var(--ink-2); }
+.mf__pay b { color: var(--ink); }
+.mf__new { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding: 5px 9px; border-radius: 999px; background: var(--accent); color: var(--ink); }
