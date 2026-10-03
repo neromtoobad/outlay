@@ -15,7 +15,7 @@ Canteen's essay [*Agents and Ledgers in 2026*](https://thecanteenapp.com/analysi
 
 - Each seller's payout address is **pinned per service** in [`payees.json`](https://github.com/neromtoobad/syncly/blob/main/server/src/payees.json), which is reviewed in git. A new service is pinned on its first payment.
 - If a seller asks to be paid at a different address, the payment is **refused before anything is signed** and the refusal goes into the CFO's log for review.
-- Every payee, and every customer wallet before an escrow opens, is **screened against Circle's USDC blacklist**.
+- Every payee, and every customer wallet before an escrow opens, is **screened against Circle's USDC blacklist**. Every address we or a Pay business deal with is **re-screened daily**, and **one hop out**: the other side of every USDC transfer they make or receive on Arc is screened too.
 - An escrow's customer is fixed when it opens, and only that wallet can receive a refund or a bond.
 
 ## Paying twice
@@ -59,7 +59,8 @@ Canteen's essay [*Agents and Ledgers in 2026*](https://thecanteenapp.com/analysi
 | A supplier's "new bank details" scam | Each supplier's payout address is pinned after the first payment. A bill with a different address is stopped until the owner says they called the supplier on a number they already had. |
 | An invoice with no real document | Each invoice's document hash is fixed before any money moves; the pay page shows the document and its hash. |
 | Someone invoicing in a business's name | Only the CFO's key can book, and only after the business confirms its email. A new payout address for an existing business waits for the same confirmation. |
-| A sanctioned address | Every payee is screened against Circle's USDC blacklist. |
+| A sanctioned address | Every payee is screened against Circle's USDC blacklist when it's checked, again every day, and one hop out (whoever it trades with on Arc). A hit stops payments to it. |
+| An agent paying bills on its own | Autopay runs from the business's own PayVault account: the contract lets the CFO pay only suppliers the owner approved, under the owner's per-bill and weekly caps, and only booked invoices. Anything else is a proposal the owner approves from their wallet. The desk offers a supplier for autopay only after the owner has paid it once. |
 | Rounding | Exact USDC to 6 decimals; the 0.5% fee is floored, in the payee's favour. |
 
 ## Limits the agents can't talk past
@@ -71,5 +72,8 @@ Canteen's essay [*Agents and Ledgers in 2026*](https://thecanteenapp.com/analysi
 | CFO moves at most 2 USDC alone | The SynclyVault contract (`maxMove`) |
 | Weekly tool budget, reserve floor, bond cover | The SynclyVault contract |
 | Only the customer accepts or rejects | The JobEscrow contract |
+| Autopay only to approved suppliers, under per-bill and weekly caps | The PayVault contract |
+| Only a business's owner withdraws its autopay money or changes its rules | The PayVault contract |
+| A mid-week re-plan stays inside the weekly tool budget | The SynclyVault contract (`setAllowance`) |
 
 > **Honest limit** The payment code's checks run on our server. The contract limits apply to the vault and the escrow, not to what an agent may spend from its own Gateway balance once topped up. That is why top-ups are small and weekly.

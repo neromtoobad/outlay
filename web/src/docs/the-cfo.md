@@ -29,7 +29,14 @@ Every 10 minutes, and 30 seconds after any job is accepted, delivered, failed or
 2. **Plans the week.** Each agent's allowance is its measured spend per job times the jobs expected (at least 5 a week), scaled to fit the vault's weekly tool budget. **The plan's hash is sealed on-chain (`openEpoch`) before any money moves.**
 3. **Puts revenue to work**, in order: TOOLS for the week's remaining allowances, then BOND up to 3 USDC of cover, then RESERVE up to its floor. The rest stays in OPERATING.
 4. **Tops up** any agent that can afford fewer than 2 of its jobs, to about 5 jobs' worth, within its allowance.
-5. **Escalates** to the Boss when it can't act: the TOOLS bucket is empty, it is low on gas, or an agent has used its whole allowance.
+5. **Re-plans mid-week** when an agent has used its whole allowance and is running low: it gives that agent more, first from the week's unplanned budget, then from allowance that fully stocked agents won't need. `setAllowance` still enforces the weekly tool budget on-chain, so a re-plan can never spend more in a week than the Boss allowed.
+6. **Escalates** to the Boss when it can't act: the TOOLS bucket is empty, it is low on gas, or the week's whole budget is used.
+
+New money in the vault is acted on within a minute: a watcher reads the vault's USDC balance every minute and runs the loop when it grows.
+
+## Funding the team
+
+The Boss doesn't split money between agents by hand. They send USDC to the vault (the owner's desk has a **Fund the team** box, or any wallet can send USDC on Arc to the vault's address), and the CFO does the rest: credits it to OPERATING, moves what the week's allowances need into TOOLS, and tops each agent up from its plan, all inside the limits below.
 
 ## What it can't do
 
@@ -55,7 +62,7 @@ The vault transaction's `reason` field carries the hash of the decision behind i
 
 ## Syncly Pay
 
-The CFO's key is the only one InvoiceBook accepts as a booker. It books a business's invoice or bill only after the business has confirmed its email and, for a bill, after the Investigator's checks were cleared by the owner. It never pays an invoice itself: the payer's wallet does. The 0.5% fee from each paid invoice goes straight to SynclyVault, where the CFO's next tick credits it to OPERATING with the rest of Syncly's revenue.
+The CFO's key is the only one InvoiceBook accepts as a booker. It books a business's invoice or bill only after the business has confirmed its email and, for a bill, after the Investigator's checks were cleared by the owner. It pays a bill itself only through [autopay](/docs/pay#autopay-inside-limits-you-set), from the business's own PayVault account, to a supplier the owner approved, under the owner's caps; the PayVault contract enforces each of those. Outside them it can only propose, and the owner decides from their wallet. It also re-screens every address Pay businesses deal with each day, and emails each business a report every Monday. The 0.5% fee from each paid invoice goes straight to SynclyVault, where the CFO's next tick credits it to OPERATING with the rest of Syncly's revenue.
 
 ## Proposals and the Boss
 

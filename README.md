@@ -12,11 +12,12 @@ Tameion asks for AI agents that manage a business's money: the treasury, invoice
 
 | The brief | In Syncly | Code |
 |---|---|---|
-| **Treasury** | SynclyVault holds the company's USDC in five buckets: operating, tools, bond, reserve and promo. Every 10 minutes the CFO reads the vault, plans the week, puts revenue to work and keeps the reserve above its floor. | [`SynclyVault.sol`](contracts/src/SynclyVault.sol), [`treasury.ts`](server/src/cfo/treasury.ts) |
-| **Invoices** | *Money in:* every order is a fixed-price bill paid into JobEscrow on Arc, released only when the customer accepts (or after 48 h of silence); a rejection refunds it plus a bond the CFO put up. *Money out:* the agents' tool bills, paid per call with x402 and settled on Arc. *A customer's own invoices and bills:* [Syncly Pay](https://hiresyncly.site/pay) books them on InvoiceBook, paid once, straight to the right payee. | [`JobEscrow.sol`](contracts/src/JobEscrow.sol), [`InvoiceBook.sol`](contracts/src/InvoiceBook.sol), [`escrow.ts`](server/src/escrow.ts), [`pay.ts`](server/src/pay.ts), [`x402.ts`](server/src/x402.ts) |
-| **Contractors** | The ten agents are contractors. Each has its own wallet, a weekly allowance set from what it really spends per job, and a top-up from the CFO when it runs low. Their suppliers' payout addresses are pinned per service and screened against the USDC blacklist before anything is signed. | [`treasury.ts`](server/src/cfo/treasury.ts), [`payees.json`](server/src/payees.json) |
-| **Autonomous operations** | The CFO acts alone up to 2 USDC per move, and per bucket pair per week. Anything bigger is a proposal only the owner's wallet can co-sign on-chain. It prices every job, bonds its own quotes, and turns down jobs its team can't afford to finish. No language model touches the money. | [`quote.ts`](server/src/cfo/quote.ts), [`SynclyVault.sol`](contracts/src/SynclyVault.sol) |
-| **Audit trail** | Every CFO decision is hash-chained to the one before and signed by its key, and the hash rides in the vault transaction's `reason` field. Every payment links to its Arc transaction, and each escrow seals the hashes of the agreed terms and of the delivery. The beancount ledger is in the owner's private books. | [`log.ts`](server/src/cfo/log.ts), [/api/cfo](https://hiresyncly.site/api/cfo) |
+| **Treasury** | SynclyVault holds the company's USDC in five buckets: operating, tools, bond, reserve and promo. Every 10 minutes (and within a minute of new money landing) the CFO reads the vault, plans the week, re-plans mid-week when an agent runs dry, puts revenue to work and keeps the reserve above its floor. The owner funds the team by sending USDC to the vault; nobody splits money by hand. | [`SynclyVault.sol`](contracts/src/SynclyVault.sol), [`treasury.ts`](server/src/cfo/treasury.ts) |
+| **AP / AR** | *Syncly's own:* every order is a fixed-price bill paid into JobEscrow, released only when the customer accepts; the agents' tool bills are paid per call with x402 and settled on Arc. *A customer business's:* [Syncly Pay](https://hiresyncly.site/pay) books its invoices and supplier bills on InvoiceBook (paid once, straight to the booked payee), chases what it's owed, pays approved suppliers by itself from the business's own PayVault account, and emails it a CFO's report every Monday. | [`JobEscrow.sol`](contracts/src/JobEscrow.sol), [`InvoiceBook.sol`](contracts/src/InvoiceBook.sol), [`PayVault.sol`](contracts/src/PayVault.sol), [`pay.ts`](server/src/pay.ts), [`x402.ts`](server/src/x402.ts) |
+| **Contractor & vendor network** | The ten agents are contractors: each has its own wallet, a weekly allowance set from what it really spends per job, and top-ups from the CFO. Their vendors' payout addresses are pinned per service; a Pay business's suppliers are pinned after the first payment, and a changed address is stopped. | [`treasury.ts`](server/src/cfo/treasury.ts), [`payees.json`](server/src/payees.json), [`pay.ts`](server/src/pay.ts) |
+| **Autonomous operator** | The CFO acts alone, inside limits contracts enforce: at most 2 USDC per vault move, a 3 USDC weekly tool budget, and for a Pay business only its approved suppliers under its own per-bill and weekly caps. Anything beyond is an on-chain proposal a human approves from their wallet. No language model touches the money. | [`SynclyVault.sol`](contracts/src/SynclyVault.sol), [`PayVault.sol`](contracts/src/PayVault.sol), [`quote.ts`](server/src/cfo/quote.ts) |
+| **Compliance intelligence** | Every address we or a Pay business deal with (suppliers, payers, tool vendors) is re-screened daily against Circle's USDC blacklist, and watched one hop out: the other side of every USDC transfer they make on Arc is screened too. A hit stops payments or holds autopay for a person. | [`screen.ts`](server/src/screen.ts), [`payees.ts`](server/src/payees.ts) |
+| **Audit trail** | Every CFO decision is hash-chained to the one before and signed by its key, and the hash rides in the vault transaction's `reason` field. Every payment links to its Arc transaction; each escrow and invoice seals the hash of its document. | [`log.ts`](server/src/cfo/log.ts), [/api/cfo](https://hiresyncly.site/api/cfo) |
 
 ## Syncly Pay: the agents run a business's own payments
 
@@ -25,6 +26,9 @@ Syncly's CFO doesn't only run Syncly's money. [**Syncly Pay**](https://hiresyncl
 - **Invoices.** The business types *"Ada, 2 party trays at ₦25,000 each, due Friday"*; the Writer turns it into an invoice, the CFO books it on Arc, and the Messenger emails a pay link and chases it. The customer pays straight to the business's address (a Bybit Arc deposit address works, so it can be cashed out to naira).
 - **Bills.** The business uploads a photo of a supplier's invoice; the Analyst reads it, and the Investigator checks the payee before anything is booked: Circle's USDC blacklist, **a payout address that changed since the last bill** (the classic invoice fraud), duplicates, unusual amounts. The business approves, then pays from its wallet.
 - **[`InvoiceBook.sol`](contracts/src/InvoiceBook.sol)** fixes each invoice's payee, exact amount and document hash when it's booked, then lets it be paid once, straight from payer to payee: no wrong payee, no double pay, no phantom invoice, no rounding. Only the CFO's key can book, after the business confirms its email. 0.5% per paid invoice goes to SynclyVault. 14 tests.
+- **Autopay, inside the owner's limits.** The business puts USDC in its own [`PayVault`](contracts/src/PayVault.sol) account and sets the rules from its wallet: which suppliers, the most per bill, the most per week. The CFO pays approved suppliers' bills on their due dates by itself; the contract re-checks every rule on every payment. Outside them it can only propose on-chain, and the owner approves from their wallet. Only the owner can withdraw. 12 tests.
+- **Screening, daily and one hop out.** Suppliers, payers and the business's own address are re-checked every day against Circle's USDC blacklist, and the other side of every USDC transfer they make on Arc is screened too. A hit stops payment or holds autopay.
+- **A CFO's report every Monday:** the week's money in and out, overdue invoices, a 7-day cash forecast, whether autopay covers next week's bills (and how much to add), and what's waiting for the owner.
 
 ## Try it (for judges)
 
@@ -34,6 +38,7 @@ Syncly's CFO doesn't only run Syncly's money. [**Syncly Pay**](https://hiresyncl
 4. **Check a receipt.** Job #1 ([ord_mulrvp33_0603](https://hiresyncly.site/job/ord_mulrvp33_0603)) found 9 restaurants with 5 x402 payments, each linked to its settlement on Arc ([0xb76f18…](https://explorer.arc.io/tx/0xb76f1819087eea9c3bbd9886384a44556450a6fa831a1575818165fa0355fe25), [0xc99ba1…](https://explorer.arc.io/tx/0xc99ba105332d26b54c73cc1ba1677e299c9dc632eb3f835e50309a40d41d4fbd)).
 5. **Pay for a job** (needs about 2.05 USDC on Arc in a browser wallet). The page walks through the steps: connect the wallet, the CFO opens the escrow, then approve and fund. On the job page you then accept, revise or reject from the same wallet.
 6. **Watch the office** at [/live](https://hiresyncly.site/live). The agents act out real events: the CFO stamps the quote and walks the brief to the whiteboard, and the Messenger carries the delivery out.
+7. **Run a business's payments** at [/pay](https://hiresyncly.site/pay): send an invoice from one sentence, confirm by email, then on your desk upload a supplier's bill, set up autopay with your own limits, and read the CFO's weekly report.
 
 ## How the money moves
 
@@ -59,8 +64,11 @@ Every 10 minutes, and soon after any job is accepted, delivered or refunded, the
 2. **Plans the week.** Each agent's allowance is its measured spend per job times the jobs expected, scaled to fit the vault's weekly tool budget. The plan's hash is sealed on-chain (`openEpoch`) before any money moves.
 3. **Puts revenue to work**, in order: TOOLS for the week's remaining allowances, then BOND up to 3 USDC of cover, then RESERVE up to its floor. The rest stays in OPERATING.
 4. **Tops up** any agent that can afford fewer than two of its jobs, to about five jobs' worth, within its allowance.
-5. **Escalates** when it can't act: TOOLS is empty, its gas is low, or a move exceeds what it may do alone.
-6. **Writes every decision down**: what it saw, the rule that fired, the amount and the transaction.
+5. **Re-plans mid-week** when an agent has used its whole allowance and is running low: more from the week's unplanned budget, then from allowance fully stocked agents won't need. The vault's `setAllowance` still enforces the weekly budget, so a re-plan can't overspend the week.
+6. **Escalates** when it can't act: TOOLS is empty, its gas is low, or a move exceeds what it may do alone.
+7. **Writes every decision down**: what it saw, the rule that fired, the amount and the transaction.
+
+New money in the vault is acted on within a minute. The owner funds the team by sending USDC to the vault (the **Fund the team** box on the books page), and the CFO credits it, moves what the week needs into TOOLS and tops the agents up.
 
 It also prices every job ([`server/src/cfo/quote.ts`](server/src/cfo/quote.ts)). The cost comes from the median measured cost. p(accept) comes from a Beta(4,1) prior updated with the service's acceptance history. The bond is 10–30% of the price, higher when confidence is higher, and capped by what the BOND bucket can cover. Every service is priced at 1 or 2 USDC on purpose (traction over profit), so the CFO takes a job unless it is expected to lose more than 2 USDC. Every number is on the quote, which only the owner sees in full.
 
@@ -79,12 +87,20 @@ Canteen's [essay](https://thecanteenapp.com/analysis/2026/09/12/agents-and-ledge
 
 | Failure | Control in Syncly |
 |---|---|
-| Paying the wrong party (commission) | Each seller's payout address is pinned per service in [`payees.json`](server/src/payees.json), which is reviewed in git. A changed payee is refused before anything is signed and logged for review. Payees and customer wallets are screened against Circle's USDC blacklist. The escrow's payee is fixed when it opens. |
+| Paying the wrong party (commission) | Each seller's payout address is pinned per service in [`payees.json`](server/src/payees.json), which is reviewed in git. A changed payee is refused before anything is signed and logged for review. The escrow's payee is fixed when it opens. For a Pay business, see below. |
 | Paying twice after a timeout | If a call fails after the payment was signed, the seller may already have taken it, so it is not retried. It is retried only when the seller says it declined. Tested in [`scripts/pay-safety.ts`](server/scripts/pay-safety.ts). |
 | Recording a payment that never happened | A receipt is written only after a paid call succeeds, and each is linked to the Arc settlement transaction Circle Gateway produced: a record from outside our own books. |
 | Rounding 6 decimals down to 2 | The ledger keeps 6 decimals and refuses an unbalanced entry. There is no silent round-off account. |
 | Releasing money on a model's confidence | The customer's wallet accepts or rejects. The CFO's rules are deterministic, and models only produce the work and check it. |
 | An entry with no document behind it | Every ledger line points to its job. Each escrow seals the hash of the agreed terms (`specHash`) and of the delivery (`deliverableHash`) on-chain, so terms, delivery and payment can be matched. |
+
+**Paying the wrong party, answered in layers.** The essay's hardest case is the one the chain can't catch: it confirms you paid exactly whom you chose. So Syncly makes choosing the wrong payee hard at every step, each enforced somewhere an agent can't argue with:
+
+1. **A human approves the first payment** to any supplier. After that its address is pinned to it.
+2. **A changed payout address is a stop**, not a warning: the owner must say they called the supplier on a number they already had. ("New bank details" is the classic invoice fraud.)
+3. **The payee is fixed on-chain when the invoice is booked** (InvoiceBook), so an edited link or a forged message can't redirect the money.
+4. **The agent can only autopay addresses the owner approved** from their own wallet (PayVault), under the owner's caps.
+5. **Every address is re-screened daily and one hop out**, so a supplier that turns bad after the first payment is caught before the next one.
 
 **Why beancount:** the ledger is written in [beancount](https://github.com/beancount/beancount) format, kept in the owner's private books. Precision is declared in the entry itself, not hidden in a column type, and a human can read what the agent wrote.
 
@@ -146,7 +162,7 @@ The menu comes from research into what small businesses already pay agencies and
 
 - **Circle Gateway (x402 batching):** every agent pays sellers per call from its own Gateway balance, via [`@circle-fin/x402-batching`](https://www.npmjs.com/package/@circle-fin/x402-batching). The vault funds agents by calling `GatewayWallet.depositFor`, and settlement transactions are read back with `getTransferById`.
 - **USDC on Arc:** customer payments, escrow, bonds, the vault, and gas (Arc pays gas in USDC).
-- **Smart contracts on Arc:** SynclyVault and JobEscrow, and InvoiceBook (Syncly Pay), written in Foundry with 30 tests.
+- **Smart contracts on Arc:** SynclyVault and JobEscrow, and InvoiceBook and PayVault (Syncly Pay), written in Foundry with 42 tests.
 - **x402 discovery:** sellers were chosen from Circle's x402 discovery API for Arc (2,133 paid endpoints on 30 Sep 2026), and `scripts/preflight.ts` checks each one's payment terms without paying.
 - **Two ways to pay a seller:** Gateway-batched payments from an agent's Gateway balance, and direct EIP-3009 USDC transfers from the agent's own wallet for sellers that only take those (Claude Opus 5 on BlockRun's Arc endpoint), through `@x402/core` with the batch scheme and an exact-scheme fallback. Async sellers (video) are polled with the same signed payment and settle only when the result is ready. `scripts/pay-safety.ts` tests both paths against a fake seller.
 
@@ -157,7 +173,7 @@ The menu comes from research into what small businesses already pay agencies and
 | [`server/`](server) | The company: API (Hono, Node 24 running TypeScript directly), services, x402 payments, the CFO, escrow, the ledger |
 | [`server/assets/reel/`](server/assets/reel) | The motion engine behind Motion Ad: one-shape morph reels with springs, a cursor and a synthesised score, rendered frame by frame in headless Chrome |
 | [`web/`](web) | The site (Next.js 16): hire, job pages, books, the CFO's desk, the office (PixiJS) with a marimba soundtrack |
-| [`contracts/`](contracts) | SynclyVault, JobEscrow and InvoiceBook, with tests (Foundry) |
+| [`contracts/`](contracts) | SynclyVault, JobEscrow, InvoiceBook and PayVault, with tests (Foundry) |
 | [`deployments/`](deployments) | Mainnet addresses and deploy transactions |
 | [`assets/`](assets) | The cast (generated with Higgsfield), sliced sprites and the office scene; [`STYLE.md`](assets/STYLE.md) logs every generation credit |
 | [`proto/`](proto) | The day-1 office prototype |
