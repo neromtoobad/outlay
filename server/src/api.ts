@@ -19,7 +19,7 @@ import { escrowConfig, refreshBondFree } from './escrow.ts';
 import { MODE as CFO_MODE, POLICY as CFO_POLICY, freshSnapshot, startTreasury, teamShortfall } from './cfo/treasury.ts';
 import { decisions as cfoDecisions, verifyLog } from './cfo/log.ts';
 import { tractionReport } from './traction.ts';
-import { approveBill, booksCsv, cancelDoc, confirmBusiness, createBill, createInvoice, desk, getDoc, payConfig, payTick, payWatchlist, publicDoc, registerBusiness, syncPaid } from './pay.ts';
+import { approveBill, booksCsv, cancelDoc, confirmBusiness, createBill, createInvoice, desk, getDoc, payConfig, payTick, payWatchlist, publicDoc, registerBusiness, reportFor, syncPaid } from './pay.ts';
 import { vendorPayees } from './payees.ts';
 import { startScreening } from './screen.ts';
 import { books, beancount, team } from './books.ts';
@@ -285,6 +285,11 @@ app.post('/api/pay/business', async (c) => {
 });
 app.post('/api/pay/confirm', async (c) => { const b = await c.req.json().catch(() => ({} as any)); try { return c.json(await confirmBusiness(String(b.b ?? ''), String(b.c ?? ''))); } catch (e) { return fail(c, e); } });
 app.get('/api/pay/desk/:token', async (c) => { try { return c.json(await desk(c.req.param('token'))); } catch (e) { return fail(c, e, 404); } });
+app.get('/api/pay/desk/:token/report', async (c) => { try { return c.json(await reportFor(c.req.param('token'))); } catch (e) { return fail(c, e, 404); } });
+app.post('/api/pay/desk/:token/report', async (c) => {
+  if (!payAllowed(c, 6)) return c.json({ error: 'Too many requests from here in the last hour. Try again later.' }, 429);
+  try { return c.json(await reportFor(c.req.param('token'), true)); } catch (e) { return fail(c, e); }
+});
 app.get('/api/pay/desk/:token/books.csv', async (c) => {
   try { const csv = await booksCsv(c.req.param('token')); c.header('content-type', 'text/csv; charset=utf-8'); c.header('content-disposition', 'attachment; filename="syncly-pay-books.csv"'); return c.body(csv); } catch (e) { return fail(c, e, 404); }
 });

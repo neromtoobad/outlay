@@ -52,7 +52,7 @@ export const payConfig = () => ({ mode: payMode(), book: BOOK ?? null, vault: VA
 export type Flag = { level: 'ok' | 'warn' | 'stop'; text: string; override?: 'payee' | 'duplicate' };
 export type Line = { what: string; qty: number; unitUsd: number };
 type Supplier = { name: string; payee: Address; paid: number; totalUsd: number; lastPaidAt?: string };
-export type Business = { id: string; name: string; email: string; payee: Address; pendingPayee?: Address; token: string; verified: boolean; code?: string; createdAt: string; suppliers: Record<string, Supplier> };
+export type Business = { id: string; name: string; email: string; payee: Address; pendingPayee?: Address; token: string; verified: boolean; code?: string; createdAt: string; suppliers: Record<string, Supplier>; lastReportAt?: string; lastReportAsked?: string };
 export type PayDoc = {
   id: string; key: Hex; kind: 'invoice' | 'bill'; biz: string;
   seller: { name: string; email?: string }; // who gets paid
@@ -470,6 +470,10 @@ export function cancelDoc(id: string, token: string) {
 
 // ---------------------------------------------------------------- the business's desk and books
 
+/** Every address a business deals with: its own payout address, its suppliers, who paid it, and payees on open bills. */
+const dealsWith = (b: Business, docs: PayDoc[]) => [b.payee, ...Object.values(b.suppliers).map((s) => s.payee), ...docs.filter((d) => d.kind === 'invoice' && d.payer).map((d) => d.payer!), ...docs.filter((d) => d.kind === 'bill' && ['review', 'open'].includes(d.status)).map((d) => d.payee)]
+  .filter((a, i, xs) => xs.findIndex((x) => x.toLowerCase() === a.toLowerCase()) === i);
+
 export async function desk(token: string) {
   const b = bizByToken(token);
   if (!b) throw new Error('This link is not valid.');
@@ -482,7 +486,7 @@ export async function desk(token: string) {
     biz: bizKey(b.id),
     docs: docs.map((d) => ({ ...publicDoc(d), buyer: d.buyer, seller: d.seller, upload: d.upload })),
     mode: payMode(),
-    screening: screeningSummary([b.payee, ...Object.values(b.suppliers).map((s) => s.payee), ...docs.filter((d) => d.kind === 'invoice' && d.payer).map((d) => d.payer!), ...docs.filter((d) => d.kind === 'bill' && ['review', 'open'].includes(d.status)).map((d) => d.payee)].filter((a, i, all) => all.findIndex((x) => x.toLowerCase() === a.toLowerCase()) === i)),
+    screening: screeningSummary(dealsWith(b, docs)),
     autopay: VAULT ? await (async () => {
       const account = await vaultAccount(b.id).catch(() => null);
       const allowed: Record<string, boolean> = {};
@@ -491,6 +495,72 @@ export async function desk(token: string) {
     })() : null,
   };
 }
+// ---------------------------------------------------------------- the CFO's weekly report
+
+const money = (n: number) => n.toFixed(2);
+const dueAt = (d: PayDoc) => (d.due ? Date.parse(`${d.due}T23:59:59Z`) : undefined);
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** Everything a small business's CFO would tell it on a Monday: the week's money, who owes, what's due, and whether autopay can cover it. */
+export async function weeklyReport(b: Business) {
+  const now = Date.now(), weekAgo = now - 7 * 86400_000, ahead = now + 7 * 86400_000;
+  const docs = all<PayDoc>('docs').filter((d) => d.biz === b.id);
+  const sum = (xs: PayDoc[]) => usd(xs.reduce((t, d) => t + d.amountUsd, 0));
+  const inWeek = docs.filter((d) => d.kind === 'invoice' && d.status === 'paid' && Date.parse(d.paidAt ?? '') > weekAgo);
+  const outWeek = docs.filter((d) => d.kind === 'bill' && d.status === 'paid' && Date.parse(d.paidAt ?? '') > weekAgo);
+  const overdue = docs.filter((d) => d.kind === 'invoice' && d.status === 'open' && (dueAt(d) ?? Infinity) < now).sort((x, y) => dueAt(x)! - dueAt(y)!);
+  const comingIn = docs.filter((d) => d.kind === 'invoice' && d.status === 'open' && (dueAt(d) ?? now) >= now && (dueAt(d) ?? now) <= ahead);
+  const goingOut = docs.filter((d) => d.kind === 'bill' && ['open', 'review'].includes(d.status) && (dueAt(d) ?? now) <= ahead);
+  const waiting = docs.filter((d) => d.kind === 'bill' && d.status === 'open' && d.autopay?.state === 'proposed');
+  const acct = await vaultAccount(b.id).catch(() => null);
+  const autopaid = outWeek.filter((d) => d.autopay?.state === 'paid').length;
+  const net = usd(sum(inWeek) - sum(outWeek)), fwd = usd(sum(comingIn) - sum(goingOut));
+  const fees = usd(inWeek.reduce((t, d) => t + (d.feeUsd ?? 0), 0));
+  const lines: string[] = [
+    `Hi ${b.name}, here is your week in Syncly Pay, from your CFO.`,
+    `Last 7 days: ${money(sum(inWeek))} USDC in from ${plural(inWeek.length, 'invoice')}, ${money(sum(outWeek))} USDC out on ${plural(outWeek.length, 'bill')}${autopaid ? ` (${autopaid} paid by autopay)` : ''}. Net ${net >= 0 ? '+' : '−'}${money(Math.abs(net))} USDC.`,
+  ];
+  if (overdue.length) lines.push(`Overdue: ${overdue.slice(0, 5).map((d) => `${d.buyer.name} owes ${money(d.amountUsd)} USDC, ${Math.max(1, Math.floor((now - dueAt(d)!) / 86400_000))} days late`).join('; ')}${overdue.length > 5 ? `, and ${overdue.length - 5} more` : ''}. The Messenger has been reminding them; a call from you usually works faster.`);
+  lines.push(`Next 7 days: ${money(sum(comingIn))} USDC due in from ${plural(comingIn.length, 'invoice')} and ${money(sum(goingOut))} USDC due out on ${plural(goingOut.length, 'bill')}, so ${fwd >= 0 ? '+' : '−'}${money(Math.abs(fwd))} USDC if everyone pays on time.`);
+  if (acct) {
+    const inRules = goingOut.filter((d) => d.status === 'open' && d.autopay?.state !== 'proposed');
+    const need = usd(sum(inRules) - acct.balanceUsd);
+    lines.push(`Autopay holds ${money(acct.balanceUsd)} USDC (at most ${money(acct.perPayCapUsd)} per bill, ${money(acct.weekCapUsd)} a week). ${inRules.length ? (need > 0 ? `The bills it will pay next week come to ${money(sum(inRules))}: add ${money(need)} USDC so none of them waits.` : `That covers the ${money(sum(inRules))} USDC of bills it will pay next week.`) : 'No bills for it to pay next week.'}`);
+  }
+  if (waiting.length) lines.push(`Waiting for you: ${waiting.map((d) => `${d.seller.name}, ${money(d.amountUsd)} USDC (${d.autopay?.reason})`).join('; ')}. Approve or cancel on your desk.`);
+  const scr = screeningSummary(dealsWith(b, docs));
+  lines.push(scr.findings.length ? `Screening found ${plural(scr.findings.length, 'problem')}: ${scr.findings.map((f) => f.text).join(' ')}` : `Screening: everyone you paid or were paid by is checked daily against Circle's USDC blacklist. Nothing found.`);
+  if (fees > 0) lines.push(`Syncly's fee this week: ${money(fees)} USDC (0.5% of what you were paid).`);
+  lines.push(`Your desk, with every invoice, bill and on-chain receipt: ${deskLink(b)}`);
+  const subject = `Your week: ${net >= 0 ? '+' : '−'}${money(Math.abs(net))} USDC${overdue.length ? `, ${plural(overdue.length, 'invoice')} overdue` : ''}${waiting.length ? `, ${waiting.length} waiting for you` : ''}`;
+  return { subject, lines, figures: { in: sum(inWeek), out: sum(outWeek), net, overdue: overdue.length, comingIn: sum(comingIn), goingOut: sum(goingOut), waiting: waiting.length, findings: scr.findings.length } };
+}
+
+async function sendReport(b: Business, why: 'weekly' | 'asked') {
+  if (MAILER !== 'resend') throw new Error("Email isn't switched on here yet.");
+  const r = await weeklyReport(b);
+  await mail(b.email, r.subject, r.lines);
+  b[why === 'weekly' ? 'lastReportAt' : 'lastReportAsked'] = new Date().toISOString(); write('biz', b);
+  await record({ kind: 'report', summary: `Sent ${b.name} its ${why === 'weekly' ? 'weekly' : 'requested'} report: ${money(r.figures.in)} in, ${money(r.figures.out)} out${r.figures.overdue ? `, ${r.figures.overdue} overdue` : ''}${r.figures.waiting ? `, ${r.figures.waiting} waiting for it` : ''}.`, rule: 'every Pay business hears from its CFO each Monday', inputs: { business: b.name, ...r.figures }, key: `report:${b.id}:${new Date().toISOString().slice(0, 10)}`, status: 'done' });
+  return r;
+}
+/** The desk previews this week's report, and can have it emailed now (once an hour). */
+export async function reportFor(token: string, send = false) {
+  const b = bizByToken(token);
+  if (!b || !b.verified) throw new Error('This link is not valid.');
+  if (!send) return weeklyReport(b);
+  if (b.lastReportAsked && Date.now() - Date.parse(b.lastReportAsked) < 3600_000) throw new Error('Sent within the last hour. Check your inbox (and spam).');
+  return sendReport(b, 'asked');
+}
+/** Monday 07:00 UTC (08:00 in Lagos): each business with any activity gets its week. */
+async function weeklyReports() {
+  const d = new Date(), slot = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - ((d.getUTCDay() + 6) % 7), 7));
+  if (Date.now() < slot.getTime() || Date.now() - slot.getTime() > 24 * 3600_000 || MAILER !== 'resend') return; // Mondays only
+  const active = new Set(all<PayDoc>('docs').map((x) => x.biz));
+  for (const b of all<Business>('biz').filter((x) => x.verified && active.has(x.id) && Date.parse(x.lastReportAt ?? '1970') < slot.getTime())) {
+    await sendReport(b, 'weekly').catch((e) => console.error(`report ${b.id}: ${e?.message ?? e}`));
+  }
+}
+
 export async function booksCsv(token: string) {
   const { docs } = await desk(token);
   const q = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
@@ -533,5 +603,6 @@ export async function payTick() {
         await mail(d.buyer.email, `${stage === 'late' ? 'Overdue' : stage === 'due' ? 'Due today' : 'Due tomorrow'}: ${d.seller.name}, ${d.amountUsd.toFixed(2)} USDC`, [`Hi ${d.buyer.name}, a reminder that ${d.seller.name}'s invoice for ${d.amountUsd.toFixed(2)} USDC ${stage === 'late' ? `was due on ${d.due}` : stage === 'due' ? 'is due today' : 'is due tomorrow'}.`, `Pay it here: ${link(d)}`]).catch(() => {});
       }
     }
+    await weeklyReports();
   } finally { ticking = false; }
 }

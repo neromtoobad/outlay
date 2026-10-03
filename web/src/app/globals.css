@@ -984,3 +984,5 @@ label.check input { margin-top: 3px; }
 .fundrow input { width: 120px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-variant-numeric: tabular-nums; }
 .fundbox .ok { font-size: 13.5px; color: var(--green, #2E7A38); }
 .screenbox.alert { border-color: #ecd9ae; background: #fffaf0; }
+.report p { font-size: 14.5px; color: var(--ink-2); margin: 0 0 10px; line-height: 1.55; }
+.report__subj { font-weight: 650; font-size: 16px; margin: 4px 0 12px; }

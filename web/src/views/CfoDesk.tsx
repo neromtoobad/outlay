@@ -19,7 +19,7 @@ type Cfo = {
 const KIND: Record<string, string> = {
   epoch: 'Weekly plan', allowance: 'Allowance', 'top-up': 'Top-up', move: 'Move', propose: 'Asked the Boss', escalate: 'Escalated',
   hold: 'Held', 'payee-pinned': 'Payee pinned', 'payee-refused': 'Payment refused', 'screen-refused': 'Screened out',
-  autopay: 'Autopaid a bill', 'pay-propose': 'Asked a business', screen: 'Screening',
+  autopay: 'Autopaid a bill', 'pay-propose': 'Asked a business', screen: 'Screening', report: 'Weekly report',
 };
 const STATUS: Record<string, string> = { done: 'done', 'would-do': 'would do', escalated: 'to the Boss', refused: 'refused', failed: 'failed' };
 

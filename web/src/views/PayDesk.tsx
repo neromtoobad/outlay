@@ -89,6 +89,29 @@ function Upload({ token, onAdded }: { token: string; onAdded: () => void }) {
   );
 }
 
+/** The CFO's Monday email, previewed here; it can be sent now too. */
+function Report({ token }: { token: string }) {
+  const { data: r } = useApi<{ subject: string; lines: string[] }>(`/api/pay/desk/${token}/report`);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!r) return null;
+  async function send() {
+    setBusy(true); setMsg(null);
+    try { await api(`/api/pay/desk/${token}/report`, { method: 'POST' }); setMsg('Sent. Check your inbox (and spam).'); } catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <div className="card pad report" style={{ marginTop: 20 }}>
+      <h3 className="t">Your CFO's weekly report <small>emailed every Monday morning</small></h3>
+      <div className="report__subj">{r.subject}</div>
+      {r.lines.slice(1, -1).map((l, i) => <p key={i}>{l}</p>)}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button className="btn secondary sm" disabled={busy} onClick={send}>{busy ? 'Sending…' : 'Email it to me now'}</button>
+        {msg && <span className="muted" style={{ fontSize: 13.5 }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
 /** Compliance: who this business pays and is paid by, re-screened daily and watched one hop out. */
 function Screening({ s }: { s: Desk['screening'] }) {
   if (!s) return null;
@@ -226,6 +249,7 @@ export default function PayDesk({ token }: { token: string }) {
       </div>
       {desk.autopay && <div style={{ marginTop: 20 }}><Autopay desk={desk} onChange={load} /></div>}
       <Screening s={desk.screening} />
+      <Report token={token} />
       {review.length > 0 && (
         <section style={{ marginTop: 26, display: 'grid', gap: 14 }}>
           <h2 className="paysect">Bills to approve</h2>
