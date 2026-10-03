@@ -8,6 +8,11 @@ const config: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   compress: false, // keep Server-Sent Events from being buffered through the proxy
   images: { unoptimized: true },
+  // The office art and sprites change rarely: browsers keep them a day and refresh them in the background after that.
+  async headers() {
+    const keep = [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }];
+    return [{ source: '/sprites/:path*', headers: keep }, { source: '/scene/:path*', headers: keep }];
+  },
   async rewrites() {
     return [
       { source: '/api/:path*', destination: `${API}/api/:path*` },

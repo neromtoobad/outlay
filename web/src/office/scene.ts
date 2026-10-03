@@ -66,10 +66,18 @@ type ShotName = keyof typeof SHOTS;
 const css = (v: string, fb: string) => (typeof document !== 'undefined' && getComputedStyle(document.documentElement).getPropertyValue(v).trim()) || fb;
 
 type Frames = { meta: any; tex: PIXI.Texture[] };
+/** A character's frames: one packed WebP per character (tools/sprites/atlas.mjs), or the single PNGs if there is no atlas. */
+const atlasOf = (id: string) => fetch(`/sprites/${id}/${id}.atlas.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+async function loadTextures(id: string, meta: any, atlas: any): Promise<PIXI.Texture[]> {
+  if (atlas) {
+    const sheet: PIXI.Texture = await PIXI.Assets.load(`/sprites/${id}/${atlas.image}`);
+    return atlas.rects.map(([x, y, w, h]: number[]) => new PIXI.Texture({ source: sheet.source, frame: new PIXI.Rectangle(x, y, w, h) }));
+  }
+  return Promise.all(meta.frames.map((f: any) => PIXI.Assets.load(`/sprites/${id}/${f.file}`)));
+}
 async function loadFrames(id: string): Promise<Frames> {
-  const meta = await (await fetch(`/sprites/${id}/${id}.json`)).json();
-  const tex = await Promise.all(meta.frames.map((f: any) => PIXI.Assets.load(`/sprites/${id}/${f.file}`)));
-  return { meta, tex };
+  const [meta, atlas] = await Promise.all([fetch(`/sprites/${id}/${id}.json`).then((r) => r.json()), atlasOf(id)]);
+  return { meta, tex: await loadTextures(id, meta, atlas) };
 }
 /** A side-view walk cycle (frames face RIGHT), scaled to the character's standing height. */
 type Cycle = { tex: PIXI.Texture[]; anchorX: number; k: number; dist: number };
@@ -79,9 +87,9 @@ const CYCLE_SHEETS = new Set(['cfo-walk', 'auditor-walk', 'messenger-walk', 'mes
 async function loadCycle(id: string, base: Frames): Promise<Cycle | undefined> {
   if (!CYCLE_SHEETS.has(id)) return undefined;
   try {
-    const r = await fetch(`/sprites/${id}/${id}.json`); if (!r.ok) return undefined;
+    const [r, atlas] = await Promise.all([fetch(`/sprites/${id}/${id}.json`), atlasOf(id)]); if (!r.ok) return undefined;
     const meta = await r.json();
-    const tex = await Promise.all(meta.frames.map((f: any) => PIXI.Assets.load(`/sprites/${id}/${f.file}`)));
+    const tex = await loadTextures(id, meta, atlas);
     const hc = meta.frames.reduce((a: number, f: any) => a + bboxH(f), 0) / meta.frames.length;
     return { tex, anchorX: meta.anchor.x, k: bboxH(base.meta.frames[0]) / hc, dist: STEP * (CYCLE_STEPS[id] ?? 2) };
   } catch { return undefined; }
@@ -216,11 +224,22 @@ export class OfficeScene {
     return t;
   }
   private wait(ms: number) { return new Promise<void>((r) => { const t = gsap.delayedCall(ms / 1000, () => { this.tweens.delete(t); if (!this.destroyed) r(); }); this.tweens.add(t); }); }
-  private crop(x0: number, y0: number, x1: number, y1: number) {
+  private crops: { s: PIXI.Sprite; r: [number, number, number, number] }[] = [];
+  private cropTex(x0: number, y0: number, x1: number, y1: number) {
     const k = this.bgTex.width / WW;
-    const t = new PIXI.Texture({ source: this.bgTex.source, frame: new PIXI.Rectangle(x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k) });
-    const s = new PIXI.Sprite(t); s.position.set(x0, y0); s.width = x1 - x0; s.height = y1 - y0;
+    return new PIXI.Texture({ source: this.bgTex.source, frame: new PIXI.Rectangle(x0 * k, y0 * k, (x1 - x0) * k, (y1 - y0) * k) });
+  }
+  private crop(x0: number, y0: number, x1: number, y1: number) {
+    const s = new PIXI.Sprite(this.cropTex(x0, y0, x1, y1)); s.position.set(x0, y0); s.width = x1 - x0; s.height = y1 - y0;
+    this.crops.push({ s, r: [x0, y0, x1, y1] });
     return s;
+  }
+  /** Swap in a sharper copy of the building (and everything cut from it) once it has loaded. */
+  private upgradeBackground(tex: PIXI.Texture, bg: PIXI.Sprite) {
+    if (this.destroyed) return;
+    this.bgTex = tex;
+    bg.texture = tex; bg.width = WW; bg.height = WH;
+    for (const { s, r } of this.crops) { s.texture = this.cropTex(...r); s.width = r[2] - r[0]; s.height = r[3] - r[1]; }
   }
   private radial(size: number, stops: [number, string][]) {
     const c = document.createElement('canvas'); c.width = c.height = size;
@@ -239,13 +258,13 @@ export class OfficeScene {
     this.app.canvas.style.display = 'block';
     el.appendChild(this.app.canvas);
 
+    // First paint needs only the light building and each character's packed frames. The sharp building and
+    // the walk sheets load afterwards, while the office is already on screen.
     const ids = [...SEATS, 'cfo'];
-    const [bgTex, ...chars] = await Promise.all([PIXI.Assets.load(small ? '/scene/building-1920.webp' : '/scene/building.webp'), ...ids.map(loadFrames)]);
+    const [bgTex, ...chars] = await Promise.all([PIXI.Assets.load('/scene/building-1920.webp'), ...ids.map(loadFrames)]);
     if (this.destroyed) return;
     this.bgTex = bgTex as PIXI.Texture;
     const byId = Object.fromEntries(ids.map((id, i) => [id, chars[i] as Frames]));
-    const cycles = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, { walk: await loadCycle(`${id}-walk`, byId[id]), carry: await loadCycle(`${id}-carry`, byId[id]) }] as const)));
-    if (this.destroyed) return;
 
     const bg = new PIXI.Sprite(this.bgTex); bg.width = WW; bg.height = WH;
     this.lane.sortableChildren = true;
@@ -279,7 +298,6 @@ export class OfficeScene {
     SEATS.forEach((id, i) => {
       const a = new Actor(id, byId[id], WF, LAPTOP_X[i] + 4, SEAT_Y, SEATED);
       a.home = { x: DESK_X[i], laptop: LAPTOP_X[i] };
-      a.cycles = cycles[id];
       a.mode = 'seat';
       a.last = 'at their desk';
       this.seats.addChild(a.root);
@@ -291,7 +309,7 @@ export class OfficeScene {
       this.laptopGlow.set(id, glow);
     });
     const cfo = new Actor('cfo', byId.cfo, CF, CFO_SPOT.x, CFO_SPOT.y, CFO_SCALE);
-    cfo.mode = 'behind'; cfo.last = 'watching the vault'; cfo.cycles = cycles.cfo;
+    cfo.mode = 'behind'; cfo.last = 'watching the vault';
     this.seats.addChild(cfo.root);
     this.actors.set('cfo', cfo);
     cfo.root.on('pointertap', () => this.onAgentClick?.('cfo'));
@@ -301,6 +319,15 @@ export class OfficeScene {
     this.ro.observe(el);
 
     this.app.ticker.add(() => this.tick());
+
+    // Until its walk sheet arrives, an agent walks with its pose frames.
+    for (const id of ids) {
+      void Promise.all([loadCycle(`${id}-walk`, byId[id]), loadCycle(`${id}-carry`, byId[id])]).then(([walk, carry]) => {
+        const a = this.actors.get(id);
+        if (a && !this.destroyed) a.cycles = { walk, carry };
+      });
+    }
+    if (!small) void PIXI.Assets.load('/scene/building.webp').then((t: PIXI.Texture) => this.upgradeBackground(t, bg)).catch(() => {});
   }
 
   private buildAmbient() {
