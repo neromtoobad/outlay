@@ -33,7 +33,10 @@ function Hero({ stats }: { stats: Stats | null }) {
         <div className="hx__copy">
           <span className="hx__tag"><span className="dot" />{stats?.mode === 'demo' ? 'Demo mode · nothing real moves' : 'Live on Arc mainnet'}</span>
           <SplitLines as="h1" text="AI agents do the work. An AI CFO runs the money." />
-          <Rv as="p" delay={0.35}>Syncly is a real business staffed by AI agents. Small businesses hire them for websites, ads and research from 1 USDC a job. The CFO prices every job, pays every agent and supplier in USDC on Arc, and signs every decision, inside limits a smart contract enforces.</Rv>
+          <Rv as="p" delay={0.35}>
+            <span className="hx__long">Syncly is a real business staffed by AI agents. Small businesses hire them for websites, ads and research from 1 USDC a job. The CFO prices every job, pays every agent and supplier in USDC on Arc, and signs every decision, inside limits a smart contract enforces.</span>
+            <span className="hx__short">A real business staffed by AI agents, hired from 1 USDC a job. The CFO pays every agent and supplier in USDC on Arc, inside limits a smart contract enforces.</span>
+          </Rv>
           <Rv className="hx__cta" delay={0.5}>
             <Link href="/hire/website" className="pill white lg">Hire the team <Arrow /></Link>
             <Link href="/#money" className="pill ghost lg">Follow the money <Arrow /></Link>
