@@ -173,8 +173,19 @@ async function run(o: Order) {
   o.status = 'running';
   saveOrder(o);
   const brief = o.revisionNote ? `${o.brief}\n\nRevision requested by the customer: ${o.revisionNote}` : o.brief;
-  const job = await svc.run(brief, { orderId: o.id, details: o.details });
-  await emailDelivery(job, o); // the Messenger emails the delivery (never fails the job)
+  let job: Awaited<ReturnType<typeof svc.run>>;
+  try {
+    job = await svc.run(brief, { orderId: o.id, details: o.details });
+  } catch (e: any) {
+    // a crash inside a service must not leave the order "running" forever: it fails, and a free job can be retried
+    console.error(`order ${o.id}: ${e?.message ?? e}`);
+    const fresh = getOrder(o.id)!;
+    fresh.status = 'failed';
+    if (fresh.payment?.mode !== 'promo' && !fresh.escrow) fresh.refund = { priceUsd: fresh.quote.priceUsd, bondUsd: fresh.quote.bondUsd, at: new Date().toISOString() };
+    saveOrder(fresh);
+    return;
+  }
+  await emailDelivery(job, o).catch(() => {}); // the Messenger emails the delivery (never fails the job)
   const fresh = getOrder(o.id)!;
   fresh.runs.push(job.id);
   if (job.status === 'delivered') {
@@ -215,6 +226,22 @@ function revise(o: Order, note?: string) {
   saveOrder(o);
   o.status = 'queued';
   void run(o);
+}
+
+/**
+ * A deploy or a crash stops the process mid-job, and the job lived only in memory. At boot, orders that were
+ * paid (or free) and still queued, running or in revision are started again, unless an escrow's delivery
+ * deadline has passed (the contract refunds those).
+ */
+export function resumeInterrupted() {
+  for (const o of listOrders()) {
+    if (o.demo !== DRY || !o.payment || !['queued', 'running', 'revision'].includes(o.status)) continue;
+    if (o.escrow && Date.now() > Date.parse(o.escrow.deliverBy)) continue;
+    console.log(`resuming ${o.id} (${o.service}): the server restarted while it was ${o.status}`);
+    o.status = 'queued';
+    saveOrder(o);
+    void run(o);
+  }
 }
 
 /** A free job we failed to deliver can be run again (paid ones were already refunded + bonded). */

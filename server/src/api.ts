@@ -14,7 +14,7 @@ import { bus, type SynclyEvent } from './bus.ts';
 import { CATALOG, findService } from './services/index.ts';
 import { cleanDetails, detailsBrief, type BusinessDetails } from './details.ts';
 import { MAX_BYTES, allowUpload, readUpload, saveUpload } from './uploads.ts';
-import { autoAcceptDue, createQuote, decide, escrowPending, getOrder, noteForRevision, openEscrow, readJob, replay, retry, start, syncEscrow } from './orders.ts';
+import { autoAcceptDue, createQuote, decide, escrowPending, getOrder, noteForRevision, openEscrow, readJob, replay, resumeInterrupted, retry, start, syncEscrow } from './orders.ts';
 import { escrowConfig, refreshBondFree } from './escrow.ts';
 import { MODE as CFO_MODE, POLICY as CFO_POLICY, freshSnapshot, startTreasury, teamShortfall } from './cfo/treasury.ts';
 import { decisions as cfoDecisions, verifyLog } from './cfo/log.ts';
@@ -316,6 +316,8 @@ app.get('/api/events', (c) =>
 // The web app (web/, Next.js) is its own service and proxies /api here (OUTLAY_API_URL).
 
 setInterval(() => autoAcceptDue(), 60_000);
+// jobs a deploy or crash cut off are picked up again once the server is up
+setTimeout(() => resumeInterrupted(), 5_000);
 // the CFO's side of every open escrow: start funded jobs, submit deliveries, release, refund, cancel
 let ticking = false;
 async function escrowTick() {
