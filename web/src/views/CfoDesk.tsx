@@ -3,7 +3,7 @@
 // decision it made, each signed by the CFO's key and chained to the one before.
 import { useState } from 'react';
 import { api, useApi, usd, timeAgo, Avatar, ROLE_NAME } from '@/lib.tsx';
-import { connect, coSignOnChain, hasWallet, short, txUrl, walletError, type EscrowCfg } from '@/wallet.ts';
+import { connect, coSignOnChain, fundVault, hasWallet, short, txUrl, usdcBalance, walletError, type EscrowCfg } from '@/wallet.ts';
 
 type Decision = { n: number; at: string; kind: string; summary: string; rule: string; inputs: Record<string, unknown>; amount?: number; agent?: string; tx?: string; proposal?: number; status: string; hash: string; sig?: string };
 type Agent = { role: string; balance: number; perJob: number; perJobFrom: string; allowance: number; toppedUp: number };
@@ -11,7 +11,7 @@ type Cfo = {
   enabled: boolean; mode: 'live' | 'observe';
   verify: { ok: boolean; entries: number; signer?: string | null; why?: string };
   metrics: { done: number; escalated: number; refused: number; wouldDo: number; proposed: number; cosigned: number };
-  snapshot: null | { at: string; epoch: number; owner: string; cfoGas: number; jobsPerWeek: number; agents: Agent[]; pending: { id: number; from: string; to: string; amount: number }[]; buckets: Record<string, number> };
+  snapshot: null | { at: string; epoch: number; owner: string; cfoGas: number; jobsPerWeek: number; agents: Agent[]; epochToolBudget: number; epochAllocated: number; maxMove: number; vaultUsdc: number; pending: { id: number; from: string; to: string; amount: number }[]; buckets: Record<string, number> };
   plan: null | { vaultEpoch: number; openedAt: string; jobsPerWeek: number; allowances: Record<string, number>; commit: string };
   decisions: Decision[];
 };
@@ -30,6 +30,7 @@ export default function CfoDesk() {
   const [busy, setBusy] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [all, setAll] = useState(false);
+  const [fund, setFund] = useState({ amount: '10', busy: false, err: null as string | null, done: null as string | null });
   if (!c?.enabled) return null;
   const s = c.snapshot;
 
@@ -42,6 +43,20 @@ export default function CfoDesk() {
       await coSignOnChain(cfg, who, id);
       setData(await api<Cfo>('/api/cfo'));
     } catch (e: any) { setErr(walletError(e)); } finally { setBusy(null); }
+  }
+
+  async function sendToVault() {
+    if (!cfg) return;
+    const n = Number(fund.amount);
+    setFund((f) => ({ ...f, busy: true, err: null, done: null }));
+    try {
+      if (!(n > 0)) throw new Error('Enter an amount in USDC.');
+      const who = await connect(cfg);
+      const have = await usdcBalance(cfg, who);
+      if (have < n) throw new Error(`This wallet has ${usd(have)} USDC on Arc.`);
+      const tx = await fundVault(cfg, who, n);
+      setFund((f) => ({ ...f, busy: false, done: tx }));
+    } catch (e: any) { setFund((f) => ({ ...f, busy: false, err: walletError(e) })); }
   }
 
   const shown = all ? c.decisions : c.decisions.slice(0, 12);
@@ -76,6 +91,22 @@ export default function CfoDesk() {
         </div>
       )}
 
+      {s && cfg && (
+        <div className="fundbox">
+          <div>
+            <b>Fund the team</b>
+            <p className="muted" style={{ fontSize: 13, margin: '4px 0 0' }}>Send USDC to the vault and the CFO does the rest within a minute: credits it to OPERATING, moves what the agents need into TOOLS, and tops each one up from its plan. Nobody splits money by hand, and the vault's limits still hold.</p>
+          </div>
+          <div className="fundrow">
+            <input type="text" inputMode="decimal" value={fund.amount} onChange={(e) => setFund((f) => ({ ...f, amount: e.target.value }))} aria-label="USDC to send" />
+            <button className="btn primary sm" disabled={fund.busy || !hasWallet()} onClick={sendToVault}>{fund.busy ? 'Confirm in your wallet…' : 'Send to the vault'}</button>
+          </div>
+          {fund.err && <div className="error">{fund.err}</div>}
+          {fund.done && <div className="ok">Sent. <a href={txUrl(cfg, fund.done)} target="_blank" rel="noreferrer">Transaction ↗</a> Watch the CFO's log below.</div>}
+          {!hasWallet() && <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Open this page in a wallet browser, or send USDC on Arc to <span className="mono">{cfg.vault}</span>.</p>}
+        </div>
+      )}
+
       {s && (
         <div className="row2" style={{ marginTop: 16 }}>
           <div>
@@ -99,7 +130,7 @@ export default function CfoDesk() {
             <h4 className="subh">This week's plan <small>week {c.plan?.vaultEpoch ?? s.epoch}</small></h4>
             {c.plan ? (
               <>
-                <p style={{ fontSize: 14, color: 'var(--ink-2)', margin: '4px 0 8px' }}>Planned for {c.plan.jobsPerWeek} jobs, {timeAgo(c.plan.openedAt)}.</p>
+                <p style={{ fontSize: 14, color: 'var(--ink-2)', margin: '4px 0 8px' }}>Planned for {c.plan.jobsPerWeek} jobs, {timeAgo(c.plan.openedAt)}. {usd(s.epochAllocated, 2)} of the {usd(s.epochToolBudget, 2)} USDC weekly tool budget is allocated; when an agent runs out mid-week the CFO re-plans inside what's left, and the vault refuses anything past it.</p>
                 <ul className="rules" style={{ fontSize: 14 }}>{Object.entries(c.plan.allowances).map(([r, x]) => <li key={r}><b>{ROLE_NAME[r] ?? r}</b>: {usd(x, 3)} USDC</li>)}</ul>
                 <p className="muted" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>The plan's hash was sealed on-chain (openEpoch) before any money moved: <span className="mono">{c.plan.commit}</span></p>
               </>

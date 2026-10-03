@@ -979,3 +979,7 @@ label.check input { margin-top: 3px; }
 .apstats b { font-size: 20px; font-variant-numeric: tabular-nums; }
 .aprow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .btn.sm { padding: 7px 12px; font-size: 13px; }
+.fundbox { margin-top: 16px; border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; background: #fff; }
+.fundrow { display: flex; gap: 8px; align-items: center; }
+.fundrow input { width: 120px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; font: inherit; font-variant-numeric: tabular-nums; }
+.fundbox .ok { font-size: 13.5px; color: var(--green, #2E7A38); }

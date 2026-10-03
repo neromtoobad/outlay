@@ -288,6 +288,50 @@ export async function tick(reason = 'scheduled') {
       }
     }
 
+    // 2b. Mid-week: an agent that has spent its whole allowance and is running low gets more: first from the
+    //     room left in the week's tool budget, then from allowance that fully stocked agents aren't using.
+    //     The vault enforces the budget (setAllowance reverts past it, and can't go below what an agent was
+    //     already sent), so re-planning never spends more in a week than the Boss allowed; it only stops a
+    //     plan made from last week's guess starving a busy agent while an idle one sits on its allowance.
+    let room = r6(s.epochToolBudget - s.epochAllocated);
+    const funded = r6(s.buckets.tools + s.buckets.operating);
+    const plan2 = new Map(s.agents.map((a) => [a.role, a.allowance]));
+    let replanned = false;
+    for (const a of s.agents) {
+      if (!(a.perJob > 0) || !Number.isFinite(a.balance) || funded < POLICY.dust) continue;
+      const low = a.perJob * POLICY.lowWaterJobs, target = Math.max(POLICY.minFloat, a.perJob * POLICY.jobsAhead);
+      const mine = plan2.get(a.role)!;
+      if (a.balance >= low || r6(mine - a.toppedUp) >= POLICY.dust) continue;
+      const want = r6(target - a.balance);
+      // agents stocked to their target don't need their unused allowance this week
+      const donors = s.agents.filter((d) => d.role !== a.role && Number.isFinite(d.balance) && d.balance >= Math.max(POLICY.minFloat, d.perJob * POLICY.jobsAhead))
+        .map((d) => ({ d, spare: r6(plan2.get(d.role)! - d.toppedUp) })).filter((x) => x.spare >= POLICY.dust).sort((x, y) => y.spare - x.spare);
+      const cuts: { role: Role; address: Address; from: number; to: number }[] = [];
+      let found = Math.min(room, want);
+      for (const { d, spare } of donors) {
+        if (found >= want - 1e-9) break;
+        const cut = r6(Math.min(spare, want - found));
+        cuts.push({ role: d.role, address: d.address, from: plan2.get(d.role)!, to: r6(plan2.get(d.role)! - cut) });
+        found = r6(found + cut);
+      }
+      const raise = r6(found);
+      if (raise < POLICY.dust) continue; // nothing to give this week: step 4 tells the Boss
+      const to = r6(mine + raise), fromRoom = r6(Math.min(room, want));
+      const inputs = { ...seen, role: a.role, balance: a.balance, perJob: a.perJob, perJobFrom: a.perJobFrom, allowance: mine, toppedUp: a.toppedUp, epochToolBudget: s.epochToolBudget, epochAllocated: s.epochAllocated, room, fromRoom, cuts, fundedUsd: funded };
+      const moved = cuts.map((c) => `${usd(r6(c.from - c.to))} of ${c.role}'s unused allowance`).join(' and ');
+      const why = cuts.length ? `; ${cuts.map((c) => c.role).join(' and ')} ${cuts.length === 1 ? 'is' : 'are'} stocked and won't need it this week` : '';
+      const ok = await act({
+        kind: 'allowance', agent: a.role, amount: raise, inputs, rule: "re-plan mid-week inside the vault's weekly tool budget", key: `replan:${a.role}:w${s.epoch}:${Date.now()}`,
+        summary: `Re-planned mid-week: ${a.role} ${mine > 0 ? `used all ${usd(mine)} USDC of its allowance` : 'had no allowance this week'} and has ${usd(a.balance)} left, under two jobs' worth. Gave it ${usd(raise)} more, to ${usd(to)}: ${[fromRoom >= POLICY.dust ? `${usd(fromRoom)} from the budget's unplanned room` : '', moved].filter(Boolean).join(' and ')}${why}. The week stays inside its ${usd(s.epochToolBudget)} USDC budget; the vault refuses anything past it.`,
+        tx: async () => {
+          for (const c of cuts) await cfoWrite(DEP!.vault, VAULT, 'setAllowance', [c.address, atomic(c.to)]); // free the room first
+          return cfoWrite(DEP!.vault, VAULT, 'setAllowance', [a.address, atomic(to)]);
+        },
+      });
+      if (ok) { for (const c of cuts) plan2.set(c.role, c.to); plan2.set(a.role, to); room = r6(room - fromRoom); replanned = true; }
+    }
+    if (replanned) s = last = await observe();
+
     // 3. Put revenue to work, in order: TOOLS for this week's remaining allowances, BOND to its target,
     //    RESERVE to its floor. The rest stays in OPERATING. Alone, the CFO moves at most maxMove per
     //    bucket pair per week; beyond that it proposes and the Boss co-signs. It never splits a move.
@@ -326,7 +370,7 @@ export async function tick(reason = 'scheduled') {
       if (amount >= POLICY.dust) {
         const after = a.balance + amount, jobs = Math.floor(after / a.perJob + 1e-9);
         const capped = amount < want - 1e-9 ? (amount === left ? ', as far as its weekly allowance goes' : ', all that TOOLS holds') : '';
-        await act({ kind: 'top-up', summary: `${a.role} had ${usd(a.balance)} USDC, under two jobs' worth (${usd(low)}). Topped it up by ${usd(amount)} to ${usd(after)}, about ${jobs} jobs' worth${capped}.`, rule: 'keep every agent funded for its next jobs', inputs, key: `topup:${a.role}:${Date.now()}`, amount, agent: a.role, tx: write('topUp', [a.address, atomic(amount), reasonOf({ kind: 'top-up', summary: '', rule: 'keep every agent funded for its next jobs', inputs, key: '', amount, agent: a.role })]) });
+        await act({ kind: 'top-up', summary: `${a.role} had ${usd(a.balance)} USDC, under two jobs' worth (${usd(low)}). Topped it up by ${usd(amount)} to ${usd(after)}, ${jobs < 1 ? "less than one job's worth" : `about ${jobs} job${jobs === 1 ? "'s" : "s'"} worth`}${capped}.`, rule: 'keep every agent funded for its next jobs', inputs, key: `topup:${a.role}:${Date.now()}`, amount, agent: a.role, tx: write('topUp', [a.address, atomic(amount), reasonOf({ kind: 'top-up', summary: '', rule: 'keep every agent funded for its next jobs', inputs, key: '', amount, agent: a.role })]) });
         tools = r6(tools - amount);
       } else if (left < POLICY.dust) {
         await escalate(`allowance:${a.role}:w${s.epoch}`, `${a.role} is low (${usd(a.balance)} USDC) and has used its whole allowance for this week. It waits for next week's plan unless the Boss raises the weekly budget.`, 'never top up past the weekly allowance', inputs);
@@ -345,9 +389,16 @@ export async function tick(reason = 'scheduled') {
 
 /** Tick every few minutes, and soon after money comes in or a job finishes. */
 export function startTreasury() {
-  if (!DEP) return;
+  const dep = DEP;
+  if (!dep) return;
   setTimeout(() => void tick('startup'), 5000);
   setInterval(() => void tick(), POLICY.tickMinutes * 60_000);
+  // Money landing in the vault (the Boss funding the team, revenue released by escrow) is acted on within a minute.
+  setInterval(async () => {
+    if (running || !last) return;
+    const held = u6(await pub.readContract({ address: dep.usdc, abi: ERC20, functionName: 'balanceOf', args: [dep.vault] }).catch(() => atomic(last!.vaultUsdc)));
+    if (held - last.vaultUsdc >= POLICY.dust) void tick(`${usd(r6(held - last.vaultUsdc))} USDC arrived in the vault`);
+  }, 60_000);
   let soon: NodeJS.Timeout | undefined;
   bus.on('event', (e: any) => {
     if (e.type !== 'order' || !['accepted', 'delivered', 'failed', 'rejected'].includes(e.data?.status)) return;

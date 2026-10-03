@@ -9,6 +9,7 @@ const ERC20 = parseAbi([
   'function balanceOf(address) view returns (uint256)',
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 value) returns (bool)',
+  'function transfer(address to, uint256 value) returns (bool)',
 ]);
 const ESCROW = parseAbi([
   'function fund(bytes32 id)',
@@ -166,5 +167,15 @@ export async function coSignOnChain(c: EscrowCfg, who: Address, id: number): Pro
   const hash = await wallet.writeContract({ address: c.vault, abi: VAULT, functionName: 'coSign', args: [BigInt(id)], ...fees(c) });
   const r = await pub.waitForTransactionReceipt({ hash });
   if (r.status !== 'success') throw new Error('The co-sign failed on-chain.');
+  return hash;
+}
+
+/** Send USDC to the company's vault. The CFO credits it to OPERATING and puts it to work inside the vault's limits. */
+export async function fundVault(c: EscrowCfg, who: Address, amountUsd: number): Promise<Hex> {
+  await ensureChain(c);
+  const { pub, wallet } = clients(c, who);
+  const hash = await wallet.writeContract({ address: c.usdc, abi: ERC20, functionName: 'transfer', args: [c.vault, BigInt(Math.round(amountUsd * 1e6))], ...fees(c) });
+  const r = await pub.waitForTransactionReceipt({ hash });
+  if (r.status !== 'success') throw new Error('The transfer failed on-chain.');
   return hash;
 }
