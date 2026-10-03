@@ -17,6 +17,7 @@ import { DEP, cfoWrite, pub } from './escrow.ts';
 import { Job } from './job.ts';
 import { HOSTS, llm, parseJson } from './tools.ts';
 import { blacklisted } from './payees.ts';
+import { findingsFor, screeningSummary, type Watched } from './screen.ts';
 import { MAILER, PUBLIC_URL, resend } from './mail.ts';
 import { readUpload } from './uploads.ts';
 import { record } from './cfo/log.ts';
@@ -130,6 +131,7 @@ async function checkBill(job: Job, biz: Business, d: PayDoc): Promise<Flag[]> {
   job.log('investigator', 'check', `checking the payee ${short(d.payee)} and ${d.seller.name}'s history with ${biz.name}`);
   const flags: Flag[] = [];
   if (await blacklisted(d.payee)) flags.push({ level: 'stop', text: "This address is on Circle's USDC blacklist. Don't pay it." });
+  for (const f of findingsFor(d.payee)) flags.push({ level: f.level, text: `Screening: ${f.text}` });
   const sup = biz.suppliers[key(d.seller.name)];
   if (sup && sup.payee.toLowerCase() !== d.payee.toLowerCase()) {
     flags.push({ level: 'stop', override: 'payee', text: `${d.seller.name}'s payout address changed. You paid ${short(sup.payee)} ${sup.paid} time${sup.paid === 1 ? '' : 's'}; this bill says ${short(d.payee)}. Changed bank or wallet details are the most common invoice fraud: call ${d.seller.name} on a number you already have before paying.` });
@@ -211,7 +213,9 @@ export async function runAutopay(d: PayDoc) {
   const name = biz?.name ?? 'the business';
   const ok = await pub.readContract({ address: VAULT, abi: VAULT_ABI, functionName: 'allowed', args: [bizKey(d.biz), d.payee] });
   const inputs = { business: name, supplier: d.seller.name, amountUsd: d.amountUsd, perPayCapUsd: acct.perPayCapUsd, weekCapUsd: acct.weekCapUsd, spentThisWeekUsd: acct.spentUsd, balanceUsd: acct.balanceUsd, approvedSupplier: ok, invoice: d.id };
-  const reason = !ok ? `${d.seller.name} isn't an approved supplier for autopay`
+  const screened = findingsFor(d.payee);
+  const reason = screened.length ? (screened.some((f) => f.level === 'stop') ? `screening found ${d.seller.name}'s address on a blacklist` : `screening found ${d.seller.name}'s address trading with a blacklisted one`)
+    : !ok ? `${d.seller.name} isn't an approved supplier for autopay`
     : d.amountUsd > acct.perPayCapUsd ? `${d.amountUsd.toFixed(2)} USDC is over the ${acct.perPayCapUsd.toFixed(2)} USDC per-payment cap`
       : acct.spentUsd + d.amountUsd > acct.weekCapUsd ? `it would pass the weekly cap (${acct.spentUsd.toFixed(2)} of ${acct.weekCapUsd.toFixed(2)} USDC used)`
         : undefined;
@@ -478,6 +482,7 @@ export async function desk(token: string) {
     biz: bizKey(b.id),
     docs: docs.map((d) => ({ ...publicDoc(d), buyer: d.buyer, seller: d.seller, upload: d.upload })),
     mode: payMode(),
+    screening: screeningSummary([b.payee, ...Object.values(b.suppliers).map((s) => s.payee), ...docs.filter((d) => d.kind === 'invoice' && d.payer).map((d) => d.payer!), ...docs.filter((d) => d.kind === 'bill' && ['review', 'open'].includes(d.status)).map((d) => d.payee)].filter((a, i, all) => all.findIndex((x) => x.toLowerCase() === a.toLowerCase()) === i)),
     autopay: VAULT ? await (async () => {
       const account = await vaultAccount(b.id).catch(() => null);
       const allowed: Record<string, boolean> = {};
@@ -491,6 +496,20 @@ export async function booksCsv(token: string) {
   const q = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
   const rows = docs.map((d) => [d.createdAt.slice(0, 10), d.kind === 'invoice' ? 'money in' : 'money out', d.kind === 'invoice' ? d.buyer.name : d.seller.name, d.ref ?? d.id, d.amountUsd.toFixed(2), (d.feeUsd ?? 0).toFixed(4), d.status, d.paidAt?.slice(0, 10) ?? '', d.payTx ?? '', d.payee].map(q).join(','));
   return ['date,direction,counterparty,reference,amount_usdc,fee_usdc,status,paid_on,arc_tx,payee', ...rows].join('\n') + '\n';
+}
+
+/** Everyone Pay businesses deal with, for daily screening: their payout addresses, suppliers, payers, and payees on open bills. */
+export function payWatchlist(): Watched[] {
+  const out: Watched[] = [];
+  for (const b of all<Business>('biz').filter((x) => x.verified)) {
+    out.push({ address: b.payee, label: `${b.name}'s payout address`, role: 'business', biz: b.id });
+    for (const s of Object.values(b.suppliers)) out.push({ address: s.payee, label: `${s.name}, supplier to ${b.name},`, role: 'supplier', biz: b.id });
+  }
+  for (const d of all<PayDoc>('docs')) {
+    if (d.kind === 'invoice' && d.payer) out.push({ address: d.payer as Address, label: `${d.buyer.name}, who paid ${d.seller.name},`, role: 'payer', biz: d.biz });
+    if (d.kind === 'bill' && ['review', 'open'].includes(d.status)) out.push({ address: d.payee, label: `${d.seller.name}, on a bill to ${d.buyer.name},`, role: 'supplier', biz: d.biz });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- the tick: payments seen on-chain, reminders

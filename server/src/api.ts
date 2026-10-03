@@ -19,7 +19,9 @@ import { escrowConfig, refreshBondFree } from './escrow.ts';
 import { MODE as CFO_MODE, POLICY as CFO_POLICY, freshSnapshot, startTreasury, teamShortfall } from './cfo/treasury.ts';
 import { decisions as cfoDecisions, verifyLog } from './cfo/log.ts';
 import { tractionReport } from './traction.ts';
-import { approveBill, booksCsv, cancelDoc, confirmBusiness, createBill, createInvoice, desk, getDoc, payConfig, payTick, publicDoc, registerBusiness, syncPaid } from './pay.ts';
+import { approveBill, booksCsv, cancelDoc, confirmBusiness, createBill, createInvoice, desk, getDoc, payConfig, payTick, payWatchlist, publicDoc, registerBusiness, syncPaid } from './pay.ts';
+import { vendorPayees } from './payees.ts';
+import { startScreening } from './screen.ts';
 import { books, beancount, team } from './books.ts';
 import { resolveSettlements } from './settle.ts';
 import { MAILER, MAIL_FROM, resend } from './mail.ts';
@@ -372,6 +374,7 @@ async function escrowTick() {
 }
 setTimeout(escrowTick, 2000);
 startTreasury();
+startScreening(() => [...payWatchlist(), ...vendorPayees()]);
 setInterval(escrowTick, 15_000);
 // link each live receipt to its on-chain settlement once Circle Gateway has batched it
 const settle = () => void resolveSettlements().then((n) => n && console.log(`settled ${n} receipts on Arc`)).catch(() => {});

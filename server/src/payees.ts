@@ -32,6 +32,9 @@ export async function blacklisted(who: string): Promise<boolean> {
   }
 }
 
+/** Every tool vendor's payout address (reviewed in git, or pinned on first use), for daily screening. */
+export const vendorPayees = () => Object.entries({ ...pinned(), ...REVIEWED }).filter(([, a]) => /^0x[0-9a-fA-F]{40}$/.test(a)).map(([service, a]) => ({ address: a as Address, label: `Tool vendor ${service}`, role: 'vendor' as const }));
+
 /** Returns a refusal reason, or undefined when the payee is the one we expect and is not blacklisted. */
 export async function checkPayee(url: string, payTo: string, ctx: { agent: string; vendor: string }): Promise<string | undefined> {
   const service = serviceOf(url);

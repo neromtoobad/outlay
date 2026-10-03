@@ -145,7 +145,7 @@ export default function CfoDesk() {
           <li key={d.n} className={d.status}>
             <div className="dl-top">
               <span className="kind">{KIND[d.kind] ?? d.kind}</span>
-              <span className={`st ${d.status}`}>{d.kind === 'pay-propose' || (d.kind === 'escalate' && (d as { key?: string }).key?.startsWith('autopay')) ? 'to the owner' : STATUS[d.status] ?? d.status}</span>
+              <span className={`st ${d.status}`}>{d.kind === 'pay-propose' || (d.kind === 'escalate' && (d as { key?: string }).key?.startsWith('autopay')) ? 'to the owner' : d.kind === 'screen' && d.status !== 'done' ? (d.status === 'refused' ? 'stopped' : 'flagged') : STATUS[d.status] ?? d.status}</span>
               <span className="when">#{d.n} · {timeAgo(d.at)}</span>
             </div>
             <div className="sum">{d.summary}</div>

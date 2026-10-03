@@ -18,6 +18,7 @@ type Desk = {
   mode: 'live' | 'demo' | 'off';
   biz: Hex;
   autopay: null | { vault: Address; account: VaultAccount | null; allowed: Record<string, boolean> };
+  screening: { at: string | null; checked: number; findings: { address: string; level: 'stop' | 'warn'; text: string; at: string; tx?: string }[] };
 };
 const f2 = (n: number) => n.toFixed(2);
 const ICON: Record<string, string> = { ok: '✓', warn: '!', stop: '✕' };
@@ -84,6 +85,21 @@ function Upload({ token, onAdded }: { token: string; onAdded: () => void }) {
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => go(e.target.files?.[0])} />
       <button className="btn primary block" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Uploading…' : 'Upload a photo of the bill'}</button>
       {err && <div className="error">{err}</div>}
+    </div>
+  );
+}
+
+/** Compliance: who this business pays and is paid by, re-screened daily and watched one hop out. */
+function Screening({ s }: { s: Desk['screening'] }) {
+  if (!s) return null;
+  return (
+    <div className={`card pad screenbox${s.findings.length ? ' alert' : ''}`} style={{ marginTop: 20 }}>
+      <h3 className="t">Screening <small>{s.at ? `last full check ${new Date(s.at).toLocaleString()}` : 'first check within the hour'}</small></h3>
+      {s.findings.length ? (
+        <ul className="checks">{s.findings.map((f, i) => <li key={i} className={f.level}><i>{ICON[f.level]}</i><span>{f.text}{f.tx && <> <a href={`https://explorer.arc.io/tx/${f.tx}`} target="_blank" rel="noreferrer">Transaction ↗</a></>}</span></li>)}</ul>
+      ) : (
+        <p style={{ fontSize: 14, color: 'var(--ink-2)', margin: 0 }}>{s.checked ? `All ${s.checked} address${s.checked === 1 ? '' : 'es'} you pay or get paid by` : 'Everyone you pay or get paid by'} {s.checked === 1 ? 'is' : 'are'} checked every day against Circle’s USDC blacklist, and every USDC transfer they make on Arc is screened one hop out. Nothing found. A hit stops autopay to that address until you decide.</p>
+      )}
     </div>
   );
 }
@@ -209,6 +225,7 @@ export default function PayDesk({ token }: { token: string }) {
         <Upload token={token} onAdded={load} />
       </div>
       {desk.autopay && <div style={{ marginTop: 20 }}><Autopay desk={desk} onChange={load} /></div>}
+      <Screening s={desk.screening} />
       {review.length > 0 && (
         <section style={{ marginTop: 26, display: 'grid', gap: 14 }}>
           <h2 className="paysect">Bills to approve</h2>
