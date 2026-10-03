@@ -115,6 +115,36 @@ export async function payInvoiceOnChain(c: EscrowCfg, who: Address, book: Addres
   return hash;
 }
 
+const PAYVAULT = parseAbi([
+  'function open(bytes32 biz, uint96 perPayCap, uint96 weekCap, address[] payees)',
+  'function deposit(bytes32 biz, uint96 amount)',
+  'function withdraw(bytes32 biz, uint96 amount, address to)',
+  'function setLimits(bytes32 biz, uint96 perPayCap, uint96 weekCap)',
+  'function setPayee(bytes32 biz, address payee, bool ok)',
+  'function approve(bytes32 biz, bytes32 invoice)',
+]);
+export type VaultCall = 'open' | 'deposit' | 'withdraw' | 'setLimits' | 'setPayee' | 'approve';
+/** The business owner's own wallet acts on its PayVault account: setting rules, adding or taking money, approving. */
+export async function vaultWrite(c: EscrowCfg, who: Address, vault: Address, functionName: VaultCall, args: readonly unknown[]): Promise<Hex> {
+  await ensureChain(c);
+  const { pub, wallet } = clients(c, who);
+  const hash = await wallet.writeContract({ address: vault, abi: PAYVAULT, functionName, args, ...fees(c) } as any);
+  const r = await pub.waitForTransactionReceipt({ hash });
+  if (r.status !== 'success') throw new Error(`${functionName} failed on-chain.`);
+  return hash;
+}
+/** Let `spender` take up to `amountUsd` USDC from this wallet (skipped when it already may). */
+export async function approveUsdc(c: EscrowCfg, who: Address, spender: Address, amountUsd: number): Promise<void> {
+  await ensureChain(c);
+  const { pub, wallet } = clients(c, who);
+  const amount = BigInt(Math.round(amountUsd * 1e6));
+  const allowance = await pub.readContract({ address: c.usdc, abi: ERC20, functionName: 'allowance', args: [who, spender] });
+  if (allowance >= amount) return;
+  const h = await wallet.writeContract({ address: c.usdc, abi: ERC20, functionName: 'approve', args: [spender, amount], ...fees(c) });
+  const r = await pub.waitForTransactionReceipt({ hash: h });
+  if (r.status !== 'success') throw new Error('The approval failed on-chain.');
+}
+
 /** The customer's decision, signed by the wallet that paid. */
 export async function decideOnChain(c: EscrowCfg, who: Address, id: Hex, action: 'accept' | 'reject' | 'requestRevision'): Promise<Hex> {
   await ensureChain(c);

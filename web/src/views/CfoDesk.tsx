@@ -19,6 +19,7 @@ type Cfo = {
 const KIND: Record<string, string> = {
   epoch: 'Weekly plan', allowance: 'Allowance', 'top-up': 'Top-up', move: 'Move', propose: 'Asked the Boss', escalate: 'Escalated',
   hold: 'Held', 'payee-pinned': 'Payee pinned', 'payee-refused': 'Payment refused', 'screen-refused': 'Screened out',
+  autopay: 'Autopaid a bill', 'pay-propose': 'Asked a business', screen: 'Screening',
 };
 const STATUS: Record<string, string> = { done: 'done', 'would-do': 'would do', escalated: 'to the Boss', refused: 'refused', failed: 'failed' };
 
@@ -113,7 +114,7 @@ export default function CfoDesk() {
           <li key={d.n} className={d.status}>
             <div className="dl-top">
               <span className="kind">{KIND[d.kind] ?? d.kind}</span>
-              <span className={`st ${d.status}`}>{STATUS[d.status] ?? d.status}</span>
+              <span className={`st ${d.status}`}>{d.kind === 'pay-propose' || (d.kind === 'escalate' && (d as { key?: string }).key?.startsWith('autopay')) ? 'to the owner' : STATUS[d.status] ?? d.status}</span>
               <span className="when">#{d.n} · {timeAgo(d.at)}</span>
             </div>
             <div className="sum">{d.summary}</div>

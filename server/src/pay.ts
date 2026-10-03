@@ -19,6 +19,7 @@ import { HOSTS, llm, parseJson } from './tools.ts';
 import { blacklisted } from './payees.ts';
 import { MAILER, PUBLIC_URL, resend } from './mail.ts';
 import { readUpload } from './uploads.ts';
+import { record } from './cfo/log.ts';
 
 export const NGN_PER_USD = 1330; // shown as an approximation only, like the site
 const BOOK_ABI = parseAbi([
@@ -29,12 +30,21 @@ const BOOK_ABI = parseAbi([
   'event Paid(bytes32 indexed id, address indexed payer, address indexed payee, uint256 amount, uint256 fee)',
 ]);
 const PAID = BOOK_ABI.find((x) => x.type === 'event' && x.name === 'Paid')!;
+const VAULT = (DEP as any)?.payVault as Address | undefined;
+const VAULT_ABI = parseAbi([
+  'function accounts(bytes32) view returns (address owner, uint96 balance, uint96 perPayCap, uint96 weekCap, uint96 spent, uint64 weekStart)',
+  'function allowed(bytes32, address) view returns (bool)',
+  'function autopay(bytes32 biz, bytes32 invoice)',
+  'function propose(bytes32 biz, bytes32 invoice, string reason)',
+]);
+/** A business's id in PayVault. */
+export const bizKey = (bizId: string): Hex => keccak256(toBytes(bizId));
 const BOOK = (DEP as any)?.invoiceBook as Address | undefined;
 const FROM_BLOCK = BigInt((DEP as any)?.invoiceBookBlock ?? 0);
 /** Live when InvoiceBook is deployed; in demo mode the chain is simulated so the flow can be tried. */
 export const payMode = (): 'live' | 'demo' | 'off' => (BOOK ? 'live' : DRY ? 'demo' : 'off');
 /** What the pay page needs to talk to the chain itself (the payer's wallet signs; the server only reads). */
-export const payConfig = () => ({ mode: payMode(), book: BOOK ?? null, usdc: (DEP as any)?.usdc ?? null, chainId: (DEP as any)?.chainId ?? null, ngnPerUsd: NGN_PER_USD });
+export const payConfig = () => ({ mode: payMode(), book: BOOK ?? null, vault: VAULT ?? null, usdc: (DEP as any)?.usdc ?? null, chainId: (DEP as any)?.chainId ?? null, ngnPerUsd: NGN_PER_USD });
 
 // ---------------------------------------------------------------- records
 
@@ -52,6 +62,7 @@ export type PayDoc = {
   checks?: Flag[]; upload?: string; read?: Record<string, unknown>;
   bookTx?: string; payTx?: string; payer?: string; paidAt?: string; feeUsd?: number;
   reminders: string[]; createdAt: string; jobId?: string; error?: string;
+  autopay?: { state: 'scheduled' | 'paid' | 'proposed' | 'waiting-funds'; reason?: string; at?: string; tx?: string };
 };
 
 const dir = (k: 'biz' | 'docs') => { const d = join(DATA_DIR, 'pay', k); mkdirSync(d, { recursive: true }); return d; };
@@ -164,7 +175,66 @@ async function bookOnChain(d: PayDoc) {
   }
   saveDoc(d);
   if (d.status === 'open' && d.kind === 'invoice' && d.buyer.email) await sendInvoice(d).catch(() => {});
+  if (d.status === 'open' && d.kind === 'bill') await planAutopay(d).catch((e) => console.error(`autopay ${d.id}: ${e?.message ?? e}`));
   return d;
+}
+
+// ---------------------------------------------------------------- autopay: the CFO pays inside the owner's on-chain rules
+
+export type VaultAccount = { owner: Address; balanceUsd: number; perPayCapUsd: number; weekCapUsd: number; spentUsd: number; weekEnds: string };
+export async function vaultAccount(bizId: string): Promise<VaultAccount | null> {
+  if (!VAULT) return null;
+  const a = await pub.readContract({ address: VAULT, abi: VAULT_ABI, functionName: 'accounts', args: [bizKey(bizId)] });
+  if (a[0] === '0x0000000000000000000000000000000000000000') return null;
+  const weekEnd = (Number(a[5]) + 7 * 86400) * 1000, rolled = Date.now() >= weekEnd;
+  return { owner: a[0], balanceUsd: Number(a[1]) / 1e6, perPayCapUsd: Number(a[2]) / 1e6, weekCapUsd: Number(a[3]) / 1e6, spentUsd: rolled ? 0 : Number(a[4]) / 1e6, weekEnds: new Date(rolled ? Date.now() + 7 * 86400_000 : weekEnd).toISOString() };
+}
+
+/** A bill was booked for a business with autopay: pay it on its due date, or now if it's due. */
+async function planAutopay(d: PayDoc) {
+  if (!VAULT || !(await vaultAccount(d.biz))) return;
+  const dueAt = d.due ? Date.parse(`${d.due}T00:00:00Z`) : 0;
+  if (dueAt > Date.now()) { d.autopay = { state: 'scheduled', at: d.due }; saveDoc(d); return; }
+  await runAutopay(d);
+}
+
+/**
+ * The CFO's decision for one bill. Inside the rules (an approved supplier, under the per-payment and the
+ * weekly cap, money in the account) it pays from the business's PayVault balance; outside them it can only
+ * propose, and the owner decides from their wallet. Either way the decision is signed into the CFO's log.
+ */
+export async function runAutopay(d: PayDoc) {
+  if (!VAULT || d.status !== 'open' || d.kind !== 'bill') return;
+  const acct = await vaultAccount(d.biz);
+  if (!acct) return;
+  const biz = getBiz(d.biz);
+  const name = biz?.name ?? 'the business';
+  const ok = await pub.readContract({ address: VAULT, abi: VAULT_ABI, functionName: 'allowed', args: [bizKey(d.biz), d.payee] });
+  const inputs = { business: name, supplier: d.seller.name, amountUsd: d.amountUsd, perPayCapUsd: acct.perPayCapUsd, weekCapUsd: acct.weekCapUsd, spentThisWeekUsd: acct.spentUsd, balanceUsd: acct.balanceUsd, approvedSupplier: ok, invoice: d.id };
+  const reason = !ok ? `${d.seller.name} isn't an approved supplier for autopay`
+    : d.amountUsd > acct.perPayCapUsd ? `${d.amountUsd.toFixed(2)} USDC is over the ${acct.perPayCapUsd.toFixed(2)} USDC per-payment cap`
+      : acct.spentUsd + d.amountUsd > acct.weekCapUsd ? `it would pass the weekly cap (${acct.spentUsd.toFixed(2)} of ${acct.weekCapUsd.toFixed(2)} USDC used)`
+        : undefined;
+  if (!reason && d.amountUsd > acct.balanceUsd) {
+    // inside the rules, but the account is short: wait for a top-up (once in the log, then quietly)
+    if (d.autopay?.state !== 'waiting-funds') {
+      d.autopay = { state: 'waiting-funds', reason: `the autopay balance is ${acct.balanceUsd.toFixed(2)} USDC` }; saveDoc(d);
+      await record({ kind: 'escalate', summary: `${name}'s bill from ${d.seller.name} (${d.amountUsd.toFixed(2)} USDC) is due, inside its rules, but its autopay balance is ${acct.balanceUsd.toFixed(2)} USDC. Waiting for a top-up.`, rule: 'never pay more than the business deposited', inputs, key: `autopay-funds:${d.id}`, status: 'escalated' });
+      await mail(biz?.email, `Top up autopay to pay ${d.seller.name}`, [`${d.seller.name}'s bill for ${d.amountUsd.toFixed(2)} USDC is due and inside your autopay rules, but the autopay balance is ${acct.balanceUsd.toFixed(2)} USDC.`, `Add money on your desk: ${biz ? deskLink(biz) : link(d)}`]).catch(() => {});
+    }
+    return;
+  }
+  if (!reason) {
+    const r = await cfoWrite(VAULT, VAULT_ABI, 'autopay', [bizKey(d.biz), d.key]);
+    d.autopay = { state: 'paid', at: new Date().toISOString(), tx: r.hash }; saveDoc(d);
+    await record({ kind: 'autopay', summary: `Paid ${d.seller.name} ${d.amountUsd.toFixed(2)} USDC for ${name} from its autopay balance: an approved supplier, under the ${acct.perPayCapUsd.toFixed(2)} USDC per-payment cap, ${(acct.spentUsd + d.amountUsd).toFixed(2)} of ${acct.weekCapUsd.toFixed(2)} USDC used this week.`, rule: "pay approved suppliers inside the owner's on-chain caps", inputs, key: `autopay:${d.id}`, amount: d.amountUsd, tx: r.hash, status: 'done' });
+    await syncPaid(d, { tx: r.hash });
+    return;
+  }
+  const r = await cfoWrite(VAULT, VAULT_ABI, 'propose', [bizKey(d.biz), d.key, reason]);
+  d.autopay = { state: 'proposed', reason, at: new Date().toISOString(), tx: r.hash }; saveDoc(d);
+  await record({ kind: 'pay-propose', summary: `Asked ${name} to approve paying ${d.seller.name} ${d.amountUsd.toFixed(2)} USDC: ${reason}.`, rule: 'outside the owner\'s rules, the CFO can only propose', inputs, key: `pay-propose:${d.id}`, amount: d.amountUsd, tx: r.hash, status: 'escalated' });
+  await mail(biz?.email, `Approve: ${d.seller.name}, ${d.amountUsd.toFixed(2)} USDC`, [`The CFO didn't pay ${d.seller.name}'s bill automatically because ${reason}.`, `Approve it (or don't) from your wallet on your desk: ${biz ? deskLink(biz) : link(d)}`]).catch(() => {});
 }
 
 /** Read the chain; mark the invoice paid with the payer, fee and transaction. Returns true if it is paid. */
@@ -396,7 +466,7 @@ export function cancelDoc(id: string, token: string) {
 
 // ---------------------------------------------------------------- the business's desk and books
 
-export function desk(token: string) {
+export async function desk(token: string) {
   const b = bizByToken(token);
   if (!b) throw new Error('This link is not valid.');
   const docs = all<PayDoc>('docs').filter((d) => d.biz === b.id).sort((x, y) => y.createdAt.localeCompare(x.createdAt));
@@ -405,12 +475,19 @@ export function desk(token: string) {
     business: { name: b.name, email: b.email, payee: b.payee, verified: b.verified },
     totals: { paidIn: sum('invoice', ['paid']), owedToYou: sum('invoice', ['open']), paidOut: sum('bill', ['paid']), toPay: sum('bill', ['open', 'review']), fees: usd(docs.filter((d) => d.status === 'paid' && d.kind === 'invoice').reduce((a, d) => a + (d.feeUsd ?? 0), 0)) },
     suppliers: Object.values(b.suppliers),
+    biz: bizKey(b.id),
     docs: docs.map((d) => ({ ...publicDoc(d), buyer: d.buyer, seller: d.seller, upload: d.upload })),
     mode: payMode(),
+    autopay: VAULT ? await (async () => {
+      const account = await vaultAccount(b.id).catch(() => null);
+      const allowed: Record<string, boolean> = {};
+      if (account) for (const sp of Object.values(b.suppliers)) allowed[sp.payee] = await pub.readContract({ address: VAULT, abi: VAULT_ABI, functionName: 'allowed', args: [bizKey(b.id), sp.payee] }).catch(() => false);
+      return { vault: VAULT, account, allowed };
+    })() : null,
   };
 }
-export function booksCsv(token: string) {
-  const { docs } = desk(token);
+export async function booksCsv(token: string) {
+  const { docs } = await desk(token);
   const q = (s: unknown) => `"${String(s ?? '').replace(/"/g, '""')}"`;
   const rows = docs.map((d) => [d.createdAt.slice(0, 10), d.kind === 'invoice' ? 'money in' : 'money out', d.kind === 'invoice' ? d.buyer.name : d.seller.name, d.ref ?? d.id, d.amountUsd.toFixed(2), (d.feeUsd ?? 0).toFixed(4), d.status, d.paidAt?.slice(0, 10) ?? '', d.payTx ?? '', d.payee].map(q).join(','));
   return ['date,direction,counterparty,reference,amount_usdc,fee_usdc,status,paid_on,arc_tx,payee', ...rows].join('\n') + '\n';
@@ -425,6 +502,9 @@ export async function payTick() {
   try {
     for (const d of all<PayDoc>('docs').filter((x) => x.status === 'open')) {
       if (BOOK) await syncPaid(d).catch(() => {});
+      if (d.status === 'open' && d.kind === 'bill' && (d.autopay?.state === 'waiting-funds' || (d.autopay?.state === 'scheduled' && (!d.due || Date.parse(`${d.due}T00:00:00Z`) <= Date.now())))) {
+        await runAutopay(d).catch((e) => console.error(`autopay ${d.id}: ${e?.message ?? e}`));
+      }
       if (d.status !== 'open' || d.kind !== 'invoice' || !d.buyer.email || !d.due) continue;
       // the Messenger chases politely: the day before it's due, on the day, and three days late (once each)
       const left = (Date.parse(`${d.due}T23:59:59Z`) - Date.now()) / 86400_000;

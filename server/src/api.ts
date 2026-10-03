@@ -282,9 +282,9 @@ app.post('/api/pay/business', async (c) => {
   try { return c.json(await registerBusiness(await c.req.json())); } catch (e) { return fail(c, e); }
 });
 app.post('/api/pay/confirm', async (c) => { const b = await c.req.json().catch(() => ({} as any)); try { return c.json(await confirmBusiness(String(b.b ?? ''), String(b.c ?? ''))); } catch (e) { return fail(c, e); } });
-app.get('/api/pay/desk/:token', (c) => { try { return c.json(desk(c.req.param('token'))); } catch (e) { return fail(c, e, 404); } });
-app.get('/api/pay/desk/:token/books.csv', (c) => {
-  try { c.header('content-type', 'text/csv; charset=utf-8'); c.header('content-disposition', 'attachment; filename="syncly-pay-books.csv"'); return c.body(booksCsv(c.req.param('token'))); } catch (e) { return fail(c, e, 404); }
+app.get('/api/pay/desk/:token', async (c) => { try { return c.json(await desk(c.req.param('token'))); } catch (e) { return fail(c, e, 404); } });
+app.get('/api/pay/desk/:token/books.csv', async (c) => {
+  try { const csv = await booksCsv(c.req.param('token')); c.header('content-type', 'text/csv; charset=utf-8'); c.header('content-disposition', 'attachment; filename="syncly-pay-books.csv"'); return c.body(csv); } catch (e) { return fail(c, e, 404); }
 });
 app.post('/api/pay/bills', async (c) => {
   if (!payAllowed(c, 20)) return c.json({ error: 'Too many bills from here in the last hour. Try again later.' }, 429);

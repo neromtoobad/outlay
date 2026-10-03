@@ -10,7 +10,8 @@ import { publish } from '../bus.ts';
 
 export type DecisionKind =
   | 'epoch' | 'allowance' | 'top-up' | 'move' | 'propose' | 'escalate' | 'hold'
-  | 'payee-pinned' | 'payee-refused' | 'screen-refused';
+  | 'payee-pinned' | 'payee-refused' | 'screen-refused'
+  | 'autopay' | 'pay-propose' | 'screen'; // Syncly Pay: a business's bills paid inside its own on-chain rules, and payee screening
 export type Decision = {
   n: number;
   at: string;

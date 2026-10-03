@@ -2,18 +2,22 @@
 // A business's Syncly Pay desk (a private link): money in and out, bills to approve, suppliers it has pinned, its books.
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { api, Avatar, ngn } from '@/lib.tsx';
-import { short } from '@/wallet.ts';
+import type { Address, Hex } from 'viem';
+import { api, Avatar, ngn, useApi } from '@/lib.tsx';
+import { approveUsdc, connect, short, vaultWrite, walletError, type EscrowCfg } from '@/wallet.ts';
 import { DESK_KEY } from './Pay.tsx';
 import { STATUS_LABEL, type PayDocView } from './PayInvoice.tsx';
 
-type DeskDoc = PayDocView & { upload?: string };
+type DeskDoc = PayDocView & { upload?: string; autopay?: { state: 'scheduled' | 'paid' | 'proposed' | 'waiting-funds'; reason?: string; at?: string; tx?: string } };
+type VaultAccount = { owner: Address; balanceUsd: number; perPayCapUsd: number; weekCapUsd: number; spentUsd: number; weekEnds: string };
 type Desk = {
   business: { name: string; email: string; payee: string; verified: boolean };
   totals: { paidIn: number; owedToYou: number; paidOut: number; toPay: number; fees: number };
   suppliers: { name: string; payee: string; paid: number; totalUsd: number; lastPaidAt?: string }[];
   docs: DeskDoc[];
   mode: 'live' | 'demo' | 'off';
+  biz: Hex;
+  autopay: null | { vault: Address; account: VaultAccount | null; allowed: Record<string, boolean> };
 };
 const f2 = (n: number) => n.toFixed(2);
 const ICON: Record<string, string> = { ok: '✓', warn: '!', stop: '✕' };
@@ -84,6 +88,92 @@ function Upload({ token, onAdded }: { token: string; onAdded: () => void }) {
   );
 }
 
+/** The business's PayVault account: its rules, its money, and what the CFO is waiting on it for. Every action is the owner's wallet. */
+function Autopay({ desk, onChange }: { desk: Desk; onChange: () => void }) {
+  const { data: esc } = useApi<EscrowCfg | { enabled: false }>('/api/escrow');
+  const cfg = esc && esc.enabled ? esc : null;
+  const ap = desk.autopay!, acct = ap.account;
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [form, setForm] = useState({ perPay: String(acct?.perPayCapUsd ?? 50), week: String(acct?.weekCapUsd ?? 200), add: '50' });
+  const [pick, setPick] = useState<Record<string, boolean>>(() => Object.fromEntries(desk.suppliers.map((s) => [s.payee, true])));
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) => setForm((x) => ({ ...x, [k]: e.target.value }));
+  const u = (x: string) => BigInt(Math.round(Number(x) * 1e6));
+  async function run(label: string, fn: (who: Address) => Promise<unknown>) {
+    setErr(null); setBusy(label);
+    try {
+      if (!cfg) throw new Error('Open this page in your wallet app (OKX, MetaMask, Rabby) to use autopay.');
+      const who = await connect(cfg);
+      if (acct && who.toLowerCase() !== acct.owner.toLowerCase() && label !== 'add') throw new Error(`This is ${short(who)}. Switch to the wallet that owns this account (${short(acct.owner)}).`);
+      await fn(who); onChange();
+    } catch (x: any) { setErr(walletError(x)); } finally { setBusy(null); }
+  }
+  const setup = () => run('setup', async (who) => {
+    const payees = Object.entries(pick).filter(([, v]) => v).map(([k]) => k as Address);
+    await vaultWrite(cfg!, who, ap.vault, 'open', [desk.biz, u(form.perPay), u(form.week), payees]);
+    if (Number(form.add) > 0) { await approveUsdc(cfg!, who, ap.vault, Number(form.add)); await vaultWrite(cfg!, who, ap.vault, 'deposit', [desk.biz, u(form.add)]); }
+  });
+  const add = () => run('add', async (who) => { await approveUsdc(cfg!, who, ap.vault, Number(form.add)); await vaultWrite(cfg!, who, ap.vault, 'deposit', [desk.biz, u(form.add)]); });
+  const withdraw = () => run('withdraw', (who) => vaultWrite(cfg!, who, ap.vault, 'withdraw', [desk.biz, u(String(acct!.balanceUsd)), who]));
+  const limits = () => run('limits', (who) => vaultWrite(cfg!, who, ap.vault, 'setLimits', [desk.biz, u(form.perPay), u(form.week)]));
+  const toggle = (payee: string, ok: boolean) => run(`payee:${payee}`, (who) => vaultWrite(cfg!, who, ap.vault, 'setPayee', [desk.biz, payee, ok]));
+
+  if (!acct) return (
+    <div className="card pad form" style={{ gap: 12 }}>
+      <h3 className="t">Autopay <small>within limits you set, enforced on Arc</small></h3>
+      <p style={{ fontSize: 14, color: 'var(--ink-2)' }}>Put USDC aside for bills. On each due date the CFO pays your approved suppliers by itself, but never more than your caps, and never anyone else. Anything outside your rules waits for you. Only your wallet can take the money out.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
+        <label className="field">Most per bill<input type="text" inputMode="decimal" value={form.perPay} onChange={set('perPay')} /></label>
+        <label className="field">Most per week<input type="text" inputMode="decimal" value={form.week} onChange={set('week')} /></label>
+        <label className="field">Add now<input type="text" inputMode="decimal" value={form.add} onChange={set('add')} /></label>
+      </div>
+      {desk.suppliers.length > 0 ? (
+        <div className="field" style={{ display: 'grid', gap: 6 }}>Suppliers it may pay
+          {desk.suppliers.map((sp) => <label key={sp.payee} className="check"><input type="checkbox" checked={!!pick[sp.payee]} onChange={(e) => setPick((x) => ({ ...x, [sp.payee]: e.target.checked }))} /> {sp.name} <span className="mono muted">{short(sp.payee)}</span></label>)}
+        </div>
+      ) : <p className="muted" style={{ fontSize: 13 }}>Suppliers you pay once are pinned and can then be added here.</p>}
+      {err && <div className="error">{err}</div>}
+      <button className="btn primary block" disabled={!!busy} onClick={setup}>{busy ? 'Confirm in your wallet…' : 'Set up autopay from your wallet'}</button>
+    </div>
+  );
+  const proposals = desk.docs.filter((d) => d.kind === 'bill' && d.status === 'open' && d.autopay?.state === 'proposed');
+  return (
+    <div className="card pad form" style={{ gap: 12 }}>
+      <h3 className="t">Autopay <small>owned by <span className="mono">{short(acct.owner)}</span> · <a href={`https://arcscan.app/address/${ap.vault}`} target="_blank" rel="noreferrer">PayVault ↗</a></small></h3>
+      <div className="apstats">
+        <div><span className="muted">Balance</span><b>{f2(acct.balanceUsd)}</b></div>
+        <div><span className="muted">Per bill</span><b>{f2(acct.perPayCapUsd)}</b></div>
+        <div><span className="muted">This week</span><b>{f2(acct.spentUsd)} / {f2(acct.weekCapUsd)}</b></div>
+      </div>
+      {proposals.map((d) => (
+        <div key={d.id} className="note"><b>Waiting for you:</b> {d.seller.name}, {f2(d.amountUsd)} USDC to <span className="mono">{short(d.payee)}</span>. The CFO didn’t pay it because {d.autopay?.reason}.
+          {d.amountUsd > acct.balanceUsd && <div style={{ marginTop: 6 }}>Add at least {f2(d.amountUsd - acct.balanceUsd)} USDC first, or pay it from the bill’s own page.</div>}
+          <div style={{ marginTop: 8 }}><button className="btn primary" disabled={!!busy || d.amountUsd > acct.balanceUsd} onClick={() => run(`approve:${d.id}`, async (who) => { const tx = await vaultWrite(cfg!, who, ap.vault, 'approve', [desk.biz, d.key]); await api(`/api/pay/invoices/${d.id}/sync`, { method: 'POST', body: JSON.stringify({ tx }) }); })}>Approve and pay from autopay</button></div>
+        </div>
+      ))}
+      {desk.suppliers.length > 0 && (
+        <div style={{ display: 'grid', gap: 6 }}>
+          <b style={{ fontSize: 14 }}>Suppliers it may pay</b>
+          {desk.suppliers.map((sp) => { const on = !!ap.allowed[sp.payee]; return (
+            <div key={sp.payee} className="aprow"><span>{sp.name} <span className="mono muted">{short(sp.payee)}</span></span><button className={`btn ${on ? 'secondary' : 'ghost'} sm`} disabled={!!busy} onClick={() => toggle(sp.payee, !on)}>{on ? 'Approved ✓' : 'Approve'}</button></div>
+          ); })}
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
+        <label className="field">Add USDC<input type="text" inputMode="decimal" value={form.add} onChange={set('add')} /></label>
+        <label className="field">Per bill<input type="text" inputMode="decimal" value={form.perPay} onChange={set('perPay')} /></label>
+        <label className="field">Per week<input type="text" inputMode="decimal" value={form.week} onChange={set('week')} /></label>
+      </div>
+      {err && <div className="error">{err}</div>}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button className="btn primary" disabled={!!busy} onClick={add}>{busy === 'add' ? 'Confirm…' : 'Add money'}</button>
+        <button className="btn secondary" disabled={!!busy} onClick={limits}>{busy === 'limits' ? 'Confirm…' : 'Save limits'}</button>
+        <button className="btn ghost" disabled={!!busy || acct.balanceUsd <= 0} onClick={withdraw}>{busy === 'withdraw' ? 'Confirm…' : 'Withdraw it all'}</button>
+      </div>
+    </div>
+  );
+}
+
 export default function PayDesk({ token }: { token: string }) {
   const [desk, setDesk] = useState<Desk | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -118,6 +208,7 @@ export default function PayDesk({ token }: { token: string }) {
         </div>
         <Upload token={token} onAdded={load} />
       </div>
+      {desk.autopay && <div style={{ marginTop: 20 }}><Autopay desk={desk} onChange={load} /></div>}
       {review.length > 0 && (
         <section style={{ marginTop: 26, display: 'grid', gap: 14 }}>
           <h2 className="paysect">Bills to approve</h2>
@@ -135,7 +226,7 @@ export default function PayDesk({ token }: { token: string }) {
                 <span className={`dir ${d.kind}`}>{d.kind === 'invoice' ? 'In' : 'Out'}</span>
                 <span className="who2"><b>{d.kind === 'invoice' ? d.buyer.name : d.seller.name}</b><small className="muted">{d.ref ?? d.lines[0]?.what ?? ''}</small></span>
                 <span className="amt2">{d.kind === 'invoice' ? '+' : '−'}{f2(d.amountUsd)}</span>
-                <span className={`badge ${d.status === 'paid' ? 'accepted' : d.status === 'open' ? 'delivered' : d.status === 'failed' || d.status === 'cancelled' ? 'failed' : 'running'}`}>{STATUS_LABEL[d.status]}</span>
+                <span className={`badge ${d.status === 'paid' ? 'accepted' : d.status === 'open' ? 'delivered' : d.status === 'failed' || d.status === 'cancelled' ? 'failed' : 'running'}`}>{d.status === 'paid' && d.autopay?.state === 'paid' ? 'Autopaid' : d.status === 'open' && d.autopay?.state === 'scheduled' ? `Autopays ${d.autopay.at ?? ''}` : d.status === 'open' && d.autopay?.state === 'proposed' ? 'Waiting for you' : d.status === 'open' && d.autopay?.state === 'waiting-funds' ? 'Needs a top-up' : STATUS_LABEL[d.status]}</span>
               </Link>
             ))}
           </div>
