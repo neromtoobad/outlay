@@ -919,3 +919,53 @@ body:has(.home) .foot { margin-top: var(--gutter); }
 .savedbiz .muted { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .savedbiz .acts { display: grid; gap: 4px; justify-items: end; font-size: 13px; }
 .morefor { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+/* ---------- Syncly Pay */
+.paygrid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .paygrid { grid-template-columns: minmax(0, 1fr); } }
+.paygrid .paysteps li .avatar { width: 28px; height: 28px; }
+.payrules { margin: 56px 0 96px; }
+.payrules__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+.payrules__grid > div { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+.payrules__grid b { display: block; font-size: 16px; }
+.payrules__grid p { font-size: 14px; color: var(--ink-2); margin-top: 6px; line-height: 1.5; }
+@media (max-width: 900px) { .payrules__grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 560px) { .payrules__grid { grid-template-columns: minmax(0, 1fr); } }
+.invlines { width: 100%; border-collapse: collapse; font-size: 15px; }
+.invlines th { text-align: left; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+.invlines td { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.invlines th:not(:first-child), .invlines td:not(:first-child) { text-align: right; padding-left: 14px; font-variant-numeric: tabular-nums; }
+.invlines tfoot td { font-weight: 650; border-bottom: 0; padding-top: 14px; font-size: 17px; }
+.invlines tfoot small { display: block; font-weight: 400; font-size: 12.5px; }
+.paykpi .v { font-size: 38px; }
+@media (max-width: 900px) { .paykpi { grid-template-columns: 1fr 1fr; } .paykpi > div:nth-child(3) { border-left: 0; } .paykpi > div:nth-child(n+3) { border-top: 1px solid var(--line); } }
+.paysect { font-size: 22px; letter-spacing: -0.02em; margin-bottom: 12px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.paysect small { font-size: 13px; font-weight: 400; letter-spacing: 0; }
+.paylist { overflow: hidden; }
+.payrow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+.payrow:last-child { border-bottom: 0; }
+a.payrow:hover { background: var(--paper); }
+.payrow .dir { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--mono); background: var(--accent-soft); color: var(--accent-ink); }
+.payrow .dir.bill { background: var(--paper-2); color: var(--ink-2); }
+.payrow .who2 { display: grid; min-width: 0; }
+.payrow .who2 b, .payrow .who2 small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.payrow .amt2 { font-variant-numeric: tabular-nums; font-weight: 600; }
+@media (max-width: 560px) { .payrow { grid-template-columns: 36px minmax(0, 1fr) auto; } .payrow .badge { grid-column: 2 / -1; justify-self: start; } }
+.billreview { display: grid; gap: 12px; }
+.billhead { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.billhead b { display: block; font-size: 19px; }
+.billhead .amt { text-align: right; font-size: 26px; font-weight: 650; letter-spacing: -0.02em; }
+.billhead .amt small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.billhead .amt .muted { display: block; font-size: 12.5px; font-weight: 400; }
+.billreview .who, .card .who { display: flex; align-items: center; gap: 10px; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.checks li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; }
+.checks li i { font-style: normal; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; }
+.checks li.ok { background: var(--accent-soft); } .checks li.ok i { background: var(--accent-ink); }
+.checks li.warn { background: var(--amber-soft); } .checks li.warn i { background: #B7791F; }
+.checks li.stop { background: var(--bad-soft); } .checks li.stop i { background: var(--bad); }
+label.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--ink-2); }
+label.check input { margin-top: 3px; }
+.payee-full { display: grid; gap: 4px; padding: 4px 0 12px; border-bottom: 1px dashed var(--line-2); margin-bottom: 4px; }
+.payee-full .lbl { font-size: 13.5px; color: var(--muted); }
+.payee-full .mono { font-size: 13px; word-break: break-all; color: var(--ink); }

@@ -93,6 +93,28 @@ export async function fundEscrow(c: EscrowCfg, who: Address, id: Hex, priceUsd: 
   return hash;
 }
 
+const BOOK = parseAbi(['function pay(bytes32 id)']);
+/** Pay an invoice on InvoiceBook: approve exactly its amount (if needed), then pay it once. Returns the pay transaction. */
+export async function payInvoiceOnChain(c: EscrowCfg, who: Address, book: Address, key: Hex, amountUsd: number, onStep: (s: 'approve' | 'approving' | 'pay' | 'paying') => void): Promise<Hex> {
+  await ensureChain(c);
+  const { pub, wallet } = clients(c, who);
+  const amount = BigInt(Math.round(amountUsd * 1e6));
+  const allowance = await pub.readContract({ address: c.usdc, abi: ERC20, functionName: 'allowance', args: [who, book] });
+  if (allowance < amount) {
+    onStep('approve');
+    const h = await wallet.writeContract({ address: c.usdc, abi: ERC20, functionName: 'approve', args: [book, amount], ...fees(c) });
+    onStep('approving');
+    const r = await pub.waitForTransactionReceipt({ hash: h });
+    if (r.status !== 'success') throw new Error('The approval failed on-chain.');
+  }
+  onStep('pay');
+  const hash = await wallet.writeContract({ address: book, abi: BOOK, functionName: 'pay', args: [key], ...fees(c) });
+  onStep('paying');
+  const r = await pub.waitForTransactionReceipt({ hash });
+  if (r.status !== 'success') throw new Error('The payment failed on-chain. Nothing was taken.');
+  return hash;
+}
+
 /** The customer's decision, signed by the wallet that paid. */
 export async function decideOnChain(c: EscrowCfg, who: Address, id: Hex, action: 'accept' | 'reject' | 'requestRevision'): Promise<Hex> {
   await ensureChain(c);

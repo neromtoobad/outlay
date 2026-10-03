@@ -16,6 +16,7 @@ export default function Footer() {
             <li><Link href="/#team">The team</Link></li>
             <li><Link href="/#cfo">The CFO</Link></li>
             <li><Link href="/#money">Follow the money</Link></li>
+            <li><Link href="/pay">Syncly Pay</Link></li>
             <li><Link href="/#services">Services</Link></li>
             <li><Link href="/office">The office</Link></li>
           </ul>

@@ -18,6 +18,14 @@ Tameion asks for AI agents that manage a business's money: the treasury, invoice
 | **Autonomous operations** | The CFO acts alone up to 2 USDC per move, and per bucket pair per week. Anything bigger is a proposal only the owner's wallet can co-sign on-chain. It prices every job, bonds its own quotes, and turns down jobs its team can't afford to finish. No language model touches the money. | [`quote.ts`](server/src/cfo/quote.ts), [`SynclyVault.sol`](contracts/src/SynclyVault.sol) |
 | **Audit trail** | Every CFO decision is hash-chained to the one before and signed by its key, and the hash rides in the vault transaction's `reason` field. Every payment links to its Arc transaction, and each escrow seals the hashes of the agreed terms and of the delivery. The beancount ledger is in the owner's private books. | [`log.ts`](server/src/cfo/log.ts), [/api/cfo](https://hiresyncly.site/api/cfo) |
 
+## Syncly Pay: the agents run a business's own payments
+
+Syncly's CFO doesn't only run Syncly's money. [**Syncly Pay**](https://hiresyncly.site/pay) runs a customer business's invoices (money in) and supplier bills (money out):
+
+- **Invoices.** The business types *"Ada, 2 party trays at ₦25,000 each, due Friday"*; the Writer turns it into an invoice, the CFO books it on Arc, and the Messenger emails a pay link and chases it. The customer pays straight to the business's address (a Bybit Arc deposit address works, so it can be cashed out to naira).
+- **Bills.** The business uploads a photo of a supplier's invoice; the Analyst reads it, and the Investigator checks the payee before anything is booked: Circle's USDC blacklist, **a payout address that changed since the last bill** (the classic invoice fraud), duplicates, unusual amounts. The business approves, then pays from its wallet.
+- **[`InvoiceBook.sol`](contracts/src/InvoiceBook.sol)** fixes each invoice's payee, exact amount and document hash when it's booked, then lets it be paid once, straight from payer to payee: no wrong payee, no double pay, no phantom invoice, no rounding. Only the CFO's key can book, after the business confirms its email. 0.5% per paid invoice goes to SynclyVault. 14 tests.
+
 ## Try it (for judges)
 
 1. **Follow the money** on the home page ([/#money](https://hiresyncly.site/#money)): each stop has a live number from the running company.

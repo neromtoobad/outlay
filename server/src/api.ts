@@ -19,6 +19,7 @@ import { escrowConfig, refreshBondFree } from './escrow.ts';
 import { MODE as CFO_MODE, POLICY as CFO_POLICY, freshSnapshot, startTreasury, teamShortfall } from './cfo/treasury.ts';
 import { decisions as cfoDecisions, verifyLog } from './cfo/log.ts';
 import { tractionReport } from './traction.ts';
+import { approveBill, booksCsv, cancelDoc, confirmBusiness, createBill, createInvoice, desk, getDoc, payConfig, payTick, publicDoc, registerBusiness, syncPaid } from './pay.ts';
 import { books, beancount, team } from './books.ts';
 import { resolveSettlements } from './settle.ts';
 import { MAILER, MAIL_FROM, resend } from './mail.ts';
@@ -253,6 +254,45 @@ const site = (c: any) => {
 app.get('/s/:slug', site);
 app.get('/s/:slug/', site);
 app.get('/s/:slug/:file', site);
+
+// ---------------------------------------------------------------- Syncly Pay: a business's invoices and bills, booked on Arc
+const payHits = new Map<string, number[]>();
+const payAllowed = (c: any, max = 12) => {
+  const who = c.req.header('x-forwarded-for')?.split(',')[0].trim() || 'local', now = Date.now();
+  const hits = (payHits.get(who) ?? []).filter((t) => now - t < 3600_000);
+  if (hits.length >= max) return false;
+  payHits.set(who, [...hits, now]);
+  return true;
+};
+const fail = (c: any, e: any, code = 400) => c.json({ error: String(e?.message ?? e).split('\n')[0] }, code);
+app.get('/api/pay/config', (c) => c.json(payConfig()));
+app.post('/api/pay/invoices', async (c) => {
+  if (!payAllowed(c)) return c.json({ error: 'Too many invoices from here in the last hour. Try again later.' }, 429);
+  try { const r = await createInvoice(await c.req.json()); return c.json({ ...r, doc: publicDoc(r.doc) }); } catch (e) { return fail(c, e); }
+});
+app.get('/api/pay/invoices/:id', (c) => { const d = getDoc(c.req.param('id')); return d ? c.json(publicDoc(d)) : c.json({ error: 'No such invoice.' }, 404); });
+app.post('/api/pay/invoices/:id/sync', async (c) => {
+  const d = getDoc(c.req.param('id'));
+  if (!d) return c.json({ error: 'No such invoice.' }, 404);
+  const body = await c.req.json().catch(() => ({} as any));
+  try { await syncPaid(d, { tx: body.tx, demoPayer: DRY && body.demoPayer ? String(body.demoPayer) : undefined }); return c.json(publicDoc(getDoc(d.id)!)); } catch (e) { return fail(c, e); }
+});
+app.post('/api/pay/business', async (c) => {
+  if (!payAllowed(c, 6)) return c.json({ error: 'Too many requests from here in the last hour. Try again later.' }, 429);
+  try { return c.json(await registerBusiness(await c.req.json())); } catch (e) { return fail(c, e); }
+});
+app.post('/api/pay/confirm', async (c) => { const b = await c.req.json().catch(() => ({} as any)); try { return c.json(await confirmBusiness(String(b.b ?? ''), String(b.c ?? ''))); } catch (e) { return fail(c, e); } });
+app.get('/api/pay/desk/:token', (c) => { try { return c.json(desk(c.req.param('token'))); } catch (e) { return fail(c, e, 404); } });
+app.get('/api/pay/desk/:token/books.csv', (c) => {
+  try { c.header('content-type', 'text/csv; charset=utf-8'); c.header('content-disposition', 'attachment; filename="syncly-pay-books.csv"'); return c.body(booksCsv(c.req.param('token'))); } catch (e) { return fail(c, e, 404); }
+});
+app.post('/api/pay/bills', async (c) => {
+  if (!payAllowed(c, 20)) return c.json({ error: 'Too many bills from here in the last hour. Try again later.' }, 429);
+  try { return c.json(publicDoc(await createBill(await c.req.json()))); } catch (e) { return fail(c, e); }
+});
+app.post('/api/pay/bills/:id/approve', async (c) => { try { return c.json(publicDoc(await approveBill(c.req.param('id'), await c.req.json()))); } catch (e) { return fail(c, e); } });
+app.post('/api/pay/docs/:id/cancel', async (c) => { const b = await c.req.json().catch(() => ({} as any)); try { return c.json(publicDoc(cancelDoc(c.req.param('id'), String(b.token ?? '')))); } catch (e) { return fail(c, e); } });
+setInterval(() => void payTick(), 60_000);
 
 app.get('/api/books', async (c) => (isOwner(c) ? c.json(await books()) : c.json({ error: 'owner only' }, 401)));
 // What anyone can see: how much work the team has done, without any money figures.
