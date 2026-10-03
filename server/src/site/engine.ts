@@ -85,7 +85,12 @@ export function renderSite(plan: Plan, f: Facts, photos: Photo[], opts: { url: s
   const minPrice = f.items.map((i) => ({ i, v: priceValue(i.price) })).filter((x) => x.v).sort((a, b) => a.v! - b.v!)[0];
   const facts: string[] = [];
   if (f.hours) facts.push(`<li>${ICON.clock}<span><b data-open>Opening hours</b><small data-next>${esc(hoursLines(f.hours).slice(0, 1).map((l) => `${l.days} ${l.time}`).join(''))}</small></span></li>`);
-  if (f.area || f.city) facts.push(`<li>${ICON.pin}<span><b>${esc([f.area, f.city].filter(Boolean).join(', '))}</b><small>${esc(f.landmark ?? (f.delivery ? f.delivery.slice(0, 60) : 'Find us on the map'))}</small></span></li>`);
+  if (f.area || f.city) {
+    const where = [f.area, f.city].filter(Boolean).join(', ');
+    const same = (x?: string) => !!x && x.toLowerCase().replace(/[^a-z0-9]/g, '') === where.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const sub = [f.landmark, f.delivery?.slice(0, 60)].find((x) => x && !same(x)) ?? 'Find us on the map';
+    facts.push(`<li>${ICON.pin}<span><b>${esc(where)}</b><small>${esc(sub)}</small></span></li>`);
+  }
   if (f.rating && f.ratingCount) facts.push(`<li>${ICON.star}<span><b>${f.rating.toFixed(1)} on Google</b><small>${f.ratingCount} review${f.ratingCount === 1 ? '' : 's'}</small></span></li>`);
   if (minPrice) facts.push(`<li>${ICON.tag}<span><b>From ${esc(showPrice(minPrice.i.price!, f.country).replace(/^from /, ''))}</b><small>${esc(minPrice.i.name)}</small></span></li>`);
 
